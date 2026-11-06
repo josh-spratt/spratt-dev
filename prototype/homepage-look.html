@@ -238,6 +238,21 @@
   #L li:hover { background: linear-gradient(180deg,#6fb3ff,#2f7de0); color: #fff; } #L li:hover a { color: #fff; }
   #L .status { display: flex; justify-content: space-between; font: 11px Verdana, Tahoma, sans-serif; color: #4a586d; padding: 0 14px 8px; }
 
+  /* L, round 6 (chosen): bigger window filling most of the screen; full-bleed on phones; chrome kept as decoration; light only. */
+  #L { padding: clamp(1rem, 3vw, 2.5rem); display: block; }
+  body[data-v="L"] #L { display: flex; }
+  #L .win { max-width: 76rem; width: 100%; margin: 0 auto; min-height: calc(100vh - 2 * clamp(1rem, 3vw, 2.5rem)); display: flex; flex-direction: column; }
+  #L .body { flex: 1; padding: clamp(1.5rem, 5vw, 4rem); }
+  #L .body > * { max-width: 46rem; }
+  #L h1 { font-size: clamp(2.4rem, 6vw, 3.75rem); }
+  #L .role { font-size: 1.1rem; }
+  #L .body > p { font-size: 1.1rem; line-height: 1.55; }
+  #L .pill { font-size: 14px; padding: .5rem 1.3rem; }
+  #L .group { margin-top: 2rem; padding: 1rem 1.25rem; }
+  #L .group h2 { font-size: .8rem; }
+  #L li { padding: .5rem .5rem; font-size: 1rem; }
+  @media (max-width: 600px) { #L { padding: 0; } #L .win { border-radius: 0; border: 0; min-height: 100vh; } #L .body { margin: 0; border-radius: 0; border-left: 0; border-right: 0; } }
+
   /* M: I's grey bevel desktop, K's chrome name and glossy pill buttons */
   #M { background: #008080; padding: 3rem 1rem 8rem; }
   #M .win { max-width: 42rem; margin: 0 auto; background: #c0c0c0; color: #000; padding: 3px; border: 2px solid; border-color: #fff #404040 #404040 #fff; box-shadow: 1px 1px 0 #000; }
@@ -625,7 +640,8 @@
   // Round 3: F kept as the anchor; four late-90s/early-00s takes on it.
   // Round 4: I and K kept; two hybrids between them.
   // Round 5: N (L tightened) first, then the round-4 set for comparison.
-  const names = { N: "L tightened", L: "Glossy window (I + K)", I: "Desktop window", M: "Bevel desktop, chrome details (I + K)", K: "Y2K chrome" };
+  // Round 6: L chosen, now as a big window. N kept for comparison.
+  const names = { L: "Glossy window, big (chosen)", N: "L tightened (comparison)" };
   const keys = Object.keys(names);
   const b = document.body;
   const params = new URLSearchParams(location.search);
