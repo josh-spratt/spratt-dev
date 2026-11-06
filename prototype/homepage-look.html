@@ -91,6 +91,52 @@
   #D .row.small h3 { font-size: 1.35rem; }
   #D footer { padding: 4rem clamp(1.25rem, 5vw, 4rem) 8rem; color: var(--muted); }
 
+  /* ===== Round 2: between A (plain document) and C (terminal) ===== */
+  body[data-v="E"] #E, body[data-v="F"] #F, body[data-v="G"] #G { display: block; }
+  .r2 main { max-width: 36rem; margin: 0 auto; padding: 5rem 1.25rem 8rem; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+  /* E: serif body, mono for structure (name, labels, tags, dates) */
+  #E { font-family: Charter, "Iowan Old Style", Georgia, serif; font-size: 19px; line-height: 1.6; }
+  #E h1 { font: 600 1.05rem/1.3 ui-monospace, "SF Mono", Menlo, monospace; margin: 0; }
+  #E .role { font: .85rem ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); margin: .2rem 0 1.5rem; }
+  #E .links { font: .85rem ui-monospace, "SF Mono", Menlo, monospace; }
+  #E .links a { color: var(--accent); margin-right: 1.25rem; text-underline-offset: 3px; }
+  #E h2 { font: .8rem ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); margin: 3rem 0 1rem; font-weight: normal; }
+  #E .item { margin-bottom: 1.25rem; }
+  #E .item a { color: var(--accent); font-weight: 600; }
+  #E .item .tags, #E .item time { font: .75rem ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); margin-left: .5rem; }
+  #E .item p { margin: 0; }
+
+  /* F: all mono, document structure, no terminal gimmicks */
+  #F { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 15px; line-height: 1.75; }
+  #F h1 { font-size: 1rem; margin: 0; }
+  #F .role { color: var(--muted); margin: 0 0 1.5rem; }
+  #F p { margin: 0 0 1.5rem; }
+  #F .links a { color: var(--accent); margin-right: 1.5rem; text-underline-offset: 3px; }
+  #F h2 { font-size: 1rem; font-weight: normal; color: var(--muted); margin: 3rem 0 .75rem; }
+  #F ul { list-style: none; padding: 0; margin: 0; }
+  #F li { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; padding: .35rem 0; }
+  #F li a { color: var(--accent); }
+  #F li .d { color: var(--muted); }
+  @media (max-width: 600px) { #F li { grid-template-columns: 1fr; gap: 0; padding: .5rem 0; } }
+
+  /* G: sans body, markdown-source flavour (visible # markers), mono metadata */
+  #G { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 17px; line-height: 1.6; }
+  #G h1, #G h2 { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }
+  #G h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  #G h2 { font-size: .95rem; margin: 2.75rem 0 .75rem; }
+  #G h1::before { content: "# "; color: var(--muted); font-weight: normal; }
+  #G h2::before { content: "## "; color: var(--muted); font-weight: normal; }
+  #G .role { color: var(--muted); margin: 0 0 1.25rem; }
+  #G .links a { color: var(--accent); margin-right: 1.25rem; }
+  #G ul { padding: 0; margin: 0; list-style: none; }
+  #G li { padding: .3rem 0; }
+  #G li::before { content: "- "; font-family: ui-monospace, monospace; color: var(--muted); }
+  #G li a { color: var(--accent); font-weight: 500; }
+  #G li .tags, #G li time { font: .75rem ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); }
+  #G hr { border: 0; border-top: 1px dashed var(--line); margin: 3rem 0 0; }
+
   /* ---------- prototype switcher (not part of any design) ---------- */
   #proto { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 99; display: flex; align-items: center; gap: .25rem;
     background: #ff3e8a; color: #fff; font: 600 13px/1 system-ui, sans-serif; padding: .35rem; border-radius: 99px; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
@@ -196,6 +242,65 @@
   <footer>© Josh Spratt</footer>
 </div>
 
+<!-- E: Serif + mono structure -->
+<div class="variant r2" id="E"><main>
+  <h1>Josh Spratt</h1>
+  <p class="role">software engineer</p>
+  <p>Placeholder bio, two or three sentences. I build data-heavy tools and small web things, and I care about software that's simple to run and pleasant to use. Currently interested in databases and games.</p>
+  <p class="links"><a href="#">github</a><a href="#">linkedin</a><a href="#">hello@jspratt.dev</a></p>
+  <h2>projects</h2>
+  <div class="item"><a href="#">games.jspratt.dev</a><span class="tags">ts · canvas</span><p>Small browser games, built for fun.</p></div>
+  <div class="item"><a href="#">marinaraDB</a><span class="tags">rust</span><p>A toy database written to learn how storage engines work.</p></div>
+  <div class="writing">
+    <h2>recent writing</h2>
+    <div class="item"><a href="#">What I learned writing a B-tree</a><time>2027-02</time></div>
+    <div class="item"><a href="#">Shipping a tiny site on Cloudflare</a><time>2027-01</time></div>
+    <div class="item"><a href="#">all writing →</a></div>
+  </div>
+</main></div>
+
+<!-- F: All mono, plain document -->
+<div class="variant r2" id="F"><main>
+  <h1>Josh Spratt</h1>
+  <p class="role">Software engineer</p>
+  <p>Placeholder bio, two or three sentences. I build data-heavy tools and small web things, and I care about software that's simple to run and pleasant to use.</p>
+  <p class="links"><a href="#">GitHub</a><a href="#">LinkedIn</a><a href="#">hello@jspratt.dev</a></p>
+  <h2>Projects</h2>
+  <ul>
+    <li><a href="#">games.jspratt.dev</a><span>Small browser games, built for fun. <span class="d">ts, canvas</span></span></li>
+    <li><a href="#">marinaraDB</a><span>A toy database written to learn how storage engines work. <span class="d">rust</span></span></li>
+  </ul>
+  <div class="writing">
+    <h2>Writing</h2>
+    <ul>
+      <li><span class="d">2027-02-14</span><a href="#">What I learned writing a B-tree</a></li>
+      <li><span class="d">2027-01-08</span><a href="#">Shipping a tiny site on Cloudflare</a></li>
+      <li><span class="d"></span><a href="#">All writing →</a></li>
+    </ul>
+  </div>
+</main></div>
+
+<!-- G: Markdown-source flavour -->
+<div class="variant r2" id="G"><main>
+  <h1>Josh Spratt</h1>
+  <p class="role">Software engineer</p>
+  <p>Placeholder bio, two or three sentences. I build data-heavy tools and small web things, and I care about software that's simple to run and pleasant to use.</p>
+  <p class="links"><a href="#">GitHub</a><a href="#">LinkedIn</a><a href="#">hello@jspratt.dev</a></p>
+  <h2>Projects</h2>
+  <ul>
+    <li><a href="#">games.jspratt.dev</a>: Small browser games, built for fun. <span class="tags">ts canvas</span></li>
+    <li><a href="#">marinaraDB</a>: A toy database written to learn how storage engines work. <span class="tags">rust</span></li>
+  </ul>
+  <div class="writing">
+    <h2>Recent writing</h2>
+    <ul>
+      <li><time>2027-02</time> <a href="#">What I learned writing a B-tree</a></li>
+      <li><time>2027-01</time> <a href="#">Shipping a tiny site on Cloudflare</a></li>
+    </ul>
+  </div>
+  <hr>
+</main></div>
+
 <div id="proto">
   <button id="prev" title="Previous (←)">←</button>
   <span class="label" id="label"></span>
@@ -205,7 +310,8 @@
 </div>
 
 <script>
-  const names = { A: "Plain document", B: "Split, sticky intro", C: "Terminal", D: "Big type" };
+  // Round 2: B and D dropped from the cycle; A and C kept as the two anchors.
+  const names = { A: "Plain document (anchor)", E: "Serif + mono structure", F: "All mono, no prompts", G: "Markdown source", C: "Terminal (anchor)" };
   const keys = Object.keys(names);
   const b = document.body;
   const params = new URLSearchParams(location.search);
