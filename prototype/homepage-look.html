@@ -286,7 +286,19 @@
   #N .row .chev { color: #9aa5b5; font-size: 1.4rem; line-height: 1; }
   #N .row:active { background: linear-gradient(180deg,#3a8df0,#1a5fc8); color: #fff; }
   #N .row:active small, #N .row:active .chev { color: #fff; }
-  @media (max-width: 600px) { #N { padding: 0; } #N .win { border-radius: 0; border: 0; min-height: 100vh; } }
+  /* Round 5b: fill the screen. No floating window: full-bleed sticky bar, full-page background, wider column, bigger type. */
+  #N { padding: 0; background: linear-gradient(180deg,#eef2f7,#dfe6ef 60%,#d3dce8) fixed; }
+  #N .win { max-width: none; border: 0; border-radius: 0; box-shadow: none; background: transparent; min-height: 100vh; overflow: visible; }
+  #N .bar { position: sticky; top: 0; z-index: 5; height: 52px; font-size: 17px; box-shadow: 0 1px 6px rgba(20,40,80,.25); }
+  #N .body { max-width: 46rem; margin: 0 auto; padding: clamp(2.5rem, 7vh, 5rem) 1.25rem 6rem; }
+  #N h1 { font-size: clamp(2.4rem, 6vw, 3.75rem); }
+  #N .role { font-size: 1.15rem; }
+  #N .bio { font-size: 1.1rem; max-width: 38rem; }
+  #N .pill { font-size: 15px; padding: .6rem 1.4rem; }
+  #N h2 { font-size: 16px; margin-top: 2.75rem; }
+  #N .row { padding: 1rem 1.25rem; }
+  #N .row b { font-size: 17px; }
+  #N .row small { font-size: 15px; }
 
   /* ---------- prototype switcher (not part of any design) ---------- */
   #proto { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 99; display: flex; align-items: center; gap: .25rem;
