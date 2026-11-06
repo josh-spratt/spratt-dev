@@ -1,0 +1,235 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Never merge to main.
+  Question (map ticket "What should the homepage look like?"): what visual direction for the Homepage?
+  Plan: four structurally different variants of the Homepage, switchable via ?variant=A|B|C|D,
+  with a floating bar: ←/→ cycle variants, T toggles light/dark, W shows the future Recent writing block.
+  All copy is placeholder; final copy is written during the build.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Josh Spratt (prototype)</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  a { color: inherit; }
+  .variant { display: none; min-height: 100vh; }
+  body[data-v="A"] #A, body[data-v="B"] #B, body[data-v="C"] #C, body[data-v="D"] #D { display: block; }
+  body:not([data-writing="on"]) .writing { display: none; }
+
+  /* theme tokens: per variant, light + dark */
+  body { --bg:#fff; --fg:#111; --muted:#666; --line:#e4e4e4; --accent:#1a56db; background: var(--bg); color: var(--fg); }
+  body[data-theme="dark"] { --bg:#111; --fg:#eee; --muted:#999; --line:#2a2a2a; --accent:#7aa2ff; }
+
+  /* ---------- A: Plain document ---------- */
+  #A { font-family: Charter, "Iowan Old Style", Georgia, serif; font-size: 19px; line-height: 1.6; }
+  #A main { max-width: 34rem; margin: 0 auto; padding: 5rem 1.25rem 8rem; }
+  #A h1 { font-size: 1.6rem; margin: 0 0 .25rem; font-weight: 600; }
+  #A .role { color: var(--muted); margin: 0 0 1.5rem; font-style: italic; }
+  #A .links a { color: var(--accent); text-underline-offset: 3px; }
+  #A h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 3rem 0 1rem; }
+  #A dl { margin: 0; }
+  #A dt a { color: var(--accent); font-weight: 600; }
+  #A dd { margin: 0 0 1.25rem; }
+  #A .tags { color: var(--muted); font-size: .85em; }
+
+  /* ---------- B: Split, sticky intro ---------- */
+  #B { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #B .wrap { display: grid; grid-template-columns: minmax(18rem, 2fr) 3fr; gap: 4rem; max-width: 70rem; margin: 0 auto; padding: 0 2rem; }
+  #B aside { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+  #B h1 { font-size: 3rem; line-height: 1; margin: 0 0 .75rem; letter-spacing: -.03em; }
+  #B .role { font-size: 1.15rem; margin: 0 0 1rem; font-weight: 500; }
+  #B .bio { color: var(--muted); line-height: 1.6; max-width: 26rem; }
+  #B .links { display: flex; flex-direction: column; gap: .5rem; margin-top: 2rem; }
+  #B .links a { text-decoration: none; font-weight: 500; }
+  #B .links a::before { content: "→ "; color: var(--accent); }
+  #B section { padding: 6rem 0 2rem; }
+  #B h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 1.5rem; }
+  #B .card { display: block; text-decoration: none; padding: 1.5rem; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 1rem; transition: border-color .15s, transform .15s; }
+  #B .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  #B .card h3 { margin: 0 0 .35rem; font-size: 1.15rem; }
+  #B .card p { margin: 0; color: var(--muted); line-height: 1.5; }
+  #B .chips { margin-top: .9rem; display: flex; gap: .4rem; flex-wrap: wrap; }
+  #B .chips span { font-size: .75rem; padding: .15rem .55rem; border-radius: 99px; background: var(--line); }
+  #B .post { display: flex; justify-content: space-between; padding: .9rem 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+  #B .post time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 760px) { #B .wrap { grid-template-columns: 1fr; gap: 0; } #B aside { position: static; height: auto; padding-top: 4rem; } #B section { padding-top: 3rem; } }
+
+  /* ---------- C: Terminal / mono ---------- */
+  #C { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 15px; line-height: 1.7; }
+  #C main { max-width: 46rem; margin: 0 auto; padding: 4rem 1.25rem 8rem; }
+  #C .prompt { color: var(--muted); }
+  #C .prompt b { color: var(--accent); font-weight: normal; }
+  #C h1 { font-size: 1.5rem; margin: .25rem 0 0; }
+  #C p { margin: .25rem 0 1.5rem; }
+  #C .links a { color: var(--accent); margin-right: 1.5rem; text-decoration: none; }
+  #C .links a:hover { text-decoration: underline; }
+  #C table { width: 100%; border-collapse: collapse; margin: .5rem 0 2rem; }
+  #C td { padding: .5rem 1rem .5rem 0; border-top: 1px dashed var(--line); vertical-align: top; }
+  #C td:first-child a { color: var(--accent); white-space: nowrap; }
+  #C td.t { color: var(--muted); white-space: nowrap; text-align: right; }
+  @media (max-width: 600px) { #C td.t { display: none; } }
+
+  /* ---------- D: Big type, editorial ---------- */
+  #D { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  #D header { min-height: 92vh; display: flex; flex-direction: column; justify-content: flex-end; padding: 2rem clamp(1.25rem, 5vw, 4rem) 3rem; border-bottom: 1px solid var(--fg); }
+  #D h1 { font-size: clamp(4rem, 15vw, 13rem); line-height: .85; letter-spacing: -.05em; margin: 0; font-weight: 800; }
+  #D .under { display: flex; justify-content: space-between; align-items: flex-end; gap: 2rem; margin-top: 2rem; flex-wrap: wrap; }
+  #D .under p { max-width: 30rem; font-size: 1.15rem; line-height: 1.5; margin: 0; }
+  #D .under p b { display: block; margin-bottom: .5rem; }
+  #D .links { display: flex; gap: 1.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: .9rem; }
+  #D section { padding: 0 clamp(1.25rem, 5vw, 4rem); }
+  #D h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .15em; margin: 3rem 0 0; }
+  #D .row { display: grid; grid-template-columns: 4rem 1fr auto; align-items: baseline; gap: 1rem; padding: 1.75rem 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+  #D .row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #D .row h3 { font-size: clamp(1.75rem, 4vw, 3rem); margin: 0; letter-spacing: -.03em; font-weight: 700; }
+  #D .row p { margin: .4rem 0 0; color: var(--muted); }
+  #D .row .arr { font-size: 2rem; transition: transform .2s; }
+  #D .row:hover .arr { transform: translateX(8px); }
+  #D .row.small h3 { font-size: 1.35rem; }
+  #D footer { padding: 4rem clamp(1.25rem, 5vw, 4rem) 8rem; color: var(--muted); }
+
+  /* ---------- prototype switcher (not part of any design) ---------- */
+  #proto { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 99; display: flex; align-items: center; gap: .25rem;
+    background: #ff3e8a; color: #fff; font: 600 13px/1 system-ui, sans-serif; padding: .35rem; border-radius: 99px; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+  #proto button { all: unset; cursor: pointer; padding: .5rem .75rem; border-radius: 99px; }
+  #proto button:hover { background: rgba(0,0,0,.18); }
+  #proto .label { padding: 0 .5rem; min-width: 12rem; text-align: center; }
+</style>
+</head>
+<body data-v="A" data-theme="light">
+
+<!-- A: Plain document -->
+<div class="variant" id="A"><main>
+  <h1>Josh Spratt</h1>
+  <p class="role">Software engineer</p>
+  <p>Placeholder bio, two or three sentences. I build data-heavy tools and small web things, and I care about software that's simple to run and pleasant to use. Currently interested in databases and games.</p>
+  <p class="links"><a href="#">GitHub</a> · <a href="#">LinkedIn</a> · <a href="#">hello@jspratt.dev</a></p>
+
+  <h2>Projects</h2>
+  <dl>
+    <dt><a href="#">games.jspratt.dev</a></dt>
+    <dd>Small browser games, built for fun. <span class="tags">TypeScript, Canvas</span></dd>
+    <dt><a href="#">marinaraDB</a></dt>
+    <dd>A toy database written to learn how storage engines work. <span class="tags">Rust</span></dd>
+  </dl>
+
+  <div class="writing">
+    <h2>Recent writing</h2>
+    <dl>
+      <dt><a href="#">What I learned writing a B-tree</a></dt><dd class="tags">Feb 2027</dd>
+      <dt><a href="#">Shipping a tiny site on Cloudflare</a></dt><dd class="tags">Jan 2027</dd>
+    </dl>
+    <p><a href="#" style="color:var(--accent)">All writing →</a></p>
+  </div>
+</main></div>
+
+<!-- B: Split, sticky intro -->
+<div class="variant" id="B"><div class="wrap">
+  <aside>
+    <h1>Josh<br>Spratt</h1>
+    <p class="role">Software engineer</p>
+    <p class="bio">Placeholder bio, two or three sentences. I build data-heavy tools and small web things, and I care about software that's simple to run and pleasant to use.</p>
+    <nav class="links"><a href="#">GitHub</a><a href="#">LinkedIn</a><a href="#">hello@jspratt.dev</a></nav>
+  </aside>
+  <div>
+    <section>
+      <h2>Projects</h2>
+      <a class="card" href="#"><h3>games.jspratt.dev ↗</h3><p>Small browser games, built for fun.</p><div class="chips"><span>TypeScript</span><span>Canvas</span></div></a>
+      <a class="card" href="#"><h3>marinaraDB ↗</h3><p>A toy database written to learn how storage engines work.</p><div class="chips"><span>Rust</span></div></a>
+    </section>
+    <section class="writing">
+      <h2>Recent writing</h2>
+      <a class="post" href="#"><span>What I learned writing a B-tree</span><time>2027-02</time></a>
+      <a class="post" href="#"><span>Shipping a tiny site on Cloudflare</span><time>2027-01</time></a>
+      <a class="post" href="#"><span>All writing →</span><time></time></a>
+    </section>
+  </div>
+</div></div>
+
+<!-- C: Terminal / mono -->
+<div class="variant" id="C"><main>
+  <div class="prompt"><b>~</b> $ whoami</div>
+  <h1>Josh Spratt</h1>
+  <p>software engineer</p>
+  <div class="prompt"><b>~</b> $ cat about.txt</div>
+  <p>Placeholder bio, two or three sentences. I build data-heavy tools and small web things, and I care about software that's simple to run and pleasant to use.</p>
+  <div class="prompt"><b>~</b> $ ls links/</div>
+  <p class="links"><a href="#">github</a><a href="#">linkedin</a><a href="#">hello@jspratt.dev</a></p>
+  <div class="prompt"><b>~</b> $ ls projects/</div>
+  <table>
+    <tr><td><a href="#">games.jspratt.dev</a></td><td>Small browser games, built for fun.</td><td class="t">ts canvas</td></tr>
+    <tr><td><a href="#">marinaraDB</a></td><td>A toy database written to learn how storage engines work.</td><td class="t">rust</td></tr>
+  </table>
+  <div class="writing">
+    <div class="prompt"><b>~</b> $ ls -t writing/ | head -3</div>
+    <table>
+      <tr><td class="t" style="text-align:left">2027-02</td><td><a href="#" style="color:var(--accent)">What I learned writing a B-tree</a></td></tr>
+      <tr><td class="t" style="text-align:left">2027-01</td><td><a href="#" style="color:var(--accent)">Shipping a tiny site on Cloudflare</a></td></tr>
+    </table>
+  </div>
+  <div class="prompt"><b>~</b> $ <span style="animation: blink 1s steps(1) infinite">▍</span></div>
+  <style>@keyframes blink { 50% { opacity: 0 } }</style>
+</main></div>
+
+<!-- D: Big type, editorial -->
+<div class="variant" id="D">
+  <header>
+    <h1>Josh<br>Spratt</h1>
+    <div class="under">
+      <p><b>Software engineer.</b>Placeholder bio, two or three sentences. I build data-heavy tools and small web things, and I care about software that's simple to run.</p>
+      <nav class="links"><a href="#">GitHub</a><a href="#">LinkedIn</a><a href="#">Email</a></nav>
+    </div>
+  </header>
+  <section>
+    <h2>Projects</h2>
+    <a class="row" href="#"><span class="n">01</span><div><h3>games.jspratt.dev</h3><p>Small browser games, built for fun. · TypeScript, Canvas</p></div><span class="arr">→</span></a>
+    <a class="row" href="#"><span class="n">02</span><div><h3>marinaraDB</h3><p>A toy database written to learn how storage engines work. · Rust</p></div><span class="arr">→</span></a>
+  </section>
+  <section class="writing">
+    <h2>Recent writing</h2>
+    <a class="row small" href="#"><span class="n">Feb</span><div><h3>What I learned writing a B-tree</h3></div><span class="arr">→</span></a>
+    <a class="row small" href="#"><span class="n">Jan</span><div><h3>Shipping a tiny site on Cloudflare</h3></div><span class="arr">→</span></a>
+  </section>
+  <footer>© Josh Spratt</footer>
+</div>
+
+<div id="proto">
+  <button id="prev" title="Previous (←)">←</button>
+  <span class="label" id="label"></span>
+  <button id="next" title="Next (→)">→</button>
+  <button id="theme" title="Toggle light/dark (T)">◐</button>
+  <button id="writing" title="Toggle future Recent writing block (W)">W</button>
+</div>
+
+<script>
+  const names = { A: "Plain document", B: "Split, sticky intro", C: "Terminal", D: "Big type" };
+  const keys = Object.keys(names);
+  const b = document.body;
+  const params = new URLSearchParams(location.search);
+  const set = (k, v) => { params.set(k, v); history.replaceState(null, "", "?" + params); };
+  function render() {
+    const v = keys.includes(params.get("variant")) ? params.get("variant") : "A";
+    b.dataset.v = v;
+    b.dataset.theme = params.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    b.dataset.writing = params.get("writing") || "off";
+    document.getElementById("label").textContent = `${v} (${names[v]}) · ${b.dataset.theme}${b.dataset.writing === "on" ? " · +writing" : ""}`;
+  }
+  const step = d => { const i = keys.indexOf(b.dataset.v); set("variant", keys[(i + d + keys.length) % keys.length]); render(); window.scrollTo(0, 0); };
+  const toggleTheme = () => { set("theme", b.dataset.theme === "dark" ? "light" : "dark"); render(); };
+  const toggleWriting = () => { set("writing", b.dataset.writing === "on" ? "off" : "on"); render(); };
+  prev.onclick = () => step(-1); next.onclick = () => step(1);
+  theme.onclick = toggleTheme; writing.onclick = toggleWriting;
+  addEventListener("keydown", e => {
+    if (e.target.closest("input, textarea, [contenteditable]")) return;
+    if (e.key === "ArrowLeft") step(-1);
+    else if (e.key === "ArrowRight") step(1);
+    else if (e.key.toLowerCase() === "t") toggleTheme();
+    else if (e.key.toLowerCase() === "w") toggleWriting();
+  });
+  render();
+</script>
+</body>
+</html>
