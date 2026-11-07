@@ -8,7 +8,7 @@ Steps that happen outside the repo, in the Cloudflare dashboard or GitHub. Tick 
   - Worker name: `spratt-dev` (must match `name` in `wrangler.jsonc`, or builds fail)
   - Build command: `npm run build`
   - Deploy command: `npx wrangler deploy`
-  - Non-production branch deploy command: `npx wrangler versions upload`
+  - Non-production branch deploy command: `npx wrangler preview` (the dashboard default; changing it to `npx wrangler versions upload` didn't take effect). It's an open-beta command and needs the `previews` block in `wrangler.jsonc`.
   - Production branch: `main`
   - Turn on builds for non-production branches, so every other branch (Dependabot's included) gets a preview URL posted on its PR.
 - [x] Merge to `main` and confirm the Homepage is live at `https://jspratt.dev`.
