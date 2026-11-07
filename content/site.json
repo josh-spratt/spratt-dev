@@ -1,1 +1,10 @@
-{ "name": "Josh Spratt" }
+{
+  "name": "Josh Spratt",
+  "role": "Engineer",
+  "bio": "I love building things and solving hard problems. My faith in Jesus is core to who I am, and my wife and kids are the most important part of my life. This is where I keep my work.",
+  "links": {
+    "github": "https://github.com/josh-spratt",
+    "linkedin": "https://www.linkedin.com/in/TODO-replace-me/",
+    "email": "josh@jspratt.dev"
+  }
+}

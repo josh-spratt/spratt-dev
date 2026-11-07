@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Fixture Alpha",
+    "description": "First fixture project.",
+    "url": "https://example.com/alpha",
+    "tags": ["Rust", "SQL"]
+  },
+  {
+    "title": "Fixture Beta",
+    "description": "Second fixture project, no tags.",
+    "url": "https://example.com/beta"
+  }
+]
