@@ -1,0 +1,14 @@
+{
+  // Assets-only Worker: no Worker script, just the static build output.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "spratt-dev",
+  "compatibility_date": "2026-11-01",
+  // Production lives on the apex Custom Domain only; branch previews keep their URLs.
+  // Set here because `wrangler deploy` re-applies these on every deploy.
+  "workers_dev": false,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}
