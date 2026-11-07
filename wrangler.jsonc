@@ -7,6 +7,9 @@
   // Set here because `wrangler deploy` re-applies these on every deploy.
   "workers_dev": false,
   "preview_urls": true,
+  // Workers Builds runs `wrangler preview` (open beta) on non-main branches,
+  // which refuses to run without this block. Empty means "inherit everything".
+  "previews": {},
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page"
