@@ -11,6 +11,9 @@ npm install
 npm run dev     # local dev server
 npm run check   # astro check (type-check)
 npm run build   # static output in dist/
+npm test        # builds the site and asserts on the output (CONTENT_DIR, BUILD_MODE tweak the build)
+npm run check:links  # internal link check on dist/
+npm run lhci    # Lighthouse CI on dist/ (build first)
 ```
 
 ## Deploy
