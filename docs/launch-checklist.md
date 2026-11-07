@@ -13,8 +13,8 @@ Steps that happen outside the repo, in the Cloudflare dashboard or GitHub. Tick 
   - Turn on builds for non-production branches, so every other branch (Dependabot's included) gets a preview URL posted on its PR.
 - [x] Merge to `main` and confirm the Homepage is live at `https://jspratt.dev`.
   - Result (2026-11-07): `https://jspratt.dev/` returns 200 with the built Homepage. A missing path returns 404.
-- [ ] Open a PR from another branch and confirm a public preview URL is posted on it.
-  - Result: _not checked yet_. On 2026-11-07 the Worker's Domains tab showed the Preview URL toggle off, even though `wrangler.jsonc` sets `preview_urls: true`. If no preview URL appears, see the `workers.dev` item below.
+- [x] Open a PR from another branch and confirm a public preview URL is posted on it.
+  - Result (2026-11-07, PR #21): Cloudflare posted two preview URLs on the PR. One is per branch (`<branch>-spratt-dev.jaspratt42.workers.dev`) and one is per version (`<id>-spratt-dev.jaspratt42.workers.dev`). Both return 200 with the Homepage.
 
 ## Domain (#11)
 
@@ -26,7 +26,7 @@ Steps that happen outside the repo, in the Cloudflare dashboard or GitHub. Tick 
 - [x] Check: `curl -sI 'https://www.jspratt.dev/some/path?q=1'` returns `301` with `location: https://jspratt.dev/some/path?q=1`.
   - Result (2026-11-07): passes.
 - [x] The production `workers.dev` URL is turned off in `wrangler.jsonc` (`workers_dev: false`, `preview_urls: true`), so each deploy re-applies it and there's no dashboard toggle to set.
-  - Result (2026-11-07): `spratt-dev.jaspratt42.workers.dev` returns 404. Whether branch preview URLs still work is checked in the preview item above. If previews break, set `workers_dev` to `true` and rely on the canonical link.
+  - Result (2026-11-07): `spratt-dev.jaspratt42.workers.dev` returns 404, and branch preview URLs still work with it off.
 
 ## Zone settings
 
