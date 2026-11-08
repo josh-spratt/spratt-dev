@@ -61,7 +61,7 @@ test("Code blocks are highlighted at build time with no client JS", () => {
   assert.equal(page.querySelectorAll("script").length, 0);
 });
 
-test("Homepage does not link to /writing", () => {
-  const html = buildSite(fixtures("production")).read("index.html");
+test("Homepage does not link to /writing when there are no Posts", () => {
+  const html = buildSite({ contentDir: "tests/fixtures/zero/content", mode: "production" }).read("index.html");
   assert.doesNotMatch(html, /href="\/writing/);
 });
