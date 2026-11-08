@@ -1,0 +1,35 @@
+---
+import "../styles/global.css";
+interface Props {
+  title: string;
+  description?: string;
+  status?: string;
+}
+const { title, description, status = "Done" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+  </head>
+  <body>
+    <div class="desktop">
+      <div class="window">
+        <div class="title-bar" data-chrome="title" aria-hidden="true">
+          <span class="buttons">
+            <i data-button="close"></i><i data-button="minimize"></i><i data-button="zoom"></i>
+          </span>
+          {title}
+        </div>
+        <main class="content"><slot /></main>
+        <div class="status-bar" data-chrome="status" aria-hidden="true">
+          <span>{status}</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
