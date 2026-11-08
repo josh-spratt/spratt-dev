@@ -1,0 +1,62 @@
+---
+import Head from "../components/Head.astro";
+import { site } from "../lib/site";
+
+interface Props {
+  /** Full document title, e.g. "Writing — Josh Spratt". */
+  title: string;
+  description?: string;
+  type?: "website" | "article";
+  noindex?: boolean;
+  /** The Homepage: the name is the page's h1 instead of a link home. */
+  home?: boolean;
+  /** Text on the LCD readout above the screen. */
+  readout?: string;
+}
+
+const { title, description, type, noindex, home = false, readout = "Done" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <Head title={title} description={description} type={type} noindex={noindex} />
+  </head>
+  <body>
+    <div class="frame">
+      <!-- Source order is name, Links, screen, so the Links tab before the screen's rows.
+           Flex order puts the name and Links under the screen on desktop. -->
+      <div class="handheld" data-handheld>
+        {
+          home ? (
+            <h1 class="name" data-name>{site.name}</h1>
+          ) : (
+            <a class="name" data-name href="/">{site.name}</a>
+          )
+        }
+        <div class="controls">
+          <span class="dpad" data-chrome aria-hidden="true"></span>
+          <nav class="buttons" aria-label="Links">
+            <a href={site.links.github}><i></i><span>GitHub</span></a>
+            <a href={site.links.linkedin}><i></i><span>LinkedIn</span></a>
+            <a href={`mailto:${site.links.email}`}><i></i><span>Email</span></a>
+          </nav>
+        </div>
+        <div class="power" data-chrome aria-hidden="true">
+          <span class="switch">OFF <b></b> ON</span>
+        </div>
+        <div class="bezel">
+          <div class="bezel-top" data-chrome aria-hidden="true">
+            <span class="readout"><i class="led"></i><small>POWER</small></span>
+            <span class="lcd">{readout}</span>
+          </div>
+          <main class="screen"><slot /></main>
+        </div>
+        <div class="base" data-chrome aria-hidden="true">
+          <span class="pills"><b></b><b></b></span>
+          <span class="speaker"></span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

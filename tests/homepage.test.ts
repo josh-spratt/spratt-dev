@@ -18,11 +18,12 @@ test("Homepage builds from the real content by default", () => {
 const fixtures = { contentDir: "tests/fixtures/content", mode: "production" } as const;
 
 test("Intro shows the role line, bio and Links including a mailto", () => {
-  const intro = buildSite(fixtures).html("index.html").querySelector("header");
-  assert.ok(intro);
-  assert.match(intro.text, /Fixture role line/);
-  assert.match(intro.text, /Fixture bio sentence one/);
-  const hrefs = intro.querySelectorAll("a").map((a) => a.getAttribute("href"));
+  const html = buildSite(fixtures).html("index.html");
+  const screen = html.querySelector("main");
+  assert.ok(screen);
+  assert.match(screen.text, /Fixture role line/);
+  assert.match(screen.text, /Fixture bio sentence one/);
+  const hrefs = html.querySelectorAll('nav[aria-label="Links"] a').map((a) => a.getAttribute("href"));
   assert.deepEqual(hrefs, [
     "https://github.com/fixture",
     "https://www.linkedin.com/in/fixture",

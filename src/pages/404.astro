@@ -1,30 +1,12 @@
 ---
 import { site } from "../lib/site";
-import Head from "../components/Head.astro";
+import Handheld from "../layouts/Handheld.astro";
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <Head title={`Not found — ${site.name}`} noindex />
-  </head>
-  <body>
-    <div class="desktop desktop-centered">
-      <div class="window dialog">
-        <div class="title-bar" data-chrome="title" aria-hidden="true">
-          <span class="buttons">
-            <i data-button="close"></i><i data-button="minimize"></i><i data-button="zoom"></i>
-          </span>
-          Error
-        </div>
-        <main class="content">
-          <span class="warning-icon" data-icon="warning" aria-hidden="true"></span>
-          <p>The page you're looking for can't be found.</p>
-          <nav class="links" aria-label="Back to the homepage">
-            <a href="/">OK</a>
-          </nav>
-        </main>
-      </div>
-    </div>
-  </body>
-</html>
+<Handheld title={`Not found — ${site.name}`} noindex readout="Error">
+  <div class="not-found">
+    <span class="warning-icon" data-icon="warning" aria-hidden="true"></span>
+    <p>That page doesn't exist</p>
+    <a class="key" href="/">Go home</a>
+  </div>
+</Handheld>
