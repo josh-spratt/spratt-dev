@@ -35,3 +35,13 @@ export function buildSite(options: BuildOptions = {}): Site {
   const read = (path: string) => readFileSync(join(outDir, path), "utf8");
   return { outDir, read, html: (path) => parse(read(path)) };
 }
+
+/** All CSS shipped with the page: inline <style> blocks plus linked stylesheets. */
+export function pageCss(site: Site, page = "index.html"): string {
+  const doc = site.html(page);
+  const inline = doc.querySelectorAll("style").map((s) => s.text);
+  const linked = doc
+    .querySelectorAll('link[rel="stylesheet"]')
+    .map((l) => site.read(l.getAttribute("href")!.replace(/^\//, "")));
+  return [...inline, ...linked].join("\n");
+}
