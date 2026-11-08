@@ -1,5 +1,8 @@
 ---
 import { site, projects } from "../lib/site";
+import "../styles/global.css";
+
+const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "projects"}`;
 ---
 
 <!doctype html>
@@ -10,39 +13,57 @@ import { site, projects } from "../lib/site";
     <title>{site.name}</title>
   </head>
   <body>
-    <main>
-      <header>
-        <h1>{site.name}</h1>
-        <p>{site.role}</p>
-        <p>{site.bio}</p>
-        <nav aria-label="Links">
-          <a href={site.links.github}>GitHub</a>
-          <a href={site.links.linkedin}>LinkedIn</a>
-          <a href={`mailto:${site.links.email}`}>Email</a>
-        </nav>
-      </header>
-      <section aria-labelledby="projects">
-        <h2 id="projects">Projects</h2>
-        <ul>
-          {
-            projects.map((p) => (
-              <li>
-                <a href={p.url}>
-                  <strong>{p.title}</strong>
-                  <span>{p.description}</span>
-                  {p.tags && (
-                    <span>
-                      {p.tags.map((t) => (
-                        <span data-tag>{t}</span>
-                      ))}
-                    </span>
-                  )}
-                </a>
-              </li>
-            ))
-          }
-        </ul>
-      </section>
-    </main>
+    <div class="desktop">
+      <div class="window">
+        <div class="title-bar" data-chrome="title" aria-hidden="true">
+          <span class="buttons">
+            <i data-button="close"></i><i data-button="minimize"></i><i data-button="zoom"></i>
+          </span>
+          {site.name}
+        </div>
+        <div class="menu-row" data-chrome="menu" aria-hidden="true">
+          <span>File</span><span>Edit</span><span>View</span><span>Help</span>
+        </div>
+        <main class="content">
+          <header>
+            <h1>{site.name}</h1>
+            <p class="role">{site.role}</p>
+            <p class="bio">{site.bio}</p>
+            <nav class="links" aria-label="Links">
+              <a href={site.links.github}>GitHub</a>
+              <a href={site.links.linkedin}>LinkedIn</a>
+              <a href={`mailto:${site.links.email}`}>Email</a>
+            </nav>
+          </header>
+          <section class="projects" aria-labelledby="projects">
+            <h2 id="projects">Projects</h2>
+            <ul>
+              {
+                projects.map((p) => (
+                  <li>
+                    <a href={p.url}>
+                      <strong>{p.title}</strong>
+                      <span class="detail">
+                        {p.description}
+                        {p.tags && (
+                          <span class="tags">
+                            {p.tags.map((t) => (
+                              <span data-tag>{t}</span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                    </a>
+                  </li>
+                ))
+              }
+            </ul>
+          </section>
+        </main>
+        <div class="status-bar" data-chrome="status" aria-hidden="true">
+          <span>Done</span><span>{projectCount}</span>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
