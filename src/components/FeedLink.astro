@@ -1,0 +1,7 @@
+---
+import { getPosts } from "../lib/site";
+
+const hasPosts = (await getPosts()).length > 0;
+---
+
+{hasPosts && <link rel="alternate" type="application/rss+xml" title="Writing" href="/writing/rss.xml" />}

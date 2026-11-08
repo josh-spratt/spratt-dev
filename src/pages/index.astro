@@ -1,7 +1,9 @@
 ---
-import { site, projects } from "../lib/site";
+import { site, projects, getPosts, formatDate } from "../lib/site";
+import FeedLink from "../components/FeedLink.astro";
 import "../styles/global.css";
 
+const recent = (await getPosts()).slice(0, 3);
 const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "projects"}`;
 ---
 
@@ -11,6 +13,7 @@ const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{site.name}</title>
+    <FeedLink />
   </head>
   <body>
     <div class="desktop">
@@ -62,6 +65,28 @@ const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "
               }
             </ul>
           </section>
+          {
+            recent.length > 0 && (
+              <section class="projects recent-writing" aria-labelledby="recent-writing">
+                <h2 id="recent-writing">Recent writing</h2>
+                <ul>
+                  {recent.map((p) => (
+                    <li>
+                      <a href={`/writing/${p.id}/`}>
+                        <strong>{p.data.title}</strong>
+                        <span class="detail">
+                          {p.data.description}
+                          <span class="tags">
+                            <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          }
         </main>
         <div class="status-bar" data-chrome="status" aria-hidden="true">
           <span>Done</span><span>{projectCount}</span>
