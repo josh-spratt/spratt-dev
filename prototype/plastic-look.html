@@ -3,9 +3,10 @@
   PROTOTYPE, throwaway. Never merge to main.
   Question (issue #34): should the Homepage pivot from the Y2K silver-blue window to
   90s/00s blue/purple translucent plastic hardware, and if so, which concept?
-  Plan: three plastic variants plus today's look as a baseline, switchable via ?variant=ii|iii|iii-sticky|iii-top|iv|L.
-  iii-sticky and iii-top are iii with a different phone layout only; desktop is identical.
-  Bar: ←/→ cycle variants, W toggles the future Recent writing block, P squeezes to 375px phone width.
+  Plan: three plastic variants plus today's look as a baseline, switchable via ?variant=ii|iii|iii-sticky|iii-top|iii-rail|iv|L.
+  iii-sticky, iii-top and iii-rail are iii with a different phone layout only; desktop is identical.
+  iii-sticky and iii-rail also have a landscape-phone layout (button rail on the right); O previews it at 812x375.
+  Bar: ←/→ cycle variants, W toggles the future Recent writing block, P squeezes to 375px phone width, O shows an 812x375 landscape phone.
   Phone width works through container queries on .stage, so P and a real phone show the same thing.
   Content is real (content/site.json, projects.json); the writing entries are placeholders.
   Run: open prototype/plastic-look.html
@@ -23,6 +24,10 @@
   body[data-v="ii"] #ii, body[data-v^="iii"] #iii, body[data-v="iv"] #iv, body[data-v="L"] #L { display: block; }
   body:not([data-writing="on"]) .writing { display: none; }
   .stage { container: stage / inline-size; margin: 0 auto; min-height: 100vh; }
+  /* Landscape phone: the stage becomes a size container so @container (orientation/height) fires.
+     The prototype does the same on a real short landscape viewport; the real build would use @media instead. */
+  body[data-land="on"] .stage { max-width: 812px; height: 375px; min-height: 0; margin-top: 24px; container-type: size; overflow: auto; box-shadow: 0 0 0 1px #8888, 0 0 0 100vmax #fff8; }
+  @media (orientation: landscape) and (max-height: 500px) { .stage { container-type: size; height: 100vh; height: 100dvh; overflow: auto; } }
   body[data-phone="on"] .stage { max-width: 375px; box-shadow: 0 0 0 1px #8888, 0 0 0 100vmax #fff8; }
   ul { list-style: none; margin: 0; padding: 0; }
   a:focus-visible { outline: 3px solid #2a3fb0; outline-offset: 3px; }
@@ -221,8 +226,36 @@
     body[data-v="iii-top"] #iii .strip { display: none; }
     body[data-v="iii-top"] #iii .lens { order: 2; }
   }
+
+  /* iii-rail (portrait phones): the buttons sit in a sticky rail down the right edge */
+  @container stage (max-width: 600px) {
+    body[data-v="iii-rail"] #iii .handheld { display: grid; grid-template-columns: minmax(0, 1fr) 64px; grid-template-rows: auto 1fr; padding: 6px 0 6px 6px; border-radius: 0; }
+    body[data-v="iii-rail"] #iii h1 { grid-column: 1 / 3; grid-row: 1; margin: 6px 0 10px; font-size: 1.9rem; }
+    body[data-v="iii-rail"] #iii .strip { display: none; }
+    body[data-v="iii-rail"] #iii .lens { grid-column: 1; grid-row: 2; }
+    body[data-v="iii-rail"] #iii .controls { grid-column: 2; grid-row: 2; align-self: start; position: sticky; top: 0; margin: 0; padding: 14px 0; justify-content: center; }
+    body[data-v="iii-rail"] #iii nav { flex-direction: column; gap: 16px; padding: 0; background: none; transform: none; }
+    body[data-v="iii-rail"] #iii .ab i { width: 40px; height: 40px; }
+    body[data-v="iii-rail"] #iii .ab span { font-size: 8.5px; letter-spacing: .04em; }
+  }
+  /* Landscape phones (iii-sticky and iii-rail): screen on the left, button rail on the right */
+  @container stage (orientation: landscape) and (max-height: 500px) {
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii .frame { padding: 0; }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii .handheld { display: grid; grid-template-columns: minmax(0, 1fr) 112px; grid-template-rows: auto 1fr;
+      column-gap: 10px; max-width: none; border-radius: 0; border-width: 0; padding: 6px 0 8px 8px; --guts: none; }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii h1 { grid-column: 1; grid-row: 1; margin: 2px 0 6px; padding-left: 6px; font-size: 1.5rem; text-align: left; }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii .lens { grid-column: 1; grid-row: 2; border-radius: 10px 10px 28px 10px; padding: 6px 8px 14px; }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii :is(.strip, .base, .dpad) { display: none; }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii .controls { grid-column: 2; grid-row: 1 / 3; align-self: start; position: sticky; top: 0;
+      height: 100cqh; margin: 0; padding: 0 0 env(safe-area-inset-bottom); justify-content: center;
+      background: rgba(118, 78, 196, .94); border-left: 1px solid rgba(255, 255, 255, .6); box-shadow: inset 2px 0 0 rgba(255,255,255,.35), -6px 0 16px rgba(40, 20, 100, .25); }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii nav { flex-direction: column; gap: 14px; padding: 0; background: none; transform: none; }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii .ab i { width: 44px; height: 44px; }
+    body:is([data-v="iii-sticky"], [data-v="iii-rail"]) #iii .ab span { font-size: 10px; }
+  }
   /* keep the prototype bar off the sticky deck */
   body[data-v="iii-sticky"] #proto { bottom: auto; top: 12px; }
+  body[data-land="on"] #proto { top: auto; bottom: 16px; }
 
   /* ===================== iv: clip-together modules ===================== */
   #iv { --led: #6ab8ff; }
@@ -506,11 +539,12 @@
   <button id="next" title="Next (→)">→</button>
   <button id="writing" title="Toggle future Recent writing block (W)">W</button>
   <button id="phone" title="Squeeze to 375px phone width (P)">P</button>
+  <button id="land" title="Landscape phone, 812x375 (O)">O</button>
 </div>
 
 <script>
   // Prototype switcher only. The real site ships zero JS.
-  const names = { ii: "Device bezel", iii: "Handheld", "iii-sticky": "Handheld, sticky deck on phones", "iii-top": "Handheld, controls on top on phones", iv: "Clip-together modules", L: "Today's look (baseline)" };
+  const names = { ii: "Device bezel", iii: "Handheld", "iii-sticky": "Handheld, sticky deck on phones", "iii-top": "Handheld, controls on top on phones", "iii-rail": "Handheld, side rail on phones", iv: "Clip-together modules", L: "Today's look (baseline)" };
   const keys = Object.keys(names);
   const b = document.body;
   const params = new URLSearchParams(location.search);
@@ -520,21 +554,24 @@
     b.dataset.v = v;
     b.dataset.writing = params.get("writing") || "off";
     b.dataset.phone = params.get("phone") || "off";
+    b.dataset.land = params.get("land") || "off";
+    document.getElementById("land").setAttribute("aria-pressed", b.dataset.land === "on");
     document.getElementById("writing").setAttribute("aria-pressed", b.dataset.writing === "on");
     document.getElementById("phone").setAttribute("aria-pressed", b.dataset.phone === "on");
     document.getElementById("label").textContent =
-      `${v} (${names[v]})${b.dataset.writing === "on" ? " · +writing" : ""}${b.dataset.phone === "on" ? " · 375px" : ""}`;
+      `${v} (${names[v]})${b.dataset.writing === "on" ? " · +writing" : ""}${b.dataset.phone === "on" ? " · 375px" : ""}${b.dataset.land === "on" ? " · 812×375 landscape" : ""}`;
   }
   const step = d => { const i = keys.indexOf(b.dataset.v); set("variant", keys[(i + d + keys.length) % keys.length]); render(); scrollTo(0, 0); };
   const toggle = k => { set(k, b.dataset[k] === "on" ? "off" : "on"); render(); };
   prev.onclick = () => step(-1); next.onclick = () => step(1);
-  writing.onclick = () => toggle("writing"); phone.onclick = () => toggle("phone");
+  writing.onclick = () => toggle("writing"); phone.onclick = () => toggle("phone"); land.onclick = () => toggle("land");
   addEventListener("keydown", e => {
     if (e.target.closest("input, textarea, [contenteditable]")) return;
     if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "ArrowRight") step(1);
     else if (e.key.toLowerCase() === "w") toggle("writing");
     else if (e.key.toLowerCase() === "p") toggle("phone");
+    else if (e.key.toLowerCase() === "o") toggle("land");
   });
   render();
 </script>
