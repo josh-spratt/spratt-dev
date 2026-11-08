@@ -394,3 +394,14 @@ a:focus-visible {
   top: 31px;
   height: 4px;
 }
+
+/* Writing */
+.back { margin: 0 0 1rem; font-family: var(--font-chrome); font-size: 0.9rem; }
+.back a, .post-list a, .post a { color: var(--link-text); }
+.post-list { margin: 1.5rem 0 0; padding: 0; list-style: none; }
+.post-list li { margin-bottom: 1.5rem; }
+.post-list a { font: bold 1.1rem var(--font-chrome); }
+.post-list time, .post .meta { display: block; color: var(--muted); font-size: 0.85rem; }
+.post-list p { margin: 0.25rem 0 0; }
+.post pre { overflow-x: auto; padding: 1rem; border-radius: 6px; font-size: 0.9rem; }
+.post img { max-width: 100%; height: auto; }

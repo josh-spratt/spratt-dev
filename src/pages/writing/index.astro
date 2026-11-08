@@ -1,0 +1,22 @@
+---
+import Window from "../../layouts/Window.astro";
+import { site, getPosts, formatDate } from "../../lib/site";
+
+const posts = await getPosts();
+---
+
+<Window title={`Writing · ${site.name}`} status={`${posts.length} ${posts.length === 1 ? "post" : "posts"}`}>
+  <p class="back"><a href="/">← {site.name}</a></p>
+  <h1>Writing</h1>
+  <ul class="post-list">
+    {
+      posts.map((p) => (
+        <li>
+          <a href={`/writing/${p.id}/`}>{p.data.title}</a>
+          <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
+          <p>{p.data.description}</p>
+        </li>
+      ))
+    }
+  </ul>
+</Window>
