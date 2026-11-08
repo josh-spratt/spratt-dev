@@ -1,13 +1,11 @@
 [
   {
-    "title": "Games",
-    "description": "Coming soon: games I've built, playable right here on this site.",
-    "url": "https://games.jspratt.dev"
-  },
-  {
     "title": "MarinaraDB",
     "description": "A toy relational database written in Rust, with pasta-themed terminology and its own query language.",
     "url": "https://github.com/josh-spratt/marinaraDB",
-    "tags": ["Rust", "Databases"]
+    "tags": [
+      "Rust",
+      "Databases"
+    ]
   }
 ]
