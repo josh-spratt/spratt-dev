@@ -1,15 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <radialGradient id="orb" cx="50%" cy="65%" r="60%">
-      <stop offset="0" stop-color="#5aa9ff"/>
-      <stop offset="0.6" stop-color="#1a6fd6"/>
-      <stop offset="1" stop-color="#0b3a7c"/>
+    <radialGradient id="btn" cx="50%" cy="62%" r="62%">
+      <stop offset="0" stop-color="#f0473c"/>
+      <stop offset="1" stop-color="#b0161b"/>
     </radialGradient>
     <linearGradient id="hl" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fff" stop-opacity="0.95"/>
       <stop offset="1" stop-color="#fff" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <circle cx="32" cy="32" r="30" fill="url(#orb)" stroke="#0b3a7c" stroke-width="2"/>
-  <ellipse cx="32" cy="18" rx="19" ry="11" fill="url(#hl)"/>
+  <rect width="64" height="64" rx="14" fill="#a28dd9"/>
+  <circle cx="32" cy="36" r="21" fill="#6a0c10"/>
+  <circle cx="32" cy="32" r="21" fill="url(#btn)" stroke="#7a0f0f" stroke-width="2"/>
+  <ellipse cx="32" cy="21" rx="13" ry="7" fill="url(#hl)"/>
 </svg>
