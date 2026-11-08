@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { parse } from "node-html-parser";
 import { buildSite, pageCss } from "./helpers.ts";
 
 const site = buildSite({ contentDir: "tests/fixtures/content", mode: "production" });
@@ -47,12 +48,21 @@ test("status bar shows Done and the Project count", () => {
   assert.match(status?.text ?? "", /2 projects/);
 });
 
-test("no page ships a script", () => {
-  for (const file of ["index.html", "404.html"]) {
-    try {
-      assert.equal(site.html(file).querySelectorAll("script").length, 0, file);
-    } catch (e: any) {
-      if (e.code !== "ENOENT") throw e;
+/** Every built .html file under a directory. */
+function htmlFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? htmlFiles(join(dir, e.name)) : e.name.endsWith(".html") ? [join(dir, e.name)] : [],
+  );
+}
+
+test("no page ships a script, apart from the analytics beacon", () => {
+  const beacon = /^https:\/\/static\.cloudflareinsights\.com\//;
+  const pages = htmlFiles(site.outDir);
+  assert.ok(pages.length > 0);
+  for (const file of pages) {
+    const scripts = parse(readFileSync(file, "utf8")).querySelectorAll("script");
+    for (const s of scripts) {
+      assert.match(s.getAttribute("src") ?? "", beacon, `${file} ships a script`);
     }
   }
 });
@@ -77,6 +87,9 @@ test("text meets 4.5:1 on the lightest point of its backdrop", () => {
     ["--chrome-text", "--chrome-light"],
     ["--on-accent", "--pill-lightest"],
     ["--on-accent", "--hover-lightest"],
+    ["--on-accent", "--pill-hover-bottom"],
+    ["--name-stroke", "--content-light"],
+    ["--muted", "--chrome-light"],
   ];
   for (const [fg, bg] of pairs) {
     const ratio = contrast(token(fg), token(bg));
@@ -85,8 +98,10 @@ test("text meets 4.5:1 on the lightest point of its backdrop", () => {
 });
 
 test("Links and Project rows have a visible focus ring", () => {
-  assert.match(css, /a:focus-visible[^{]*\{[^}]*outline:\s*[^;}]*[1-9]/);
-  assert.match(css, /focus-visible/);
+  assert.match(css, /a:focus-visible[^{]*\{[^}]*outline:\s*[1-9]\d*px solid/);
+  // Pills and rows also change fill on focus, like hover.
+  assert.match(css, /\.links a:focus-visible/);
+  assert.match(css, /\.projects a:is\(:hover,\s*:focus-visible\)|\.projects a:focus-visible/);
 });
 
 test("any animation respects prefers-reduced-motion", () => {
@@ -100,8 +115,8 @@ test("on phones the window is full-bleed and Project rows stack", () => {
     /@media\s*\((?:max-width:\s*|width\s*<=\s*)(?:[1-6]\d\d)px\)\s*\{([\s\S]*)\}/,
   );
   assert.ok(phone, "a phone media query exists");
-  assert.match(phone[1], /border-radius:\s*0/);
-  assert.match(phone[1], /grid-template-columns:\s*1fr/);
+  assert.match(phone[1], /\.window\s*\{[^}]*border-radius:\s*0/);
+  assert.match(phone[1], /\.projects a\s*\{[^}]*grid-template-columns:\s*1fr/);
 });
 
 test("Lighthouse budget: the built page stays under 100 KB", () => {

@@ -2,7 +2,7 @@
 import { site, projects } from "../lib/site";
 import "../styles/global.css";
 
-const count = `${projects.length} ${projects.length === 1 ? "project" : "projects"}`;
+const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "projects"}`;
 ---
 
 <!doctype html>
@@ -17,7 +17,7 @@ const count = `${projects.length} ${projects.length === 1 ? "project" : "project
       <div class="window">
         <div class="title-bar" data-chrome="title" aria-hidden="true">
           <span class="buttons">
-            <i style="--c:#e0443e"></i><i style="--c:#dea123"></i><i style="--c:#1aab29"></i>
+            <i data-button="close"></i><i data-button="minimize"></i><i data-button="zoom"></i>
           </span>
           {site.name}
         </div>
@@ -35,7 +35,7 @@ const count = `${projects.length} ${projects.length === 1 ? "project" : "project
               <a href={`mailto:${site.links.email}`}>Email</a>
             </nav>
           </header>
-          <section class="group" aria-labelledby="projects">
+          <section class="projects" aria-labelledby="projects">
             <h2 id="projects">Projects</h2>
             <ul>
               {
@@ -61,7 +61,7 @@ const count = `${projects.length} ${projects.length === 1 ? "project" : "project
           </section>
         </main>
         <div class="status-bar" data-chrome="status" aria-hidden="true">
-          <span>Done</span><span>{count}</span>
+          <span>Done</span><span>{projectCount}</span>
         </div>
       </div>
     </div>
