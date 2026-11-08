@@ -4,9 +4,21 @@ import { resolve } from "node:path";
 /** Where content lives. Tests point this at fixtures via CONTENT_DIR. */
 export const contentDir = resolve(process.env.CONTENT_DIR ?? "content");
 
-/** Production unless BUILD_MODE=preview. Drafts will only show in preview. */
-export const buildMode: "production" | "preview" =
-  process.env.BUILD_MODE === "preview" ? "preview" : "production";
+/**
+ * Production is a build of `main`; preview is local dev and every other branch.
+ * Workers Builds exposes the branch as WORKERS_CI_BRANCH. BUILD_MODE overrides
+ * it (tests use that). With neither set, a plain build is production so Drafts
+ * can never leak by accident; `astro dev` is preview.
+ */
+function detectBuildMode(): "production" | "preview" {
+  if (process.env.BUILD_MODE === "preview") return "preview";
+  if (process.env.BUILD_MODE === "production") return "production";
+  const branch = process.env.WORKERS_CI_BRANCH;
+  if (branch) return branch === "main" ? "production" : "preview";
+  return import.meta.env?.DEV ? "preview" : "production";
+}
+
+export const buildMode: "production" | "preview" = detectBuildMode();
 
 export interface Site {
   name: string;
@@ -82,3 +94,20 @@ function loadProjects(): Project[] {
 
 export const site: Site = loadSite();
 export const projects: Project[] = loadProjects();
+
+/** Posts that should appear in the current build mode, newest first. */
+export async function getPosts() {
+  const { getCollection } = await import("astro:content");
+  const all = await getCollection("posts", (p) => buildMode === "preview" || !p.data.draft);
+  return all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+}
+
+/** e.g. "10 Mar 2026". Dates are UTC so builds don't shift by timezone. */
+export function formatDate(d: Date): string {
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}

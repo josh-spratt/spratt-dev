@@ -1,0 +1,33 @@
+---
+import { render } from "astro:content";
+import Window from "../../layouts/Window.astro";
+import { site, getPosts, formatDate } from "../../lib/site";
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const { title, description, date, updated } = post.data;
+---
+
+<Window title={`${title} · ${site.name}`} description={description}>
+  <p class="back"><a href="/writing/">← Writing</a></p>
+  <article class="post">
+    <h1>{title}</h1>
+    <p class="meta">
+      <time datetime={date.toISOString()}>{formatDate(date)}</time>
+      {
+        updated && (
+          <>
+            {" · Updated "}
+            <time data-updated datetime={updated.toISOString()}>{formatDate(updated)}</time>
+          </>
+        )
+      }
+    </p>
+    <Content />
+  </article>
+</Window>
