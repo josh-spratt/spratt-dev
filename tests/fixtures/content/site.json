@@ -1,6 +1,7 @@
 {
   "name": "Fixture Person",
   "role": "Fixture role line",
+  "description": "Fixture homepage description.",
   "bio": "Fixture bio sentence one. Fixture bio sentence two.",
   "links": {
     "github": "https://github.com/fixture",

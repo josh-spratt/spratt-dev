@@ -18,11 +18,15 @@ function detectBuildMode(): "production" | "preview" {
   return import.meta.env?.DEV ? "preview" : "production";
 }
 
+export const siteUrl = "https://jspratt.dev";
+
 export const buildMode: "production" | "preview" = detectBuildMode();
 
 export interface Site {
   name: string;
   role: string;
+  /** Hand-written sentence for the Homepage meta description. */
+  description: string;
   bio: string;
   links: { github: string; linkedin: string; email: string };
 }
@@ -58,6 +62,7 @@ function loadSite(): Site {
   return {
     name: requireString(file, "name", raw.name),
     role: requireString(file, "role", raw.role),
+    description: requireString(file, "description", raw.description),
     bio: requireString(file, "bio", raw.bio),
     links: {
       github: requireString(file, "links.github", links.github),

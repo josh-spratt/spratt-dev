@@ -1,0 +1,37 @@
+---
+import { site, siteUrl } from "../lib/site";
+import FeedLink from "./FeedLink.astro";
+import "../styles/global.css";
+
+interface Props {
+  /** Full document title, e.g. "Writing — Josh Spratt". */
+  title: string;
+  description?: string;
+  type?: "website" | "article";
+  noindex?: boolean;
+}
+
+const { title, description, type = "website", noindex = false } = Astro.props;
+const canonical = new URL(Astro.url.pathname, siteUrl).href;
+const image = `${siteUrl}/social.png`;
+const imageAlt = `${site.name} — ${site.role}`;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title}</title>
+{description && <meta name="description" content={description} />}
+{noindex && <meta name="robots" content="noindex" />}
+{!noindex && <link rel="canonical" href={canonical} />}
+<meta name="theme-color" content="#9fb1c9" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" sizes="32x32" href="/favicon.ico" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta property="og:title" content={title} />
+{description && <meta property="og:description" content={description} />}
+{!noindex && <meta property="og:url" content={canonical} />}
+<meta property="og:type" content={type} />
+<meta property="og:image" content={image} />
+<meta property="og:image:alt" content={imageAlt} />
+<meta name="twitter:card" content="summary_large_image" />
+<FeedLink />

@@ -1,7 +1,6 @@
 ---
 import { site, projects, getPosts, formatDate } from "../lib/site";
-import FeedLink from "../components/FeedLink.astro";
-import "../styles/global.css";
+import Head from "../components/Head.astro";
 
 const recent = (await getPosts()).slice(0, 3);
 const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "projects"}`;
@@ -10,10 +9,7 @@ const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{site.name}</title>
-    <FeedLink />
+    <Head title={`${site.name} — ${site.role}`} description={site.description} />
   </head>
   <body>
     <div class="desktop">

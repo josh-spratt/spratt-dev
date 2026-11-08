@@ -1,22 +1,20 @@
 ---
-import FeedLink from "../components/FeedLink.astro";
-import "../styles/global.css";
+import Head from "../components/Head.astro";
 interface Props {
   title: string;
   description?: string;
+  /** Document title; defaults to the title-bar text. */
+  pageTitle?: string;
+  type?: "website" | "article";
   status?: string;
 }
-const { title, description, status = "Done" } = Astro.props;
+const { title, description, pageTitle = title, type, status = "Done" } = Astro.props;
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
-    {description && <meta name="description" content={description} />}
-    <FeedLink />
+    <Head title={pageTitle} description={description} type={type} />
   </head>
   <body>
     <div class="desktop">
