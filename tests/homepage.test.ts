@@ -62,3 +62,9 @@ test("Real content has the launch Project and a real mailto", () => {
   assert.deepEqual(hrefs, ["https://github.com/josh-spratt/marinaraDB"]);
   assert.ok(html.querySelector('a[href="mailto:josh@jspratt.dev"]'));
 });
+
+test("A Project's logo renders when it has one and not otherwise", () => {
+  const rows = buildSite(fixtures).html("index.html").querySelectorAll("section > ul > li");
+  assert.equal(rows[0].querySelector("img")?.getAttribute("src"), "/projects/alpha.png");
+  assert.equal(rows[1].querySelector("img"), null);
+});

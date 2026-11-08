@@ -19,6 +19,8 @@ export interface Project {
   title: string;
   description: string;
   url: string;
+  /** Optional logo, a path under public/ such as /projects/name.png. */
+  image?: string;
   tags?: string[];
 }
 
@@ -70,6 +72,9 @@ function loadProjects(): Project[] {
       title: requireString(file, `${at}: title`, p.title),
       description: requireString(file, `${at}: description`, p.description),
       url: requireString(file, `${at}: url`, p.url),
+      ...(p.image !== undefined
+        ? { image: requireString(file, `${at}: image`, p.image) }
+        : {}),
       ...(tags ? { tags } : {}),
     };
   });
