@@ -65,3 +65,8 @@ test("A Draft is absent from the feed and Recent writing in production, present 
   assert.match(preview.read("writing/rss.xml"), /Secret Draft/);
   assert.match(preview.read("index.html"), /Secret Draft/);
 });
+
+test("Root-relative links in feed content are made absolute", () => {
+  const xml = buildSite(many).read("writing/rss.xml");
+  assert.match(xml, /href=&quot;https:\/\/jspratt\.dev\/writing\/post-4\/&quot;/);
+});
