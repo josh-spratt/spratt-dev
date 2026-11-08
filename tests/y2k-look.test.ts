@@ -120,9 +120,11 @@ test("on phones the window is full-bleed and Project rows stack", () => {
 });
 
 test("Lighthouse budget: the built page stays under 100 KB", () => {
+  // The social image is only fetched by link-preview crawlers, never by a page load.
   const total = (dir: string): number =>
     readdirSync(dir).reduce((sum, f) => {
       const p = join(dir, f);
+      if (f === "social.png") return sum;
       return sum + (statSync(p).isDirectory() ? total(p) : statSync(p).size);
     }, 0);
   assert.ok(total(site.outDir) < 100 * 1024);

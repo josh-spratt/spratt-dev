@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="desk" cx="50%" cy="0%" r="110%">
+      <stop offset="0" stop-color="#dfe8f4"/>
+      <stop offset="0.7" stop-color="#9fb1c9"/>
+      <stop offset="1" stop-color="#7f93b0"/>
+    </radialGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f7"/><stop offset="1" stop-color="#d5dde8"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdfdfd"/><stop offset="0.5" stop-color="#c9d2de"/>
+      <stop offset="0.51" stop-color="#b7c2d1"/><stop offset="1" stop-color="#dbe2eb"/>
+    </linearGradient>
+    <linearGradient id="name" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb3ab"/><stop offset="0.48" stop-color="#e8412f"/>
+      <stop offset="0.5" stop-color="#8f1212"/><stop offset="1" stop-color="#f08a7e"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#142850" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#desk)"/>
+  <g filter="url(#shadow)">
+    <rect x="100" y="80" width="1000" height="470" rx="22" fill="url(#win)" stroke="#5a6b85" stroke-width="2"/>
+  </g>
+  <path d="M100 102a22 22 0 0 1 22-22h956a22 22 0 0 1 22 22v34H100z" fill="url(#bar)"/>
+  <line x1="100" y1="136" x2="1100" y2="136" stroke="#7d8ba0"/>
+  <circle cx="132" cy="108" r="11" fill="#e0443e" stroke="#00000059"/>
+  <circle cx="162" cy="108" r="11" fill="#dea123" stroke="#00000059"/>
+  <circle cx="192" cy="108" r="11" fill="#1aab29" stroke="#00000059"/>
+  <path d="M101 137h998v391a21 21 0 0 1-21 21H122a21 21 0 0 1-21-21z" fill="#ffffffd9"/>
+  <text x="160" y="320" font-family="Verdana, DejaVu Sans, sans-serif" font-weight="bold" font-size="140"
+        fill="url(#name)" stroke="#9b1c1c" stroke-width="3" paint-order="stroke">Josh Spratt</text>
+  <text x="164" y="400" font-family="Verdana, DejaVu Sans, sans-serif" font-size="52" fill="#2e5fa3">Engineer</text>
+  <text x="164" y="470" font-family="Courier New, monospace" font-size="30" fill="#4a586d">jspratt.dev</text>
+</svg>
