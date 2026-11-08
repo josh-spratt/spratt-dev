@@ -1,0 +1,33 @@
+---
+import { site } from "../lib/site";
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Not found · {site.name}</title>
+  </head>
+  <body>
+    <div class="desktop desktop-centered">
+      <div class="window dialog">
+        <div class="title-bar" data-chrome="title" aria-hidden="true">
+          <span class="buttons">
+            <i data-button="close"></i><i data-button="minimize"></i><i data-button="zoom"></i>
+          </span>
+          Error
+        </div>
+        <main class="content">
+          <span class="warning-icon" data-icon="warning" aria-hidden="true"></span>
+          <p>The page you're looking for can't be found.</p>
+          <nav class="links" aria-label="Back to the homepage">
+            <a href="/">OK</a>
+          </nav>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
