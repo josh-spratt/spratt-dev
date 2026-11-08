@@ -1,16 +1,14 @@
 ---
-import Window from "../../layouts/Window.astro";
+import Handheld from "../../layouts/Handheld.astro";
 import { site, getPosts, formatDate } from "../../lib/site";
 
 const posts = await getPosts();
 ---
 
-<Window
-  title={`Writing · ${site.name}`}
-  pageTitle={`Writing — ${site.name}`}
+<Handheld
+  title={`Writing — ${site.name}`}
   description={`Writing by ${site.name}.`}
-  status={`${posts.length} ${posts.length === 1 ? "post" : "posts"}`}>
-  <p class="back"><a href="/">← {site.name}</a></p>
+  readout={`Done · ${posts.length} ${posts.length === 1 ? "post" : "posts"}`}>
   <h1>Writing</h1>
   <ul class="post-list">
     {
@@ -23,4 +21,4 @@ const posts = await getPosts();
       ))
     }
   </ul>
-</Window>
+</Handheld>

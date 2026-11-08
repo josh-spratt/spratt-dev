@@ -1,93 +1,59 @@
 ---
 import { site, projects, getPosts, formatDate } from "../lib/site";
-import Head from "../components/Head.astro";
+import Handheld from "../layouts/Handheld.astro";
 
 const recent = (await getPosts()).slice(0, 3);
 const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "projects"}`;
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <Head title={`${site.name} — ${site.role}`} description={site.description} />
-  </head>
-  <body>
-    <div class="desktop">
-      <div class="window">
-        <div class="title-bar" data-chrome="title" aria-hidden="true">
-          <span class="buttons">
-            <i data-button="close"></i><i data-button="minimize"></i><i data-button="zoom"></i>
-          </span>
-          {site.name}
-        </div>
-        <div class="menu-row" data-chrome="menu" aria-hidden="true">
-          <span>File</span><span>Edit</span><span>View</span><span>Help</span>
-        </div>
-        <main class="content">
-          <header>
-            <h1>{site.name}</h1>
-            <p class="role">{site.role}</p>
-            <p class="bio">{site.bio}</p>
-            <nav class="links" aria-label="Links">
-              <a href={site.links.github}>GitHub</a>
-              <a href={site.links.linkedin}>LinkedIn</a>
-              <a href={`mailto:${site.links.email}`}>Email</a>
-            </nav>
-          </header>
-          <section class="projects" aria-labelledby="projects">
-            <h2 id="projects">Projects</h2>
-            <ul>
-              {
-                projects.map((p) => (
-                  <li>
-                    <a href={p.url} data-has-image={p.image ? "" : undefined}>
-                      {p.image && (
-                        <img class="logo" src={p.image} alt="" width="96" height="96" loading="lazy" />
-                      )}
-                      <strong>{p.title}</strong>
-                      <span class="detail">
-                        {p.description}
-                        {p.tags && (
-                          <span class="tags">
-                            {p.tags.map((t) => (
-                              <span data-tag>{t}</span>
-                            ))}
-                          </span>
-                        )}
-                      </span>
-                    </a>
-                  </li>
-                ))
-              }
-            </ul>
-          </section>
-          {
-            recent.length > 0 && (
-              <section class="projects recent-writing" aria-labelledby="recent-writing">
-                <h2 id="recent-writing">Recent writing</h2>
-                <ul>
-                  {recent.map((p) => (
-                    <li>
-                      <a href={`/writing/${p.id}/`}>
-                        <strong>{p.data.title}</strong>
-                        <span class="detail">
-                          {p.data.description}
-                          <span class="tags">
-                            <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
-                          </span>
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )
-          }
-        </main>
-        <div class="status-bar" data-chrome="status" aria-hidden="true">
-          <span>Done</span><span>{projectCount}</span>
-        </div>
-      </div>
-    </div>
-  </body>
-</html>
+<Handheld title={`${site.name} — ${site.role}`} description={site.description} home readout={`Done · ${projectCount}`}>
+  <p class="role">{site.role}</p>
+  <p class="bio">{site.bio}</p>
+  <section aria-labelledby="projects">
+    <h2 id="projects">Projects</h2>
+    <ul class="rows">
+      {
+        projects.map((p) => (
+          <li>
+            <a href={p.url} data-has-image={p.image ? "" : undefined}>
+              {p.image && <img class="logo" src={p.image} alt="" width="88" height="88" loading="lazy" />}
+              <strong>{p.title}</strong>
+              <span class="detail">
+                {p.description}
+                {p.tags && (
+                  <span class="tags">
+                    {p.tags.map((t) => (
+                      <span data-tag>{t}</span>
+                    ))}
+                  </span>
+                )}
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+  {
+    recent.length > 0 && (
+      <section class="recent-writing" aria-labelledby="recent-writing">
+        <h2 id="recent-writing">Recent writing</h2>
+        <ul class="rows">
+          {recent.map((p) => (
+            <li>
+              <a href={`/writing/${p.id}/`}>
+                <strong>{p.data.title}</strong>
+                <span class="detail">
+                  {p.data.description}
+                  <span class="tags">
+                    <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+</Handheld>

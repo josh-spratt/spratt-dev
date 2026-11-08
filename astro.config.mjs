@@ -7,4 +7,6 @@ export default defineConfig({
   output: "static",
   trailingSlash: "always",
   integrations: [sitemap()],
+  // Code colours come from --astro-code-* tokens in global.css, so they are contrast-checked.
+  markdown: { shikiConfig: { theme: "css-variables" } },
 });

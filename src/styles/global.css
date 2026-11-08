@@ -1,58 +1,91 @@
-/* Y2K desktop look. Tokens first; everything below reads from them.
-   Light theme only. No web fonts, no framework, no script. */
+/* Translucent Atomic Purple handheld (#34, variant iii-sticky). Tokens first;
+   everything below reads from them. Light theme only. No web fonts, no
+   framework, no script. */
 :root {
-  --accent: #1a6fd6;
+  /* Background: pale periwinkle with a faint dot grid showing through the plastic. */
+  --page: #dfe3f7;
+  --dots: radial-gradient(circle, rgba(60, 50, 150, 0.22) 1.2px, transparent 1.8px) 0 0 / 16px 16px;
 
-  /* Text, with the lightest backdrop each one sits on (checked by tests). */
-  --text: #1b2533;
-  --link-text: #1a5bb8;
-  --role: #2e5fa3;
-  --label: #4a586d;
-  --muted: #4a586d;
-  --chrome-text: #26324a;
-  --on-accent: #ffffff;
-  --panel-light: #f7f9fc;
-  --content-light: #fefefe;
-  --chrome-light: #fdfdfd;
+  /* Plastic. Alpha colours are paired with what they composite to on the
+     band behind them, which is what the contrast tests check. */
+  --plastic: rgba(118, 78, 196, 0.58);
+  --plastic-solid: #a28dd9; /* on the page */
+  --plastic-dot: #937cd1; /* on a background dot */
+  --plastic-edge: rgba(255, 255, 255, 0.6);
+  --tray-fill: rgba(40, 15, 95, 0.14); /* behind the desktop buttons */
+  --tray: #917bc8;
+  --plastic-strip: rgba(118, 78, 196, 0.94); /* pinned phone strip */
+  --strip-over-screen: #7e58c8;
+  --strip-over-bezel: #714bbc;
+  --strip-over-page: #7c57c7;
+  --trace: rgba(40, 15, 95, 0.3);
+  --dark-plastic: #3b2f78;
+  --dark-plastic-low: #221a4d;
+  --dark-plastic-side: #150f33;
 
-  /* Glossy blue. Gloss is a darker body with a pale top highlight, so white
-     text stays readable at the lightest point. */
-  --pill-lightest: #3672c0; /* #1259b5 under the 15% highlight */
-  --hover-lightest: #1259b5;
-  --pill-top: #1259b5;
-  --pill-bottom: #0d4590;
-  --pill-border: #0b3a7c;
-  --pill-hover-bottom: #0a3470;
-  --pill-gradient: linear-gradient(180deg, var(--pill-top), var(--pill-bottom));
-  --pill-hover-gradient: linear-gradient(180deg, var(--pill-top), var(--pill-hover-bottom));
-  --name-stroke: #9b1c1c; /* outlines the name; needs 4.5:1 on the content area */
+  /* CSS-drawn internals: screw posts, traces, solder pads, a chip. Shell only. */
+  --screw: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0 2px, rgba(50, 20, 110, 0.5) 2.5px 5px, rgba(255, 255, 255, 0.3) 5.5px 7px, transparent 7.5px);
+  --pad: radial-gradient(circle, rgba(40, 15, 95, 0.4) 0 3px, transparent 3.5px);
+  --line: linear-gradient(var(--trace), var(--trace));
+  --chip: linear-gradient(rgba(30, 10, 70, 0.3), rgba(30, 10, 70, 0.3));
+
+  /* Screen bezel and the backlit screen. */
+  --bezel: rgba(31, 25, 70, 0.9);
+  --bezel-solid: #2c2555; /* on the plastic */
+  --bezel-label: #d9d4ff;
+  --screen-top: #f4f7ff;
+  --screen-bottom: #e6edff;
+  --screen-rim: #6b5aa8;
+  --row-lit-top: #e3ebff;
+  --row-lit-bottom: #d2defd;
+  --row-lit-rim: #8fa6f0;
+  --logo-rim: #c3cbef;
+  --lcd-top: #e9f1ff;
+  --lcd-bottom: #cfdcf7;
+  --code-top: #e2e9fb;
+  --code-bottom: #d6e0f7;
+  --code-rim: #b4bfe6;
+  --led: #ff4b4b;
+
+  /* Ink */
+  --ink: #1d1b3a;
+  --ink-soft: #45436a;
+  --link: #2a3fb0;
+  --accent: #2a3fb0; /* focus ring */
+  --role: #1c3297;
+  --label: #250a52; /* on the plastic */
+  --strip-label: #ffffff; /* on the pinned phone strip */
+
+  /* Glossy red buttons and the name */
+  --button-light: #f0473c;
+  --button-dark: #b0161b;
+  --button-side: #6a0c10;
+  --button-rim: #7a0f0f;
+  --name-stroke: #7a0f0f;
   --name-fill: linear-gradient(180deg, #ffb3ab 0%, #e8412f 48%, #8f1212 50%, #f08a7e 100%);
-  --button-close: #e0443e;
-  --button-minimize: #dea123;
-  --button-zoom: #1aab29;
-  --title-rule: #7d8ba0;
-  --highlight-alpha: 0.15;
 
-  --desktop: radial-gradient(ellipse at top, #dfe8f4, #9fb1c9 70%, #7f93b0);
-  --window-bg: linear-gradient(180deg, #eef2f7, #d5dde8);
-  --window-border: #5a6b85;
-  --rule: #b9c3d1;
-  --title-bar: linear-gradient(
-    180deg,
-    var(--chrome-light),
-    #c9d2de 50%,
-    #b7c2d1 51%,
-    #dbe2eb
-  );
-  --panel-bg: linear-gradient(180deg, var(--panel-light), #eaeff6);
-  --content-bg: rgba(255, 255, 255, 0.85);
+  /* Candy key (the 404's Go home) */
+  --key: #2b49c0;
+  --key-hover: #3352cc;
+  --key-side: #18267a;
+  --on-key: #ffffff;
 
-  --font-body: "Courier New", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --font-chrome: Verdana, Tahoma, sans-serif;
+  /* Code blocks: Shiki's css-variables theme reads these. */
+  --astro-code-background: var(--code-bottom);
+  --astro-code-foreground: #1d1b3a;
+  --astro-code-token-comment: #4f4d72;
+  --astro-code-token-constant: #8a1a5c;
+  --astro-code-token-function: #5326a3;
+  --astro-code-token-keyword: #9c1638;
+  --astro-code-token-link: #2a3fb0;
+  --astro-code-token-parameter: #6e3a00;
+  --astro-code-token-punctuation: #45436a;
+  --astro-code-token-string: #1c5e2c;
+  --astro-code-token-string-expression: #1c5e2c;
 
-  --margin: clamp(1rem, 3vw, 2.5rem);
-  --reading: 46rem;
-  --window-max: 76rem;
+  --font-body: "Trebuchet MS", system-ui, sans-serif;
+  --font-label: Verdana, Tahoma, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, "Courier New", monospace;
 }
 
 * {
@@ -62,307 +95,479 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--desktop);
-  color: var(--text);
-  font-family: var(--font-body);
-  line-height: 1.5;
+  background: var(--dots), var(--page);
+  color: var(--ink);
+  font: 16px/1.55 var(--font-body);
 }
 
-.desktop {
-  min-height: 100vh;
-  padding: var(--margin);
-  display: flex;
+a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 
-.window {
-  width: 100%;
-  max-width: var(--window-max);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--window-border);
-  background: var(--window-bg);
-  box-shadow:
-    0 14px 40px rgba(20, 40, 80, 0.35),
-    inset 0 1px 0 #fff;
+/* The accent is too close to the plastic, so links on the shell ring in its label ink. */
+.name:focus-visible,
+.buttons a:focus-visible {
+  outline-color: var(--label);
 }
 
-/* ---- Decorative chrome ---- */
-.title-bar {
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- The handheld ---- */
+.frame {
+  padding: clamp(1rem, 3vw, 2.5rem);
+}
+
+.handheld {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 30px;
-  font: bold 13px var(--font-chrome);
-  color: var(--chrome-text);
-  background: var(--title-bar);
-  border-bottom: 1px solid var(--title-rule);
-  text-shadow: 0 1px 0 #fff;
+  flex-direction: column;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 18px clamp(16px, 4vw, 48px) 40px;
+  border-radius: 28px 28px 110px 28px;
+  background: var(--plastic);
+  border: 1px solid var(--plastic-edge);
+  backdrop-filter: blur(1.2px) saturate(1.3);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -4px 8px rgba(40, 10, 90, 0.3),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.1),
+    0 18px 40px rgba(40, 20, 100, 0.35);
 }
 
-.title-bar .buttons {
+/* Internals, painted on the shell only and never behind text. */
+.handheld::before {
+  content: "";
   position: absolute;
-  left: 10px;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    var(--screw) left 14px top 14px / 18px 18px no-repeat,
+    var(--screw) right 14px top 14px / 18px 18px no-repeat,
+    var(--screw) left 18px bottom 18px / 18px 18px no-repeat,
+    var(--line) left 10% bottom 210px / 2px 120px no-repeat,
+    var(--line) left 10% bottom 210px / 24% 2px no-repeat,
+    var(--pad) left calc(10% + 24% - 5px) bottom 205px / 12px 12px no-repeat,
+    var(--line) right 20% bottom 60px / 2px 160px no-repeat,
+    var(--pad) right calc(20% - 5px) bottom 215px / 12px 12px no-repeat,
+    var(--chip) right 26px top 40% / 30px 64px no-repeat;
+}
+
+.handheld > * {
+  position: relative;
+}
+
+/* Visual order on desktop: power switch, screen, name, buttons, base. */
+.power { order: 0; }
+.bezel { order: 1; }
+.name { order: 2; }
+.controls { order: 3; }
+.base { order: 4; }
+
+/* ---- Decorative chrome ---- */
+.power {
   display: flex;
-  gap: 7px;
+  padding: 0 6px 14px;
 }
 
-.title-bar [data-button="close"] { --c: var(--button-close); }
-.title-bar [data-button="minimize"] { --c: var(--button-minimize); }
-.title-bar [data-button="zoom"] { --c: var(--button-zoom); }
-
-.title-bar .buttons i {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.35);
-  background: radial-gradient(circle at 50% 30%, #fff 0 15%, var(--c) 60%);
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: bold 10px var(--font-label);
+  letter-spacing: 0.15em;
+  color: var(--label);
 }
 
-.menu-row {
-  padding: 4px 12px;
-  font: 12px var(--font-chrome);
-  color: var(--chrome-text);
-  border-bottom: 1px solid var(--rule);
+.switch b {
+  position: relative;
+  width: 46px;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(36, 18, 84, 0.45);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-.menu-row span {
-  margin-right: 1rem;
+.switch b::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  width: 16px;
+  height: 8px;
+  border-radius: 3px;
+  background: #efe9ff;
 }
 
-.status-bar {
+.bezel {
+  padding: 12px clamp(14px, 4vw, 40px) 30px;
+  border-radius: 16px 16px 56px 16px;
+  background: var(--bezel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.bezel-top {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding: 4px 14px 8px;
-  font: 11px var(--font-chrome);
-  color: var(--muted);
+  padding: 0 0 10px;
 }
 
-/* ---- Content ---- */
-.content {
-  flex: 1;
-  margin: 10px;
-  padding: clamp(1.5rem, 5vw, 4rem);
-  background: var(--content-bg);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+.readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.content > * {
-  max-width: var(--reading);
+.readout small {
+  font: bold 10px var(--font-label);
+  letter-spacing: 0.2em;
+  color: var(--bezel-label);
 }
 
-h1 {
-  margin: 0;
-  font: 800 clamp(2.4rem, 6vw, 3.75rem) / 1 var(--font-chrome);
+.led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fff 0 15%, var(--led) 55%);
+  box-shadow: 0 0 8px 2px var(--led);
+  animation: led 2.4s ease-in-out infinite;
+}
+
+@keyframes led {
+  50% {
+    opacity: 0.35;
+    box-shadow: none;
+  }
+}
+
+.lcd {
+  padding: 2px 10px;
+  border-radius: 4px;
+  background: linear-gradient(var(--lcd-top), var(--lcd-bottom));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  font: 12px var(--font-mono);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.dpad {
+  position: relative;
+  flex: 0 0 104px;
+  height: 104px;
+}
+
+.dpad::before,
+.dpad::after {
+  content: "";
+  position: absolute;
+  border-radius: 6px;
+  background: linear-gradient(var(--dark-plastic), var(--dark-plastic-low));
+  box-shadow:
+    0 3px 0 var(--dark-plastic-side),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dpad::before {
+  left: 36px;
+  top: 0;
+  width: 32px;
+  height: 104px;
+}
+
+.dpad::after {
+  left: 0;
+  top: 36px;
+  width: 104px;
+  height: 32px;
+}
+
+.base {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 24px;
+  padding: 0 4%;
+}
+
+.pills {
+  display: flex;
+  gap: 18px;
+  margin: 0 auto;
+  transform: rotate(-18deg);
+}
+
+.pills b {
+  width: 46px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--dark-plastic);
+  box-shadow: 0 2px 0 var(--dark-plastic-side);
+}
+
+.speaker {
+  width: 84px;
+  height: 64px;
+  border-radius: 10px;
+  transform: rotate(-30deg);
+  background: repeating-linear-gradient(90deg, rgba(40, 15, 95, 0.55) 0 5px, transparent 5px 12px);
+}
+
+/* ---- The name: red glossy, like a logo ---- */
+.name {
+  align-self: center;
+  margin: 22px 0 6px;
+  text-align: center;
+  text-decoration: none;
+  font: italic 800 clamp(2rem, 5vw, 3rem) / 1.05 var(--font-label);
   letter-spacing: -0.02em;
   background: var(--name-fill);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-stroke: 1px var(--name-stroke);
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.6));
+}
+
+/* ---- Links: round glossy red buttons, tilted beside the D-pad ---- */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 18px;
+  padding: 0 2%;
+}
+
+.buttons {
+  display: flex;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 40px;
+  background: var(--tray-fill);
+  transform: rotate(-18deg);
+}
+
+.buttons a {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.buttons i {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid var(--button-rim);
+  background:
+    radial-gradient(ellipse 60% 35% at 50% 22%, rgba(255, 255, 255, 0.75), transparent 70%),
+    radial-gradient(circle at 50% 60%, var(--button-light), var(--button-dark) 75%);
+  box-shadow:
+    0 4px 0 var(--button-side),
+    0 6px 10px rgba(40, 0, 20, 0.35);
+  transition: box-shadow 0.12s, transform 0.05s;
+}
+
+.buttons span {
+  font: bold 11px var(--font-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+.buttons a:is(:hover, :focus-visible) i {
+  box-shadow:
+    0 4px 0 var(--button-side),
+    0 0 18px 5px rgba(255, 120, 110, 0.75),
+    inset 0 0 12px rgba(255, 200, 190, 0.7);
+}
+
+.buttons a:active i {
+  transform: translateY(4px);
+  box-shadow:
+    0 0 0 var(--button-side),
+    inset 0 3px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* ---- The screen ---- */
+.screen {
+  display: block;
+  padding: clamp(1.25rem, 3.5vw, 2.25rem);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--screen-top), var(--screen-bottom));
+  border: 1px solid var(--screen-rim);
+  box-shadow: inset 0 3px 8px rgba(30, 20, 80, 0.25);
+}
+
+.screen section {
+  margin-top: 1.6rem;
+}
+
+.screen h1 {
+  margin: 0 0 0.5rem;
+  font: bold 1.6rem / 1.2 var(--font-label);
+  color: var(--ink);
+}
+
+.screen h2 {
+  margin: 0 0 0.5rem;
+  font: bold 0.78rem var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
 }
 
 .role {
-  margin: 0.4rem 0 1rem;
-  font: bold 1.1rem var(--font-chrome);
+  margin: 0 0 0.9rem;
+  font: bold 1.15rem var(--font-label);
   color: var(--role);
 }
 
 .bio {
   margin: 0;
-  font-size: 1.1rem;
-  line-height: 1.55;
+  font-size: 1.08rem;
 }
 
-/* Links: glossy pills */
-.links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-top: 1.25rem;
-}
-
-.links a {
-  position: relative;
-  overflow: hidden;
-  padding: 0.5rem 1.3rem;
-  border-radius: 99px;
-  border: 1px solid var(--pill-border);
-  background: var(--pill-gradient);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-  color: var(--on-accent);
-  font: bold 14px var(--font-chrome);
-  text-decoration: none;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
-}
-
-.links a::before {
-  content: "";
-  position: absolute;
-  left: 6%;
-  right: 6%;
-  top: 1px;
-  height: 45%;
-  border-radius: 99px;
-  background: linear-gradient(
-    rgba(255, 255, 255, var(--highlight-alpha)),
-    rgba(255, 255, 255, 0.02)
-  );
-  pointer-events: none;
-}
-
-.links a:hover,
-.links a:focus-visible {
-  background: var(--pill-hover-gradient);
-}
-
-/* Projects panel */
-.projects {
-  margin-top: 2rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  background: var(--panel-bg);
-}
-
-.projects h2 {
-  margin: 0 0 0.4rem;
-  font: bold 0.8rem var(--font-chrome);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--label);
-}
-
-.projects ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.projects a {
+/* Rows (Projects, Recent writing): light up from inside, press in */
+.rows a {
   display: grid;
-  grid-template-columns: 11rem 1fr;
+  grid-template-columns: 9rem 1fr;
   gap: 1rem;
-  padding: 0.5rem;
-  border-radius: 4px;
-  color: var(--link-text);
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  color: var(--ink);
   text-decoration: none;
+  transition: box-shadow 0.12s, transform 0.05s;
 }
 
-.projects a[data-has-image] {
-  grid-template-columns: 6rem 11rem 1fr;
+.rows a[data-has-image] {
+  grid-template-columns: 5.5rem 8rem 1fr;
   align-items: center;
 }
 
-.projects .logo {
-  width: 6rem;
-  height: 6rem;
-  border-radius: 6px;
-  background: #fff;
+.rows strong {
+  color: var(--link);
+  font-family: var(--font-label);
+}
+
+.rows .logo {
+  width: 5.5rem;
+  height: 5.5rem;
   object-fit: contain;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--logo-rim);
 }
 
-.projects a strong {
-  font-family: var(--font-chrome);
-}
-
-.projects .detail {
+.rows .detail {
   display: block;
-  color: var(--text);
 }
 
-.projects .tags {
+.rows .tags {
   display: block;
-  margin-top: 0.15rem;
-  font-size: 0.85rem;
-  color: var(--muted);
+  font: 0.85rem var(--font-mono);
+  color: var(--ink-soft);
 }
 
-.projects .tags [data-tag] + [data-tag]::before {
+.rows [data-tag] + [data-tag]::before {
   content: " · ";
 }
 
-.projects a:hover,
-.projects a:focus-visible {
-  background: var(--pill-gradient);
-  color: var(--on-accent);
+.rows a:is(:hover, :focus-visible) {
+  background: linear-gradient(var(--row-lit-top), var(--row-lit-bottom));
+  box-shadow:
+    inset 0 0 0 1px var(--row-lit-rim),
+    inset 0 0 14px rgba(120, 165, 255, 0.55),
+    0 0 12px rgba(100, 150, 255, 0.45);
 }
 
-.projects a:is(:hover, :focus-visible) :is(.detail, .tags) {
-  color: var(--on-accent);
+.rows a:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 5px rgba(30, 30, 90, 0.35);
 }
 
-/* Focus ring on every Link and Project row */
-a:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+/* ---- Writing ---- */
+.back {
+  margin: 0 0 1rem;
+  font: 0.9rem var(--font-label);
 }
 
-/* Phones: full-bleed window, stacked Project rows */
-@media (max-width: 600px) {
-  .desktop {
-    padding: 0;
-  }
-  .window {
-    border-radius: 0;
-    border: 0;
-    min-height: 100vh;
-  }
-  .content {
-    margin: 0;
-    border-radius: 0;
-    border-left: 0;
-    border-right: 0;
-  }
-  .projects a {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-
-  .projects a[data-has-image] {
-    grid-template-columns: 1fr;
-  }
-
-  .projects .logo {
-    margin-bottom: 0.5rem;
-  }
+.back a,
+.post a,
+.post-list a {
+  color: var(--link);
 }
 
-/* ---- 404 error dialog: a small window centred on the bare desktop ---- */
-.desktop-centered {
-  align-items: center;
+.post-list {
+  margin-top: 1.5rem;
 }
 
-.window.dialog {
-  max-width: 26rem;
+.post-list li {
+  margin-bottom: 1.5rem;
 }
 
-.dialog .content {
+.post-list a {
+  font: bold 1.1rem var(--font-label);
+}
+
+.post-list time,
+.post .meta {
+  display: block;
+  font: 0.85rem var(--font-mono);
+  color: var(--ink-soft);
+}
+
+.post-list p {
+  margin: 0.25rem 0 0;
+}
+
+.post .meta {
+  margin: 0 0 1.5rem;
+}
+
+.post img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Code: a darker blue-white panel with an inset bevel */
+.post pre {
+  overflow-x: auto;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--code-rim);
+  background-image: linear-gradient(var(--code-top), var(--code-bottom));
+  box-shadow:
+    inset 0 2px 5px rgba(30, 20, 80, 0.25),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.8);
+  font: 0.9rem / 1.5 var(--font-mono);
+}
+
+.post code {
+  font-family: var(--font-mono);
+}
+
+/* ---- 404 ---- */
+.not-found {
   display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  column-gap: 1rem;
-  padding: 1.5rem;
+  justify-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem 0;
+  text-align: center;
 }
 
-.dialog .content > * {
-  max-width: none;
-}
-
-.dialog .content p {
+.not-found p {
   margin: 0;
-  font-size: 1rem;
-}
-
-.dialog .links {
-  grid-column: 1 / -1;
-  justify-content: flex-end;
+  font: bold 1.2rem var(--font-label);
 }
 
 /* Warning icon: a yellow triangle with an exclamation mark, drawn in CSS */
@@ -395,13 +600,230 @@ a:focus-visible {
   height: 4px;
 }
 
-/* Writing */
-.back { margin: 0 0 1rem; font-family: var(--font-chrome); font-size: 0.9rem; }
-.back a, .post-list a, .post a { color: var(--link-text); }
-.post-list { margin: 1.5rem 0 0; padding: 0; list-style: none; }
-.post-list li { margin-bottom: 1.5rem; }
-.post-list a { font: bold 1.1rem var(--font-chrome); }
-.post-list time, .post .meta { display: block; color: var(--muted); font-size: 0.85rem; }
-.post-list p { margin: 0.25rem 0 0; }
-.post pre { overflow-x: auto; padding: 1rem; border-radius: 6px; font-size: 0.9rem; }
-.post img { max-width: 100%; height: auto; }
+/* Candy key. The highlight band stops above the glyphs; the glow sits below the baseline. */
+.key {
+  padding: 0.7rem 1.4rem;
+  border-radius: 12px;
+  color: var(--on-key);
+  text-decoration: none;
+  font: bold 14px var(--font-label);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.1) 26%, transparent 27%),
+    radial-gradient(ellipse 70% 40% at 50% 108%, rgba(150, 205, 255, 0.9), transparent),
+    var(--key);
+  border: 1px solid var(--key-side);
+  box-shadow:
+    0 3px 0 var(--key-side),
+    0 5px 8px rgba(20, 20, 80, 0.3);
+  transition: box-shadow 0.12s, transform 0.05s;
+}
+
+.key:is(:hover, :focus-visible) {
+  background-color: var(--key-hover);
+  box-shadow:
+    0 3px 0 var(--key-side),
+    0 0 16px 4px rgba(110, 170, 255, 0.7),
+    inset 0 0 10px rgba(170, 215, 255, 0.6);
+}
+
+.key:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 0 0 var(--key-side),
+    inset 0 2px 5px rgba(0, 0, 0, 0.45);
+}
+
+/* ---- Upright phones: thin plastic edge, name strip on top, buttons pinned to the bottom ---- */
+@media (max-width: 600px) {
+  .frame {
+    padding: 0;
+  }
+
+  /* svh: the shell fits the smallest viewport, so a short page never scrolls under Safari's toolbar. */
+  .handheld {
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: 8px 6px 0;
+    border-radius: 0;
+    border-width: 0 0 1px;
+  }
+
+  .handheld::before,
+  .power,
+  .dpad,
+  .base {
+    display: none;
+  }
+
+  .name {
+    order: 0;
+    margin: 6px 0 10px;
+    font-size: 1.9rem;
+  }
+
+  /* The screen fills the phone, so a short page doesn't leave an empty bezel. */
+  .bezel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 8px 18px;
+    border-radius: 10px 10px 28px 10px;
+  }
+
+  .screen {
+    flex: 1;
+    padding: 1.25rem 1rem;
+  }
+
+  .controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    justify-content: center;
+    margin: 12px -6px 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--plastic-strip);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--plastic-edge);
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.35),
+      0 -6px 16px rgba(40, 20, 100, 0.3);
+  }
+
+  .buttons {
+    gap: 22px;
+    padding: 0;
+    background: none;
+    transform: none;
+  }
+
+  .buttons a {
+    gap: 4px;
+  }
+
+  .buttons i {
+    width: 44px;
+    height: 44px;
+  }
+
+  .buttons span {
+    font-size: 10px;
+    color: var(--strip-label);
+    text-shadow: 0 1px 1px rgba(20, 0, 50, 0.6);
+  }
+
+  .buttons a:focus-visible {
+    outline-color: var(--strip-label);
+  }
+
+  .rows a,
+  .rows a[data-has-image] {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}
+
+/* ---- Sideways phones: screen on the left, a plastic strip of buttons pinned down the right ---- */
+@media (orientation: landscape) and (max-height: 500px) {
+  .frame {
+    padding: 0;
+  }
+
+  .handheld {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px;
+    grid-template-rows: auto 1fr;
+    column-gap: 10px;
+    max-width: none;
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: 6px 0 8px calc(8px + env(safe-area-inset-left));
+    border-radius: 0;
+    border-width: 0;
+  }
+
+  .handheld::before,
+  .power,
+  .dpad,
+  .base {
+    display: none;
+  }
+
+  .name {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    margin: 2px 0 6px;
+    padding-left: 6px;
+    font-size: 1.5rem;
+    text-align: left;
+  }
+
+  .bezel {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px 14px;
+    border-radius: 10px 10px 28px 10px;
+  }
+
+  .screen {
+    flex: 1;
+  }
+
+  .controls {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: start;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh; /* the visible height, so the buttons stay centred as the toolbar comes and goes */
+    margin: 0;
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) 0;
+    justify-content: center;
+    background: var(--plastic-strip);
+    border-left: 1px solid var(--plastic-edge);
+    box-shadow:
+      inset 2px 0 0 rgba(255, 255, 255, 0.35),
+      -6px 0 16px rgba(40, 20, 100, 0.25);
+  }
+
+  .buttons {
+    flex-direction: column;
+    gap: 14px;
+    padding: 0;
+    background: none;
+    transform: none;
+  }
+
+  .buttons i {
+    width: 44px;
+    height: 44px;
+  }
+
+  .buttons span {
+    font-size: 10px;
+    color: var(--strip-label);
+    text-shadow: 0 1px 1px rgba(20, 0, 50, 0.6);
+  }
+
+  .buttons a:focus-visible {
+    outline-color: var(--strip-label);
+  }
+}
+
+/* The only motion is the power LED; the presses and glows don't animate either. */
+@media (prefers-reduced-motion: reduce) {
+  .led {
+    animation: none;
+  }
+
+  .buttons i,
+  .rows a,
+  .key {
+    transition: none;
+  }
+}
