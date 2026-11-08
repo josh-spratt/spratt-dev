@@ -25,8 +25,8 @@
   --pill-hover-bottom: #0a3470;
   --pill-gradient: linear-gradient(180deg, var(--pill-top), var(--pill-bottom));
   --pill-hover-gradient: linear-gradient(180deg, var(--pill-top), var(--pill-hover-bottom));
-  --name-stroke: #4a586d; /* outlines the name; needs 4.5:1 on the content area */
-  --name-fill: linear-gradient(180deg, #fff 0%, #9aa6b8 48%, #3c4a5e 50%, #c2ccda 100%);
+  --name-stroke: #9b1c1c; /* outlines the name; needs 4.5:1 on the content area */
+  --name-fill: linear-gradient(180deg, #ffb3ab 0%, #e8412f 48%, #8f1212 50%, #f08a7e 100%);
   --button-close: #e0443e;
   --button-minimize: #dea123;
   --button-zoom: #1aab29;
@@ -255,6 +255,19 @@ h1 {
   text-decoration: none;
 }
 
+.projects a[data-has-image] {
+  grid-template-columns: 6rem 11rem 1fr;
+  align-items: center;
+}
+
+.projects .logo {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 6px;
+  background: #fff;
+  object-fit: contain;
+}
+
 .projects a strong {
   font-family: var(--font-chrome);
 }
@@ -310,5 +323,13 @@ a:focus-visible {
   .projects a {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+
+  .projects a[data-has-image] {
+    grid-template-columns: 1fr;
+  }
+
+  .projects .logo {
+    margin-bottom: 0.5rem;
   }
 }

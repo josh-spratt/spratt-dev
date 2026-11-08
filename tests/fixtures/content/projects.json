@@ -3,6 +3,7 @@
     "title": "Fixture Alpha",
     "description": "First fixture project.",
     "url": "https://example.com/alpha",
+    "image": "/projects/alpha.png",
     "tags": ["Rust", "SQL"]
   },
   {

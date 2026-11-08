@@ -41,7 +41,10 @@ const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "
               {
                 projects.map((p) => (
                   <li>
-                    <a href={p.url}>
+                    <a href={p.url} data-has-image={p.image ? "" : undefined}>
+                      {p.image && (
+                        <img class="logo" src={p.image} alt="" width="96" height="96" loading="lazy" />
+                      )}
                       <strong>{p.title}</strong>
                       <span class="detail">
                         {p.description}
