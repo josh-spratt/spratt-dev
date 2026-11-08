@@ -1,0 +1,11 @@
+[
+  {
+    "title": "MarinaraDB",
+    "description": "A toy relational database written in Rust, with pasta-themed terminology and its own query language.",
+    "url": "https://github.com/josh-spratt/marinaraDB",
+    "tags": [
+      "Rust",
+      "Databases"
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "name": "Fixture Person",
+  "role": "Fixture role line",
+  "bio": "Fixture bio sentence one. Fixture bio sentence two.",
+  "links": {
+    "github": "https://github.com/fixture",
+    "linkedin": "https://www.linkedin.com/in/fixture",
+    "email": "fixture@example.com"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-import { site } from "../lib/site";
+import { site, projects } from "../lib/site";
 ---
 
 <!doctype html>
@@ -11,7 +11,38 @@ import { site } from "../lib/site";
   </head>
   <body>
     <main>
-      <h1>{site.name}</h1>
+      <header>
+        <h1>{site.name}</h1>
+        <p>{site.role}</p>
+        <p>{site.bio}</p>
+        <nav aria-label="Links">
+          <a href={site.links.github}>GitHub</a>
+          <a href={site.links.linkedin}>LinkedIn</a>
+          <a href={`mailto:${site.links.email}`}>Email</a>
+        </nav>
+      </header>
+      <section aria-labelledby="projects">
+        <h2 id="projects">Projects</h2>
+        <ul>
+          {
+            projects.map((p) => (
+              <li>
+                <a href={p.url}>
+                  <strong>{p.title}</strong>
+                  <span>{p.description}</span>
+                  {p.tags && (
+                    <span>
+                      {p.tags.map((t) => (
+                        <span data-tag>{t}</span>
+                      ))}
+                    </span>
+                  )}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
     </main>
   </body>
 </html>
