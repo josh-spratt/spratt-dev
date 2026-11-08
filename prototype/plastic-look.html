@@ -3,7 +3,8 @@
   PROTOTYPE, throwaway. Never merge to main.
   Question (issue #34): should the Homepage pivot from the Y2K silver-blue window to
   90s/00s blue/purple translucent plastic hardware, and if so, which concept?
-  Plan: three plastic variants plus today's look as a baseline, switchable via ?variant=ii|iii|iv|L.
+  Plan: three plastic variants plus today's look as a baseline, switchable via ?variant=ii|iii|iii-sticky|iii-top|iv|L.
+  iii-sticky and iii-top are iii with a different phone layout only; desktop is identical.
   Bar: ←/→ cycle variants, W toggles the future Recent writing block, P squeezes to 375px phone width.
   Phone width works through container queries on .stage, so P and a real phone show the same thing.
   Content is real (content/site.json, projects.json); the writing entries are placeholders.
@@ -12,14 +13,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Josh Spratt (plastic prototype)</title>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body { background: #dfe3f7; }
   .variant { display: none; min-height: 100vh; }
-  body[data-v="ii"] #ii, body[data-v="iii"] #iii, body[data-v="iv"] #iv, body[data-v="L"] #L { display: block; }
+  body[data-v="ii"] #ii, body[data-v^="iii"] #iii, body[data-v="iv"] #iv, body[data-v="L"] #L { display: block; }
   body:not([data-writing="on"]) .writing { display: none; }
   .stage { container: stage / inline-size; margin: 0 auto; min-height: 100vh; }
   body[data-phone="on"] .stage { max-width: 375px; box-shadow: 0 0 0 1px #8888, 0 0 0 100vmax #fff8; }
@@ -198,6 +199,31 @@
     #iii .rows a, #iii .rows a[data-img] { grid-template-columns: 1fr; gap: .2rem; }
   }
 
+
+  /* iii-sticky (phones): name in a top strip; the buttons ride along in a sticky bottom deck */
+  @container stage (max-width: 600px) {
+    body[data-v="iii-sticky"] #iii h1 { order: 0; margin: 6px 0 10px; font-size: 1.9rem; }
+    body[data-v="iii-sticky"] #iii .strip { display: none; }
+    body[data-v="iii-sticky"] #iii .handheld { padding-bottom: 0; border-radius: 0; }
+    body[data-v="iii-sticky"] #iii .controls { position: sticky; bottom: 0; z-index: 5; margin: 12px -6px 0;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(118, 78, 196, .94); backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(255, 255, 255, .6); box-shadow: inset 0 2px 0 rgba(255,255,255,.35), 0 -6px 16px rgba(40, 20, 100, .3); }
+    body[data-v="iii-sticky"] #iii nav { gap: 22px; padding: 0; background: none; }
+    body[data-v="iii-sticky"] #iii .ab { gap: 4px; }
+    body[data-v="iii-sticky"] #iii .ab i { width: 44px; height: 44px; }
+    body[data-v="iii-sticky"] #iii .ab span { font-size: 10px; }
+  }
+  /* iii-top (phones): name, then the buttons, then the screen; nothing pinned */
+  @container stage (max-width: 600px) {
+    body[data-v="iii-top"] #iii h1 { order: 0; margin: 6px 0 4px; font-size: 1.9rem; }
+    body[data-v="iii-top"] #iii .controls { order: 1; margin: 6px 0 14px; }
+    body[data-v="iii-top"] #iii .strip { display: none; }
+    body[data-v="iii-top"] #iii .lens { order: 2; }
+  }
+  /* keep the prototype bar off the sticky deck */
+  body[data-v="iii-sticky"] #proto { bottom: auto; top: 12px; }
+
   /* ===================== iv: clip-together modules ===================== */
   #iv { --led: #6ab8ff; }
   #iv .rack { max-width: 76rem; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 26px; align-items: start; }
@@ -342,11 +368,19 @@
 </div></div></div>
 
 <!-- ============ iii: handheld ============
-     h1 comes first in the DOM but sits under the lens visually (flex order), like a logo.
-     The Links are after the screen in the DOM, so they tab after the Project rows. A trade-off to judge. -->
+     DOM order is name, Links, screen (so Links tab before the Project rows); flex order puts
+     the name and Links under the lens on desktop, like a logo and buttons. -->
 <div class="variant pp" id="iii"><div class="stage"><div class="frame">
   <div class="handheld shell">
     <h1>Josh Spratt</h1>
+    <div class="controls">
+      <span class="dpad" aria-hidden="true"></span>
+      <nav aria-label="Links">
+        <a class="ab" href="https://github.com/josh-spratt"><i></i><span>GitHub</span></a>
+        <a class="ab" href="https://www.linkedin.com/in/josh-spratt-2668aba8/"><i></i><span>LinkedIn</span></a>
+        <a class="ab" href="mailto:josh@jspratt.dev"><i></i><span>Email</span></a>
+      </nav>
+    </div>
     <div class="strip" data-chrome aria-hidden="true"><span class="switch">OFF <b></b> ON</span></div>
     <div class="lens">
       <div class="lens-top" data-chrome aria-hidden="true">
@@ -375,14 +409,6 @@
           </ul>
         </section>
       </main>
-    </div>
-    <div class="controls">
-      <span class="dpad" aria-hidden="true"></span>
-      <nav aria-label="Links">
-        <a class="ab" href="https://github.com/josh-spratt"><i></i><span>GitHub</span></a>
-        <a class="ab" href="https://www.linkedin.com/in/josh-spratt-2668aba8/"><i></i><span>LinkedIn</span></a>
-        <a class="ab" href="mailto:josh@jspratt.dev"><i></i><span>Email</span></a>
-      </nav>
     </div>
     <div class="base" data-chrome aria-hidden="true">
       <span class="pills"><b></b><b></b></span>
@@ -484,7 +510,7 @@
 
 <script>
   // Prototype switcher only. The real site ships zero JS.
-  const names = { ii: "Device bezel", iii: "Handheld", iv: "Clip-together modules", L: "Today's look (baseline)" };
+  const names = { ii: "Device bezel", iii: "Handheld", "iii-sticky": "Handheld, sticky deck on phones", "iii-top": "Handheld, controls on top on phones", iv: "Clip-together modules", L: "Today's look (baseline)" };
   const keys = Object.keys(names);
   const b = document.body;
   const params = new URLSearchParams(location.search);
