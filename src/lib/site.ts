@@ -99,7 +99,7 @@ export const projects: Project[] = loadProjects();
 export async function getPosts() {
   const { getCollection } = await import("astro:content");
   const all = await getCollection("posts", (p) => buildMode === "preview" || !p.data.draft);
-  return all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+  return all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime() || a.id.localeCompare(b.id));
 }
 
 /** e.g. "10 Mar 2026". Dates are UTC so builds don't shift by timezone. */
