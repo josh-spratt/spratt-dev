@@ -230,6 +230,27 @@ test("sideways phones move the buttons into a strip down the right side", () => 
   assert.match(rule(side, ".buttons i"), /width:\s*44px/);
 });
 
+test("the Writing page links back to the Homepage at the top of the screen", () => {
+  const screen = site.html("writing/index.html").querySelector("main");
+  const back = screen?.querySelector(".back a");
+  assert.equal(back?.getAttribute("href"), "/");
+  assert.match(back?.text ?? "", /Home/);
+  assert.ok(screen!.innerHTML.indexOf("back") < screen!.innerHTML.indexOf("<h1"), "it comes before the heading");
+});
+
+test("on desktop every page fits the window and scrolls inside the screen", () => {
+  // The screen is the scroller, so keyboard users can reach it.
+  for (const page of pages) {
+    assert.equal(site.html(page).querySelector("main")?.getAttribute("tabindex"), "0", `${page}: the screen is focusable`);
+  }
+  // Wider than a phone and tall enough for a useful screen; shorter windows scroll the page.
+  const desktop = mediaBlocks(/(min-width:\s*601px|width\s*>=\s*601px)[^{]*(min-height:\s*700px|height\s*>=\s*700px)/);
+  assert.ok(desktop, "a ≥601px wide, ≥700px tall media query exists");
+  assert.match(rule(desktop, ".frame .screen"), /overflow-y:\s*auto/);
+  // Focus ring on the dark bezel around the screen.
+  assert.match(css, /\.screen:focus-visible[^{]*\{[^}]*outline-color:\s*var\(--bezel-label\)/);
+});
+
 test("the pages ask for the full screen so the safe-area insets apply", () => {
   assert.match(site.html("index.html").querySelector('meta[name="viewport"]')?.getAttribute("content") ?? "", /viewport-fit=cover/);
 });
