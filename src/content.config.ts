@@ -16,6 +16,8 @@ const posts = defineCollection({
     date: z.coerce.date(),
     updated: z.coerce.date().optional(),
     draft: z.boolean().default(false),
+    /** Optional thumbnail, a path under public/ such as /writing/slug.png. */
+    image: z.string().min(1).optional(),
   }),
 });
 

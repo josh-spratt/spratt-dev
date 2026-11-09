@@ -41,7 +41,8 @@ const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "
         <ul class="rows">
           {recent.map((p) => (
             <li>
-              <a href={`/writing/${p.id}/`}>
+              <a href={`/writing/${p.id}/`} data-has-image={p.data.image ? "" : undefined}>
+                {p.data.image && <img class="logo" src={p.data.image} alt="" width="88" height="88" loading="lazy" />}
                 <strong>{p.data.title}</strong>
                 <span class="detail">
                   {p.data.description}
