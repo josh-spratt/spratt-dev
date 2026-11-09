@@ -9,11 +9,13 @@ const posts = await getPosts();
   title={`Writing — ${site.name}`}
   description={`Writing by ${site.name}.`}
   readout={`Done · ${posts.length} ${posts.length === 1 ? "post" : "posts"}`}>
+  <p class="back"><a href="/">← Home</a></p>
   <h1>Writing</h1>
   <ul class="post-list">
     {
       posts.map((p) => (
-        <li>
+        <li data-has-image={p.data.image ? "" : undefined}>
+          {p.data.image && <img class="logo" src={p.data.image} alt="" width="64" height="64" loading="lazy" />}
           <a href={`/writing/${p.id}/`}>{p.data.title}</a>
           <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
           <p>{p.data.description}</p>

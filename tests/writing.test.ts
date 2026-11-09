@@ -65,3 +65,16 @@ test("Homepage does not link to /writing when there are no Posts", () => {
   const html = buildSite({ contentDir: "tests/fixtures/zero/content", mode: "production" }).read("index.html");
   assert.doesNotMatch(html, /href="\/writing/);
 });
+
+test("A Post's thumbnail shows on /writing and in Recent writing when it has one and not otherwise", () => {
+  const site = buildSite(fixtures("production"));
+  for (const rows of [
+    site.html("writing/index.html").querySelectorAll("main li"),
+    site.html("index.html").querySelectorAll("section.recent-writing li"),
+  ]) {
+    const img = rows[0].querySelector("img");
+    assert.equal(img?.getAttribute("src"), "/writing/newer-post.png");
+    assert.equal(img?.getAttribute("alt"), "", "it is decorative; the title names the Post");
+    assert.equal(rows[1].querySelector("img"), null);
+  }
+});
