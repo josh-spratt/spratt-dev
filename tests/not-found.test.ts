@@ -19,8 +19,8 @@ test("the screen has one Go home key, linking to /", () => {
   assert.equal(links[0].getAttribute("href"), "/");
 });
 
-test("the 404 is the handheld, not the old error dialog, and the path isn't echoed", () => {
-  assert.ok(doc.querySelector("[data-handheld]"));
+test("the 404 uses the site layout, not the old error dialog, and the path isn't echoed", () => {
+  assert.ok(doc.querySelector("header.site-header"));
   assert.equal(doc.querySelector(".window, .dialog"), null);
   assert.doesNotMatch(doc.querySelector("main")?.text ?? "", /\//);
 });

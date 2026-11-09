@@ -9,11 +9,11 @@ The single page at `/`, made of the Intro, Projects and (once it exists) Recent 
 _Avoid_: landing page, index
 
 **Intro**:
-The opening block of the Homepage: name, role line, short bio, and the Links.
+The opening block of the Homepage: name, role line and short bio.
 _Avoid_: hero, about, header
 
 **Links**:
-The row of contact and profile links (GitHub, LinkedIn, email) inside the Intro.
+The row of contact and profile links (GitHub, LinkedIn, email) in the header on every page.
 _Avoid_: socials, footer links
 
 **Project**:

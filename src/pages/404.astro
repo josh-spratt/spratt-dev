@@ -1,12 +1,12 @@
 ---
 import { site } from "../lib/site";
-import Handheld from "../layouts/Handheld.astro";
+import Page from "../layouts/Page.astro";
 ---
 
-<Handheld title={`Not found — ${site.name}`} noindex readout="Error">
+<Page title={`Not found — ${site.name}`} noindex>
   <div class="not-found">
     <span class="warning-icon" data-icon="warning" aria-hidden="true"></span>
     <p>That page doesn't exist</p>
     <a class="key" href="/">Go home</a>
   </div>
-</Handheld>
+</Page>

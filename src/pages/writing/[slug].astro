@@ -1,6 +1,6 @@
 ---
 import { render } from "astro:content";
-import Handheld from "../../layouts/Handheld.astro";
+import Page from "../../layouts/Page.astro";
 import { site, getPosts, formatDate } from "../../lib/site";
 
 export async function getStaticPaths() {
@@ -13,8 +13,7 @@ const { Content } = await render(post);
 const { title, description, date, updated } = post.data;
 ---
 
-<Handheld title={`${title} — ${site.name}`} description={description} type="article">
-  <p class="back"><a href="/writing/">← Writing</a></p>
+<Page title={`${title} — ${site.name}`} description={description} type="article">
   <article class="post">
     <h1>{title}</h1>
     <p class="meta">
@@ -30,4 +29,4 @@ const { title, description, date, updated } = post.data;
     </p>
     <Content />
   </article>
-</Handheld>
+</Page>
