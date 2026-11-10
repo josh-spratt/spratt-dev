@@ -15,8 +15,8 @@ const posts = await getPosts();
         <li data-has-image={p.data.image ? "" : undefined}>
           {p.data.image && <img class="logo" src={p.data.image} alt="" width="64" height="64" loading="lazy" />}
           <a href={`/writing/${p.id}/`}>{p.data.title}</a>
-          <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
           <p>{p.data.description}</p>
+          <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
         </li>
       ))
     }

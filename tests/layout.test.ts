@@ -115,14 +115,17 @@ test("text meets 4.5:1 on the background it sits on", () => {
     ["--ink", "--page"],
     ["--ink-soft", "--page"],
     ["--link", "--page"],
-    // The header band; the dots are darker, so check the nav ink there too.
+    // The yellow column, where the header, Intro and footer sit.
     ["--ink", "--band"],
     ["--ink-soft", "--band"],
     ["--link", "--band"],
-    // A hovered row.
+    // Cards and the white keys.
+    ["--ink", "--card"],
+    ["--ink-soft", "--card"],
+    ["--link", "--card"],
     ["--ink", "--row-hover"],
-    ["--ink-soft", "--row-hover"],
-    ["--link", "--row-hover"],
+    // The role line: yellow on ink.
+    ["--yellow", "--ink"],
     // A Post's code block.
     ["--astro-code-foreground", "--code-bg"],
     ["--astro-code-token-comment", "--code-bg"],
@@ -134,7 +137,7 @@ test("text meets 4.5:1 on the background it sits on", () => {
     ["--astro-code-token-punctuation", "--code-bg"],
     ["--astro-code-token-string", "--code-bg"],
     ["--astro-code-token-string-expression", "--code-bg"],
-    // The 404's Go home key.
+    // Writing in the header and the 404's Go home.
     ["--on-key", "--key"],
     ["--on-key", "--key-hover"],
   ];
@@ -157,17 +160,17 @@ test("links have a visible focus ring", () => {
 
 test("any motion respects prefers-reduced-motion", () => {
   const reduced = css.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([^@]*)/)?.[1] ?? "";
-  assert.match(reduced, /\.rows a\s*\{[^}]*transition:\s*none/);
-  assert.match(reduced, /\.brick\s*\{[^}]*animation:\s*none/, "the bricks are already built");
+  assert.match(reduced, /\.rows a\s*[,{][^}]*transition:\s*none/);
+  assert.match(reduced, /\.brick\s*[,{][^}]*animation:\s*none/, "the bricks are already built");
 });
 
-test("the handheld picture is on the Homepage only, aria-hidden and with nothing focusable", () => {
-  const device = site.html("index.html").querySelectorAll(".hero [data-chrome]");
-  assert.equal(device.length, 1);
-  assert.equal(device[0].getAttribute("aria-hidden"), "true");
-  assert.equal(device[0].querySelectorAll("a, button, [tabindex]").length, 0);
+test("the brick stack is in the Homepage Intro only, aria-hidden and with nothing focusable", () => {
+  const stack = site.html("index.html").querySelectorAll(".hero [data-chrome]");
+  assert.equal(stack.length, 1);
+  assert.equal(stack[0].getAttribute("aria-hidden"), "true");
+  assert.equal(stack[0].querySelectorAll("a, button, [tabindex]").length, 0);
   for (const page of pages.filter((p) => p !== "index.html")) {
-    assert.equal(site.html(page).querySelector("[data-chrome]"), null, `${page} has no handheld`);
+    assert.equal(site.html(page).querySelector("[data-chrome]"), null, `${page} has no brick stack`);
   }
 });
 
