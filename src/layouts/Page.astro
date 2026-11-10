@@ -15,6 +15,7 @@ interface Props {
 const { title, description, type, noindex, home = false } = Astro.props;
 const hasPosts = (await getPosts()).length > 0;
 const path = Astro.url.pathname;
+const hasHero = Astro.slots.has("hero");
 ---
 
 <!doctype html>
@@ -24,12 +25,10 @@ const path = Astro.url.pathname;
   </head>
   <body>
     <a class="skip" href="#content">Skip to content</a>
-    <header class="site-header">
+    <header class:list={["site-header", { "into-hero": hasHero }]}>
       <div class="bar">
         {
-          home ? (
-            <span class="mark" aria-hidden="true" />
-          ) : (
+          !home && (
             <a class="name" data-name href="/">
               <span class="mark" aria-hidden="true" />
               {site.name}
@@ -54,7 +53,18 @@ const path = Astro.url.pathname;
         </div>
       </div>
     </header>
-    <main id="content" class="content"><slot /></main>
+    <main id="content">
+      {
+        hasHero && (
+          <div class="hero">
+            <div class="hero-inner">
+              <slot name="hero" />
+            </div>
+          </div>
+        )
+      }
+      <div class="content"><slot /></div>
+    </main>
     <footer class="site-footer">
       <p>
         © {new Date().getUTCFullYear()} {site.name}

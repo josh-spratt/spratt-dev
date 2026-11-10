@@ -49,7 +49,20 @@
   --font-prose: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, "Courier New", monospace;
 
-  --measure: 42rem;
+  /* The handheld picture */
+  --plastic-hi: rgba(160, 120, 232, 0.9);
+  --plastic-lo: rgba(108, 66, 188, 0.92);
+  --bezel: #2c2555;
+  --screen-top: #f4f7ff;
+  --screen-bottom: #e6edff;
+  --dark-plastic: #3b2f78;
+  --dark-plastic-side: #150f33;
+  --brick-red: #e8412f;
+  --brick-yellow: #f2c230;
+  --brick-blue: #2b49c0;
+  --brick-purple: #764ec4;
+
+  --measure: 46rem;
   --gutter: clamp(1rem, 4vw, 2rem);
 }
 
@@ -99,10 +112,19 @@ ul {
 }
 
 /* ---- Header: name on the left, Writing and the Links on the right ---- */
-.site-header {
+.site-header,
+.hero {
   background: var(--dots), var(--band);
+  background-attachment: fixed, scroll;
+}
+
+.site-header {
   border-top: 5px solid var(--lavender);
   border-bottom: 1px solid var(--rule);
+}
+
+.site-header.into-hero {
+  border-bottom: 0;
 }
 
 .bar {
@@ -143,6 +165,7 @@ ul {
 }
 
 .navs {
+  margin-left: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1.25rem;
@@ -155,7 +178,7 @@ ul {
 
 .navs nav + nav {
   padding-left: 1.25rem;
-  border-left: 1px solid var(--rule);
+  border-left: 1px solid var(--lavender);
 }
 
 .navs a {
@@ -171,15 +194,18 @@ ul {
 }
 
 /* ---- Main column ---- */
-.content {
+main {
   flex: 1;
+}
+
+.content {
   width: 100%;
   max-width: var(--measure);
   margin: 0 auto;
   padding: clamp(2rem, 6vw, 3.5rem) var(--gutter) 3rem;
 }
 
-.content section + section {
+.content > section + section {
   margin-top: 2.75rem;
 }
 
@@ -192,14 +218,38 @@ h1 {
 
 h2 {
   margin: 0 0 0.75rem;
-  font-size: 0.8rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--ink-soft);
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
-/* ---- Intro ---- */
+/* ---- Hero: the Intro beside a picture of the handheld ---- */
+.hero {
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.hero-inner {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 5vw, 3rem) var(--gutter) clamp(2.5rem, 6vw, 4rem);
+}
+
+.intro {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: clamp(1rem, 5vw, 3.5rem);
+}
+
+.intro h1 {
+  font-size: clamp(2.4rem, 8vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
 .role {
   margin: 0 0 1rem;
   font-size: 1.2rem;
@@ -267,12 +317,23 @@ span.logo {
 .meta,
 .post-list time {
   display: block;
-  font: 0.82rem var(--font-mono);
+  font-size: 0.88rem;
   color: var(--ink-soft);
 }
 
-.meta [data-tag] + [data-tag]::before {
-  content: " · ";
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+
+[data-tag] {
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  background: var(--band);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
 }
 
 .more {
@@ -324,6 +385,7 @@ span.logo {
 }
 
 .post {
+  max-width: 40rem;
   font: 1.2rem / 1.7 var(--font-prose);
 }
 
@@ -394,6 +456,147 @@ span.logo {
   padding: 1.25rem var(--gutter) 2rem;
   font-size: 0.85rem;
   color: var(--ink-soft);
+}
+
+/* ---- The handheld picture. Sized in em so one font-size scales the whole thing. ---- */
+.device {
+  position: relative;
+  flex: none;
+  width: 22em;
+  height: 31em;
+  font-size: 10px;
+  border-radius: 1.6em 1.6em 6em 1.6em;
+  background: linear-gradient(160deg, var(--plastic-hi), var(--plastic-lo));
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 0.25em 0 rgba(255, 255, 255, 0.55),
+    inset 0 -0.5em 1em rgba(40, 10, 90, 0.35),
+    0 2em 3em rgba(40, 20, 100, 0.3);
+  transform: rotate(6deg);
+}
+
+.device-bezel {
+  position: absolute;
+  inset: 2em 1.8em auto;
+  height: 15em;
+  padding: 1.6em 2.2em 2.4em;
+  border-radius: 1em 1em 3.5em 1em;
+  background: var(--bezel);
+}
+
+.device-led {
+  position: absolute;
+  z-index: 1;
+  left: 2.7em;
+  top: 8.6em;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 50%;
+  background: var(--button-light);
+  box-shadow: 0 0 0.6em 0.15em var(--button-light);
+}
+
+.device-screen {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0.3em;
+  background: linear-gradient(var(--screen-top), var(--screen-bottom));
+  box-shadow: inset 0 0.3em 0.8em rgba(30, 20, 80, 0.25);
+}
+
+/* The bricks on the screen: the Lego set that builds itself. */
+.brick {
+  --c: var(--brick-red);
+  position: absolute;
+  width: 7.2em;
+  height: 2em;
+  border-radius: 0.2em;
+  background: var(--c);
+  box-shadow:
+    inset 0 -0.35em 0 rgba(0, 0, 0, 0.2),
+    inset 0 0.15em 0 rgba(255, 255, 255, 0.35);
+  animation: drop 0.5s cubic-bezier(0.3, 0.8, 0.4, 1) both;
+}
+
+.brick::before {
+  content: "";
+  position: absolute;
+  left: 0.55em;
+  right: 0.55em;
+  top: -0.6em;
+  height: 0.6em;
+  border-radius: 0.2em 0.2em 0 0;
+  background: repeating-linear-gradient(90deg, var(--c) 0 1.2em, transparent 1.2em 1.85em);
+}
+
+.b1 { left: 2em; bottom: 0.8em; animation-delay: 0.3s; }
+.b2 { --c: var(--brick-yellow); left: 4.6em; bottom: 2.8em; animation-delay: 0.75s; }
+.b3 { --c: var(--brick-blue); left: 1.4em; bottom: 4.8em; animation-delay: 1.2s; }
+.b4 { --c: var(--brick-purple); left: 5em; bottom: 6.8em; width: 3.6em; animation-delay: 1.65s; }
+
+@keyframes drop {
+  from { transform: translateY(-12em); }
+  80% { transform: translateY(0.15em); }
+  to { transform: none; }
+}
+
+.device-word {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 17.3em;
+  text-align: center;
+  font: italic 800 1.5em / 1 var(--font-body);
+  letter-spacing: -0.02em;
+  color: var(--button-dark);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.device-dpad {
+  position: absolute;
+  left: 2.6em;
+  top: 21em;
+  width: 5.4em;
+  height: 5.4em;
+  background:
+    linear-gradient(var(--dark-plastic), var(--dark-plastic)) center / 1.8em 100% no-repeat,
+    linear-gradient(var(--dark-plastic), var(--dark-plastic)) center / 100% 1.8em no-repeat;
+  filter: drop-shadow(0 0.2em 0 var(--dark-plastic-side));
+}
+
+.device-ab {
+  position: absolute;
+  right: 2.4em;
+  top: 21.2em;
+  display: flex;
+  gap: 0.8em;
+  transform: rotate(-20deg);
+}
+
+.device-ab b {
+  width: 2.6em;
+  height: 2.6em;
+  border-radius: 50%;
+  border: 1px solid var(--button-rim);
+  background:
+    radial-gradient(ellipse 60% 35% at 50% 22%, rgba(255, 255, 255, 0.75), transparent 70%),
+    radial-gradient(circle at 50% 60%, var(--button-light), var(--button-dark) 75%);
+  box-shadow: 0 0.25em 0 #6a0c10;
+}
+
+.device-ab b:first-child {
+  margin-top: 1.2em;
+}
+
+.device-speaker {
+  position: absolute;
+  right: 2.6em;
+  bottom: 1.6em;
+  width: 4.2em;
+  height: 2.8em;
+  transform: rotate(-30deg);
+  background: repeating-linear-gradient(90deg, rgba(40, 15, 95, 0.55) 0 0.4em, transparent 0.4em 0.9em);
 }
 
 /* ---- 404 ---- */
@@ -488,13 +691,27 @@ span.logo {
     height: 3rem;
   }
 
+  .intro {
+    gap: 0.75rem;
+  }
+
+  .device {
+    font-size: 5.2px;
+    margin-right: 0.25rem;
+  }
+
   .post {
     font-size: 1.1rem;
   }
 }
 
+/* Reduced motion: the bricks are already built. */
 @media (prefers-reduced-motion: reduce) {
   .rows a {
     transition: none;
+  }
+
+  .brick {
+    animation: none;
   }
 }

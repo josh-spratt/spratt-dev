@@ -155,8 +155,20 @@ test("links have a visible focus ring", () => {
   assert.match(css, /a:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--accent\)/);
 });
 
-test("any transition respects prefers-reduced-motion", () => {
-  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[^@]*\.rows a\s*\{[^}]*transition:\s*none/);
+test("any motion respects prefers-reduced-motion", () => {
+  const reduced = css.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([^@]*)/)?.[1] ?? "";
+  assert.match(reduced, /\.rows a\s*\{[^}]*transition:\s*none/);
+  assert.match(reduced, /\.brick\s*\{[^}]*animation:\s*none/, "the bricks are already built");
+});
+
+test("the handheld picture is on the Homepage only, aria-hidden and with nothing focusable", () => {
+  const device = site.html("index.html").querySelectorAll(".hero [data-chrome]");
+  assert.equal(device.length, 1);
+  assert.equal(device[0].getAttribute("aria-hidden"), "true");
+  assert.equal(device[0].querySelectorAll("a, button, [tabindex]").length, 0);
+  for (const page of pages.filter((p) => p !== "index.html")) {
+    assert.equal(site.html(page).querySelector("[data-chrome]"), null, `${page} has no handheld`);
+  }
 });
 
 test("no page ships a script, apart from the analytics beacon", () => {

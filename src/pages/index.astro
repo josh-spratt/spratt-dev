@@ -1,16 +1,20 @@
 ---
 import { site, projects, getPosts, formatDate } from "../lib/site";
 import Page from "../layouts/Page.astro";
+import Handheld from "../components/Handheld.astro";
 
 const posts = await getPosts();
 const recent = posts.slice(0, 3);
 ---
 
 <Page title={`${site.name} — ${site.role}`} description={site.description} home>
-  <section class="intro" aria-label="Intro">
-    <h1 data-name>{site.name}</h1>
-    <p class="role">{site.role}</p>
-    <p class="bio">{site.bio}</p>
+  <section class="intro" aria-label="Intro" slot="hero">
+    <div class="intro-text">
+      <h1 data-name>{site.name}</h1>
+      <p class="role">{site.role}</p>
+      <p class="bio">{site.bio}</p>
+    </div>
+    <Handheld />
   </section>
   <section aria-labelledby="projects">
     <h2 id="projects">Projects</h2>
@@ -28,7 +32,7 @@ const recent = posts.slice(0, 3);
                 <strong>{p.title}</strong>
                 <span class="detail">{p.description}</span>
                 {p.tags && (
-                  <span class="meta">
+                  <span class="tags">
                     {p.tags.map((t) => (
                       <span data-tag>{t}</span>
                     ))}
@@ -67,7 +71,7 @@ const recent = posts.slice(0, 3);
         </ul>
         {posts.length > recent.length && (
           <p class="more">
-            <a href="/writing/">All writing →</a>
+            <a href="/writing/">All writing</a>
           </p>
         )}
       </section>
