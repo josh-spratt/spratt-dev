@@ -1,6 +1,6 @@
 ---
 import { render } from "astro:content";
-import Handheld from "../../layouts/Handheld.astro";
+import Page from "../../layouts/Page.astro";
 import { site, getPosts, formatDate } from "../../lib/site";
 
 export async function getStaticPaths() {
@@ -10,24 +10,26 @@ export async function getStaticPaths() {
 
 const { post } = Astro.props;
 const { Content } = await render(post);
-const { title, description, date, updated } = post.data;
+const { title, description, date, updated, image } = post.data;
 ---
 
-<Handheld title={`${title} — ${site.name}`} description={description} type="article">
-  <p class="back"><a href="/writing/">← Writing</a></p>
+<Page title={`${title} — ${site.name}`} description={description} type="article">
   <article class="post">
-    <h1>{title}</h1>
-    <p class="meta">
-      <time datetime={date.toISOString()}>{formatDate(date)}</time>
-      {
-        updated && (
-          <>
-            {" · Updated "}
-            <time data-updated datetime={updated.toISOString()}>{formatDate(updated)}</time>
-          </>
-        )
-      }
-    </p>
+    <header class:list={["post-head", { "has-cover": image }]}>
+      {image && <img class="cover" src={image} alt="" width="160" height="160" />}
+      <h1>{title}</h1>
+      <p class="meta">
+        <time datetime={date.toISOString()}>{formatDate(date)}</time>
+        {
+          updated && (
+            <>
+              {" · Updated "}
+              <time data-updated datetime={updated.toISOString()}>{formatDate(updated)}</time>
+            </>
+          )
+        }
+      </p>
+    </header>
     <Content />
   </article>
-</Handheld>
+</Page>

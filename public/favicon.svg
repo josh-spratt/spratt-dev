@@ -1,16 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <radialGradient id="btn" cx="50%" cy="62%" r="62%">
-      <stop offset="0" stop-color="#f0473c"/>
-      <stop offset="1" stop-color="#b0161b"/>
-    </radialGradient>
-    <linearGradient id="hl" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.95"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="14" fill="#a28dd9"/>
-  <circle cx="32" cy="36" r="21" fill="#6a0c10"/>
-  <circle cx="32" cy="32" r="21" fill="url(#btn)" stroke="#7a0f0f" stroke-width="2"/>
-  <ellipse cx="32" cy="21" rx="13" ry="7" fill="url(#hl)"/>
+  <rect width="64" height="64" rx="14" fill="#f2c230"/>
+  <g stroke="#15151a" stroke-width="3.5" stroke-linejoin="round">
+    <rect x="9" y="11" width="38" height="12" rx="2.5" fill="#2b49c0"/>
+    <rect x="17" y="26" width="38" height="12" rx="2.5" fill="#fff6d6"/>
+    <rect x="9" y="41" width="38" height="12" rx="2.5" fill="#e8412f"/>
+  </g>
 </svg>

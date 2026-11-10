@@ -46,7 +46,7 @@ for (const p of pages) {
     assert.equal(doc.querySelector("title")?.text, p.title);
     assert.equal(doc.querySelector("html")?.getAttribute("lang"), "en");
     assert.equal(doc.querySelector('link[rel="canonical"]')?.getAttribute("href"), p.url);
-    assert.equal(meta(doc, 'meta[name="theme-color"]'), "#a28dd9");
+    assert.equal(meta(doc, 'meta[name="theme-color"]'), "#f2c230");
     assert.equal(meta(doc, 'meta[property="og:title"]'), p.title);
     assert.equal(meta(doc, 'meta[property="og:url"]'), p.url);
     assert.equal(meta(doc, 'meta[property="og:type"]'), p.type);

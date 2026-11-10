@@ -1,25 +1,69 @@
 ---
 import { site, projects, getPosts, formatDate } from "../lib/site";
-import Handheld from "../layouts/Handheld.astro";
+import Page from "../layouts/Page.astro";
 
-const recent = (await getPosts()).slice(0, 3);
-const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "projects"}`;
+const posts = await getPosts();
+const recent = posts.slice(0, 3);
 ---
 
-<Handheld title={`${site.name} — ${site.role}`} description={site.description} home readout={`Done · ${projectCount}`}>
-  <p class="role">{site.role}</p>
-  <p class="bio">{site.bio}</p>
+<Page title={`${site.name} — ${site.role}`} description={site.description} home>
+  <section class="intro" aria-label="Intro" slot="hero">
+    <h1 data-name>{site.name}</h1>
+    <span class="stack" data-chrome aria-hidden="true">
+      <span class="brick b1"></span>
+      <span class="brick b2"></span>
+      <span class="brick b3"></span>
+    </span>
+    <p class="role">{site.role}</p>
+    <p class="bio">{site.bio}</p>
+  </section>
+  {
+    recent.length > 0 && (
+      <section class="recent-writing" aria-labelledby="recent-writing">
+        <h2 id="recent-writing">Recent writing</h2>
+        <ul class="rows posts">
+          {recent.map((p) => (
+            <li>
+              <a href={`/writing/${p.id}/`}>
+                {p.data.image ? (
+                  <img class="logo" src={p.data.image} alt="" width="64" height="64" loading="lazy" />
+                ) : (
+                  <span class="logo" aria-hidden="true" />
+                )}
+                <span class="body">
+                  <strong>{p.data.title}</strong>
+                  <span class="detail">{p.data.description}</span>
+                  <span class="meta">
+                    <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+        {posts.length > recent.length && (
+          <p class="more">
+            <a href="/writing/">All writing</a>
+          </p>
+        )}
+      </section>
+    )
+  }
   <section aria-labelledby="projects">
     <h2 id="projects">Projects</h2>
     <ul class="rows">
       {
         projects.map((p) => (
           <li>
-            <a href={p.url} data-has-image={p.image ? "" : undefined}>
-              {p.image && <img class="logo" src={p.image} alt="" width="88" height="88" loading="lazy" />}
-              <strong>{p.title}</strong>
-              <span class="detail">
-                {p.description}
+            <a href={p.url}>
+              {p.image ? (
+                <img class="logo" src={p.image} alt="" width="64" height="64" loading="lazy" />
+              ) : (
+                <span class="logo" aria-hidden="true" />
+              )}
+              <span class="body">
+                <strong>{p.title}</strong>
+                <span class="detail">{p.description}</span>
                 {p.tags && (
                   <span class="tags">
                     {p.tags.map((t) => (
@@ -34,27 +78,4 @@ const projectCount = `${projects.length} ${projects.length === 1 ? "project" : "
       }
     </ul>
   </section>
-  {
-    recent.length > 0 && (
-      <section class="recent-writing" aria-labelledby="recent-writing">
-        <h2 id="recent-writing">Recent writing</h2>
-        <ul class="rows">
-          {recent.map((p) => (
-            <li>
-              <a href={`/writing/${p.id}/`} data-has-image={p.data.image ? "" : undefined}>
-                {p.data.image && <img class="logo" src={p.data.image} alt="" width="88" height="88" loading="lazy" />}
-                <strong>{p.data.title}</strong>
-                <span class="detail">
-                  {p.data.description}
-                  <span class="tags">
-                    <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
-                  </span>
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
-    )
-  }
-</Handheld>
+</Page>

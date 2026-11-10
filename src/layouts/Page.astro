@@ -1,0 +1,75 @@
+---
+import Head from "../components/Head.astro";
+import { site, getPosts } from "../lib/site";
+
+interface Props {
+  /** Full document title, e.g. "Writing — Josh Spratt". */
+  title: string;
+  description?: string;
+  type?: "website" | "article";
+  noindex?: boolean;
+  /** The Homepage: the name is the Intro's h1, so the header leaves it out. */
+  home?: boolean;
+}
+
+const { title, description, type, noindex, home = false } = Astro.props;
+const hasPosts = (await getPosts()).length > 0;
+const path = Astro.url.pathname;
+const hasHero = Astro.slots.has("hero");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <Head title={title} description={description} type={type} noindex={noindex} />
+  </head>
+  <body class:list={{ home }}>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="site-header">
+      {
+        !home && (
+          <a class="name" data-name href="/">
+            <span class="mini-stack" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            {site.name}
+          </a>
+        )
+      }
+      <div class="navs">
+        {
+          hasPosts && (
+            <nav aria-label="Site">
+              <a href="/writing/" aria-current={path.startsWith("/writing") ? "page" : undefined}>
+                Writing
+              </a>
+            </nav>
+          )
+        }
+        <nav class="links" aria-label="Links">
+          <a href={site.links.github}>GitHub</a>
+          <a href={site.links.linkedin}>LinkedIn</a>
+          <a href={`mailto:${site.links.email}`}>Email</a>
+        </nav>
+      </div>
+    </header>
+    <main id="content">
+      {
+        hasHero && (
+          <div class="hero">
+            <slot name="hero" />
+          </div>
+        )
+      }
+      <div class="content"><slot /></div>
+    </main>
+    <footer class="site-footer">
+      <p>
+        © {new Date().getUTCFullYear()} {site.name}
+        {hasPosts && <> · <a href="/writing/rss.xml">RSS</a></>}
+      </p>
+    </footer>
+  </body>
+</html>
