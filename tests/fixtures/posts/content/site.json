@@ -7,5 +7,6 @@
     "github": "https://github.com/fixture",
     "linkedin": "https://www.linkedin.com/in/fixture",
     "email": "fixture@example.com"
-  }
+  },
+  "analyticsToken": "fixture-token"
 }

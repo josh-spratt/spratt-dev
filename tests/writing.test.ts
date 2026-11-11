@@ -58,7 +58,7 @@ test("/writing builds with zero Posts", () => {
 test("Code blocks are highlighted at build time with no client JS", () => {
   const page = buildSite(fixtures("production")).html("writing/newer-post/index.html");
   assert.ok(page.querySelector("pre.astro-code"));
-  assert.equal(page.querySelectorAll("script").length, 0);
+  assert.equal(page.querySelectorAll("script:not([data-cf-beacon])").length, 0);
 });
 
 test("Homepage does not link to /writing when there are no Posts", () => {

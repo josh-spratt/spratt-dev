@@ -29,6 +29,12 @@ export interface Site {
   description: string;
   bio: string;
   links: { github: string; linkedin: string; email: string };
+  /**
+   * Cloudflare Web Analytics site token. Not a secret: it ships in the page.
+   * When set, production builds include the beacon (zone auto-injection
+   * doesn't reach this Worker). Preview builds never do.
+   */
+  analyticsToken?: string;
 }
 
 export interface Project {
@@ -69,6 +75,9 @@ function loadSite(): Site {
       linkedin: requireString(file, "links.linkedin", links.linkedin),
       email: requireString(file, "links.email", links.email),
     },
+    ...(raw.analyticsToken !== undefined
+      ? { analyticsToken: requireString(file, "analyticsToken", raw.analyticsToken) }
+      : {}),
   };
 }
 

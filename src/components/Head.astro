@@ -1,5 +1,5 @@
 ---
-import { site, siteUrl } from "../lib/site";
+import { buildMode, site, siteUrl } from "../lib/site";
 import FeedLink from "./FeedLink.astro";
 import "../styles/global.css";
 
@@ -15,6 +15,10 @@ const { title, description, type = "website", noindex = false } = Astro.props;
 const canonical = new URL(Astro.url.pathname, siteUrl).href;
 const image = `${siteUrl}/social.png`;
 const imageAlt = `${site.name} — ${site.role}`;
+const beacon =
+  buildMode === "production" && site.analyticsToken
+    ? JSON.stringify({ token: site.analyticsToken })
+    : undefined;
 ---
 
 <meta charset="utf-8" />
@@ -35,3 +39,11 @@ const imageAlt = `${site.name} — ${site.role}`;
 <meta property="og:image:alt" content={imageAlt} />
 <meta name="twitter:card" content="summary_large_image" />
 <FeedLink />
+{beacon && (
+  <script
+    is:inline
+    defer
+    src="https://static.cloudflareinsights.com/beacon.min.js"
+    data-cf-beacon={beacon}
+  ></script>
+)}
