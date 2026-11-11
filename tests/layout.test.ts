@@ -183,6 +183,22 @@ test("no page ships a script, apart from the analytics beacon", () => {
   }
 });
 
+test("production pages carry exactly one analytics beacon with the site token", () => {
+  for (const page of pages) {
+    const scripts = site.html(page).querySelectorAll('script[src^="https://static.cloudflareinsights.com/"]');
+    assert.equal(scripts.length, 1, `${page} has one beacon`);
+    assert.equal(JSON.parse(scripts[0].getAttribute("data-cf-beacon")!).token, "fixture-token");
+    assert.ok(scripts[0].hasAttribute("defer"), `${page} defers the beacon`);
+  }
+});
+
+test("preview builds, and sites without a token, ship no beacon", () => {
+  const preview = buildSite({ contentDir: "tests/fixtures/posts/content", mode: "preview" });
+  assert.equal(preview.html("index.html").querySelectorAll("script").length, 0);
+  const noToken = buildSite({ contentDir: "tests/fixtures/content", mode: "production" });
+  assert.equal(noToken.html("index.html").querySelectorAll("script").length, 0);
+});
+
 test("Lighthouse budget: the built site stays under 100 KB", () => {
   // The social image is only fetched by link-preview crawlers, never by a page load.
   const total = (dir: string): number =>
