@@ -33,15 +33,17 @@ Steps that happen outside the repo, in the Cloudflare dashboard or GitHub. Tick 
 - [ ] Optional: turn on **Always Use HTTPS** (SSL/TLS → Edge Certificates).
   - Plain-HTTP requests currently aren't upgraded. `http://www.jspratt.dev/` returns 522, because the redirect rule only matches `https://`. `http://jspratt.dev/` is served without being upgraded.
   - Browsers never send these requests, because `.dev` is HSTS-preloaded. Only tools like `curl` and some bots hit them.
-- [ ] Turn off the injected bot-detection script, so pages ship no client JS apart from the analytics beacon.
+- [x] Turn off the injected bot-detection script, so pages ship no client JS apart from the analytics beacon.
   - Result (2026-11-07): the live HTML has a `/cdn-cgi/challenge-platform/...` script appended. It comes from **Bot Fight Mode** or **JavaScript detections** (Security → Bots).
   - This needs to be gone before the #12 "no page ships a script" test and the Lighthouse byte budget can pass against the live site.
   - Still there on 2026-11-10.
+  - Resolved (2026-11-12): accepted. Bot Fight Mode is off, but the script is now `/cdn-cgi/challenge-platform/scripts/jsd/main.js` from **JavaScript detections**, which Cloudflare enables automatically on Free plans and doesn't let you turn off ([docs](https://developers.cloudflare.com/bots/reference/javascript-detections/)). The undocumented API workaround isn't worth relying on. CI, the test suite and Lighthouse run against `dist/`, so they're unaffected. Only the live HTML carries this one extra script.
 
 ## Web Analytics
 
 - [x] Paste the site token into `content/site.json` as `analyticsToken`. Find it in Analytics & Logs → Web Analytics → `jspratt.dev` → Manage site → the `token` in the JS snippet. It isn't a secret, because it ships in every page.
   - Why (2026-11-10): zone automatic injection never added the beacon. The live HTML has no `cloudflareinsights` script. Production builds now add the snippet themselves when a token is set, and preview builds never do.
-- [ ] Check after deploy: `curl -s https://jspratt.dev/ | grep -c cloudflareinsights` returns `1`, and visits appear in the dashboard within a day.
+- [x] Check after deploy: `curl -s https://jspratt.dev/ | grep -c cloudflareinsights` returns `1`, and visits appear in the dashboard within a day.
+  - Result (2026-11-12): returns `1` after #42 deployed. Dashboard visits not confirmed yet; they should appear by 2026-11-13.
 - [x] Turn off automatic injection for the site (Manage site → Advanced Options) so the beacon is never added twice.
   - Done (2026-11-12): RUM switched to **Enable with JS Snippet installation**.
