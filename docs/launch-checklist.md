@@ -40,7 +40,8 @@ Steps that happen outside the repo, in the Cloudflare dashboard or GitHub. Tick 
 
 ## Web Analytics
 
-- [ ] Paste the site token into `content/site.json` as `analyticsToken`. Find it in Analytics & Logs → Web Analytics → `jspratt.dev` → Manage site → the `token` in the JS snippet. It isn't a secret, because it ships in every page.
+- [x] Paste the site token into `content/site.json` as `analyticsToken`. Find it in Analytics & Logs → Web Analytics → `jspratt.dev` → Manage site → the `token` in the JS snippet. It isn't a secret, because it ships in every page.
   - Why (2026-11-10): zone automatic injection never added the beacon. The live HTML has no `cloudflareinsights` script. Production builds now add the snippet themselves when a token is set, and preview builds never do.
 - [ ] Check after deploy: `curl -s https://jspratt.dev/ | grep -c cloudflareinsights` returns `1`, and visits appear in the dashboard within a day.
-- [ ] Turn off automatic injection for the site (Manage site → Advanced Options) so the beacon is never added twice.
+- [x] Turn off automatic injection for the site (Manage site → Advanced Options) so the beacon is never added twice.
+  - Done (2026-11-12): RUM switched to **Enable with JS Snippet installation**.
