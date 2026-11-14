@@ -200,11 +200,11 @@ test("preview builds, and sites without a token, ship no beacon", () => {
 });
 
 test("Lighthouse budget: the built site stays under 100 KB", () => {
-  // The social image is only fetched by link-preview crawlers, never by a page load.
+  // Share cards are only fetched by link-preview crawlers, never by a page load.
   const total = (dir: string): number =>
     readdirSync(dir).reduce((sum, f) => {
       const p = join(dir, f);
-      if (f === "social.png") return sum;
+      if (f === "social.png" || f === "cards") return sum;
       return sum + (statSync(p).isDirectory() ? total(p) : statSync(p).size);
     }, 0);
   assert.ok(total(site.outDir) < 100 * 1024);
