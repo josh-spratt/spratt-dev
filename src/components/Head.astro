@@ -9,12 +9,18 @@ interface Props {
   description?: string;
   type?: "website" | "article";
   noindex?: boolean;
+  /** Share card, a path under public/ such as /cards/slug.png. Defaults to /social.png. */
+  image?: string;
+  imageAlt?: string;
+  /** Post dates, for article:published_time and article:modified_time. */
+  published?: Date;
+  modified?: Date;
 }
 
-const { title, description, type = "website", noindex = false } = Astro.props;
+const { title, description, type = "website", noindex = false, published, modified } = Astro.props;
 const canonical = new URL(Astro.url.pathname, siteUrl).href;
-const image = `${siteUrl}/social.png`;
-const imageAlt = `${site.name} — ${site.role}`;
+const image = `${siteUrl}${Astro.props.image ?? "/social.png"}`;
+const imageAlt = Astro.props.image ? (Astro.props.imageAlt ?? title) : `${site.name} — ${site.role}`;
 const beacon =
   buildMode === "production" && site.analyticsToken
     ? JSON.stringify({ token: site.analyticsToken })
@@ -36,7 +42,11 @@ const beacon =
 {!noindex && <meta property="og:url" content={canonical} />}
 <meta property="og:type" content={type} />
 <meta property="og:image" content={image} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content={imageAlt} />
+{published && <meta property="article:published_time" content={published.toISOString()} />}
+{modified && <meta property="article:modified_time" content={modified.toISOString()} />}
 <meta name="twitter:card" content="summary_large_image" />
 <FeedLink />
 {beacon && (

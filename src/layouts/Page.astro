@@ -8,11 +8,15 @@ interface Props {
   description?: string;
   type?: "website" | "article";
   noindex?: boolean;
+  image?: string;
+  imageAlt?: string;
+  published?: Date;
+  modified?: Date;
   /** The Homepage: the name is the Intro's h1, so the header leaves it out. */
   home?: boolean;
 }
 
-const { title, description, type, noindex, home = false } = Astro.props;
+const { title, description, type, noindex, image, imageAlt, published, modified, home = false } = Astro.props;
 const hasPosts = (await getPosts()).length > 0;
 const path = Astro.url.pathname;
 const hasHero = Astro.slots.has("hero");
@@ -21,7 +25,16 @@ const hasHero = Astro.slots.has("hero");
 <!doctype html>
 <html lang="en">
   <head>
-    <Head title={title} description={description} type={type} noindex={noindex} />
+    <Head
+      title={title}
+      description={description}
+      type={type}
+      noindex={noindex}
+      image={image}
+      imageAlt={imageAlt}
+      published={published}
+      modified={modified}
+    />
   </head>
   <body class:list={{ home }}>
     <a class="skip" href="#content">Skip to content</a>
