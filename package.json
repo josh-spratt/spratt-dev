@@ -13,13 +13,15 @@
     "check:worker": "wrangler types worker/worker-configuration.d.ts > /dev/null && tsc -p worker",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "check:links": "node scripts/check-links.mjs dist",
-    "lhci": "lhci autorun"
+    "lhci": "lhci autorun",
+    "cards": "node scripts/post-cards.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "@lhci/cli": "^0.16.0",
     "astro": "^7.4.7",
     "node-html-parser": "^9.0.7",
+    "sharp": "^0.35.5",
     "typescript": "^6.0.3",
     "wrangler": "^4.158.0"
   },

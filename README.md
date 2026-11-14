@@ -14,7 +14,10 @@ npm run build   # static output in dist/
 npm test        # builds the site and asserts on the output (CONTENT_DIR, BUILD_MODE tweak the build)
 npm run check:links  # internal link check on dist/
 npm run lhci    # Lighthouse CI on dist/ (build first)
+npm run cards   # draw a share card for any Post that lacks one (-- --all redraws every card)
 ```
+
+Each Post shares its own 1200×630 card from `public/cards/<slug>.png`. Run `npm run cards` after adding a Post and commit the image. The tests fail until you do.
 
 ## Deploy
 

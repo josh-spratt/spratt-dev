@@ -50,7 +50,10 @@ for (const p of pages) {
     assert.equal(meta(doc, 'meta[property="og:title"]'), p.title);
     assert.equal(meta(doc, 'meta[property="og:url"]'), p.url);
     assert.equal(meta(doc, 'meta[property="og:type"]'), p.type);
+    // The fixture Posts have no card in public/cards, so every page falls back to the site's.
     assert.equal(meta(doc, 'meta[property="og:image"]'), "https://jspratt.dev/social.png");
+    assert.equal(meta(doc, 'meta[property="og:image:width"]'), "1200");
+    assert.equal(meta(doc, 'meta[property="og:image:height"]'), "630");
     assert.ok(meta(doc, 'meta[property="og:image:alt"]'));
     assert.equal(meta(doc, 'meta[name="twitter:card"]'), "summary_large_image");
     assert.equal(doc.querySelector('meta[name="twitter:site"]'), null);
@@ -58,6 +61,31 @@ for (const p of pages) {
     assert.equal(meta(doc, 'meta[property="og:description"]'), p.description);
   });
 }
+
+test("A Post page carries its published and updated times; other pages don't", () => {
+  const post = site.html("writing/newer-post/index.html");
+  assert.equal(meta(post, 'meta[property="article:published_time"]'), "2026-03-10T00:00:00.000Z");
+  assert.equal(meta(post, 'meta[property="article:modified_time"]'), "2026-04-01T00:00:00.000Z");
+  assert.equal(meta(site.html("writing/older-post/index.html"), 'meta[property="article:modified_time"]'), undefined);
+  assert.equal(meta(site.html("index.html"), 'meta[property="article:published_time"]'), undefined);
+});
+
+test("Every published Post shares its own 1200×630 card", async () => {
+  const sharp = (await import("sharp")).default;
+  const real = buildSite({ mode: "production" });
+  const slugs = real
+    .html("writing/index.html")
+    .querySelectorAll("main li a")
+    .map((a) => a.getAttribute("href")!.split("/")[2]);
+  assert.ok(slugs.length > 0);
+  for (const slug of slugs) {
+    const doc = real.html(`writing/${slug}/index.html`);
+    assert.equal(meta(doc, 'meta[property="og:image"]'), `https://jspratt.dev/cards/${slug}.png`, `${slug}: run npm run cards`);
+    assert.equal(meta(doc, 'meta[property="og:image:alt"]'), doc.querySelector("h1")?.text);
+    const { width, height } = await sharp(join(real.outDir, "cards", `${slug}.png`)).metadata();
+    assert.deepEqual([width, height], [1200, 630], slug);
+  }
+});
 
 test("icons are present and referenced", () => {
   for (const f of ["favicon.svg", "favicon.ico", "apple-touch-icon.png", "social.png"]) {
