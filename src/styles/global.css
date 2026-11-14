@@ -580,6 +580,37 @@ span.logo {
   display: none;
 }
 
+.like {
+  margin: 2.5rem 0 0;
+}
+
+.like button {
+  padding: 0.5rem 0.9rem;
+  color: var(--on-key);
+  background: var(--key);
+  font: 700 1rem var(--font-body);
+  border: var(--border);
+  border-radius: 8px;
+  box-shadow: 0 3px 0 var(--line);
+  cursor: pointer;
+}
+
+.like button:hover {
+  background: var(--key-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--line);
+}
+
+.like button:active {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+.like button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .post-head .cover {
   grid-row: 1 / span 2;
   width: 100%;

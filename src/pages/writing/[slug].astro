@@ -33,5 +33,9 @@ const { title, description, date, updated, image } = post.data;
       </p>
     </header>
     <Content />
+    {/* A plain form: the Worker handles the POST and fills in the label (worker/index.ts). */}
+    <form class="like" method="post" action={`/writing/${post.id}/like`}>
+      <button type="submit"><span aria-hidden="true">♥</span> <span data-like-label>Like</span></button>
+    </form>
   </article>
 </Page>
