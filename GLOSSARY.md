@@ -35,3 +35,7 @@ _Avoid_: blog section, latest posts
 **View**:
 One browser visit to a Post on the live site. Crawlers, previews and local runs don't count. A Post's View count is shown in its header once it has one.
 _Avoid_: hit, pageview, read count
+
+**Like**:
+A reader's thumbs-up on a Post, given with the button at the end of it. Each browser can Like a Post once; there is no unlike. Only the live site records them.
+_Avoid_: upvote, heart, favourite

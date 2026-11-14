@@ -1,11 +1,19 @@
 # Database
 
-Views are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
+Views and Likes are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
 
 Only `/writing/*` runs the Worker script (`worker/index.ts`), and every other path is served straight from `dist/`. For a Post page, the Worker:
 
 1. counts a View when the request is a browser navigation (`Sec-Fetch-Mode: navigate`) to `jspratt.dev`
 2. writes " · Read N times" into the page's `[data-stats]` placeholder
+
+A Like is a plain form POST to `/writing/<slug>/like`. The Worker:
+
+1. refuses it unless `Origin` matches the site, and 404s for a slug that isn't a Post
+2. adds one to `likes` and sets a `liked=1` cookie scoped to that Post's path
+3. redirects back to `/writing/<slug>/?liked`, which isn't counted as a new View
+
+A browser that already has the cookie can't like the Post again. Clearing cookies resets that, which is fine for a personal site.
 
 Branch previews read the live counts but never write them. If D1 fails, the static page is served unchanged.
 
@@ -36,4 +44,4 @@ npx wrangler d1 migrations apply spratt-dev --local
 npx wrangler dev
 ```
 
-Local requests come from `localhost`, not `jspratt.dev`, so they read counts but don't add Views.
+Local requests come from `localhost`, not `jspratt.dev`, so they read counts but don't add Views or Likes.
