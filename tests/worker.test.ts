@@ -231,7 +231,9 @@ test("the redirect back after answering isn't a View", () => {
 });
 
 test("the static Post ships the email-interest question as a plain form", () => {
-  const form = site.html("writing/newer-post/index.html").querySelector("form.interest");
+  const forms = site.html("writing/newer-post/index.html").querySelectorAll("form.interest");
+  assert.equal(forms.length, 1, "the question appears once");
+  const form = forms[0];
   assert.equal(form?.getAttribute("method"), "post");
   assert.equal(form?.getAttribute("action"), "/writing/newer-post/interest");
   assert.equal(form?.getAttribute("id"), "interest");
