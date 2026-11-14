@@ -15,8 +15,8 @@ const { Content } = await render(post);
 const { title, description, date, updated, image } = post.data;
 // Drawn by `npm run cards`; until a Post has one, it shares the site's card.
 const card = `/cards/${post.id}.png`;
-const url = new URL(`/writing/${post.id}/`, siteUrl).href;
 const hasCard = existsSync(resolve(`public${card}`));
+const url = new URL(`/writing/${post.id}/`, siteUrl).href;
 ---
 
 <Page
