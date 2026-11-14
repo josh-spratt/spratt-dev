@@ -78,3 +78,21 @@ test("A Post's thumbnail shows on /writing and in Recent writing when it has one
     assert.equal(rows[1].querySelector("img"), null);
   }
 });
+
+test("A Post ends with share links carrying its canonical URL, and ships no script", () => {
+  const page = buildSite(fixtures("production")).html("writing/newer-post/index.html");
+  const links = page.querySelectorAll(".share a");
+  const href = (name: string) => links.find((a) => a.text.trim() === name)?.getAttribute("href");
+  const url = encodeURIComponent("https://jspratt.dev/writing/newer-post/");
+  assert.equal(href("LinkedIn"), `https://www.linkedin.com/sharing/share-offsite/?url=${url}`);
+  assert.equal(href("X"), `https://x.com/intent/post?url=${url}&text=Newer%20Post`);
+  assert.equal(href("Bluesky"), `https://bsky.app/intent/compose?text=Newer%20Post%20${url}`);
+  assert.equal(href("Email"), `mailto:?subject=Newer%20Post&body=${url}`);
+  for (const a of links.filter((a) => a.text.trim() !== "Email")) {
+    assert.equal(a.getAttribute("target"), "_blank");
+    assert.equal(a.getAttribute("rel"), "noopener");
+  }
+  // The production analytics beacon is the only script.
+  const scripts = page.querySelectorAll("script").map((s) => s.getAttribute("src"));
+  assert.deepEqual(scripts, ["https://static.cloudflareinsights.com/beacon.min.js"]);
+});
