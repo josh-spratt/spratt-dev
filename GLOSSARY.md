@@ -39,3 +39,7 @@ _Avoid_: hit, pageview, read count
 **Like**:
 A reader's thumbs-up on a Post, given with the button at the end of it. Each browser can Like a Post once; there is no unlike. Only the live site records them.
 _Avoid_: upvote, heart, favourite
+
+**Interest**:
+A reader's answer to "Would you subscribe by email if I set it up?" at the end of a Post. It measures whether an email list is worth building. No address is collected. Each browser can answer once across all Posts, and only the live site records it.
+_Avoid_: signup, subscriber, lead

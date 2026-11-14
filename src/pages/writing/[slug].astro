@@ -49,5 +49,11 @@ const hasCard = existsSync(resolve(`public${card}`));
     <form class="like" method="post" action={`/writing/${post.id}/like`}>
       <button type="submit"><span aria-hidden="true">♥</span> <span data-like-label>Like</span></button>
     </form>
+    {/* Measures whether an email list is worth building; nothing is collected. The Worker
+        records the answer and swaps in a thank-you once this browser has answered. */}
+    <form class="interest" id="interest" method="post" action={`/writing/${post.id}/interest`}>
+      <p>Would you subscribe by email if I set it up?</p>
+      <button type="submit">I would</button>
+    </form>
   </article>
 </Page>

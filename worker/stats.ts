@@ -6,6 +6,15 @@ export const LIVE_HOST = "jspratt.dev";
 /** Set on /writing/<slug>/ after a Like, so the browser only sends it for that Post. */
 export const LIKED_COOKIE = "liked";
 
+/**
+ * Set on /writing/ after answering the email-interest question. Scoped to all
+ * Posts, so one browser counts once however many Posts it answers on.
+ */
+export const INTERESTED_COOKIE = "interested";
+
+/** Where the redirect back after answering lands, so the thank-you is in view. */
+export const INTEREST_ANCHOR = "interest";
+
 const SLUG = "([a-z0-9][a-z0-9-]*)";
 
 /** "/writing/some-post/" → "some-post"; anything else (the list, the feed) → null. */
@@ -18,21 +27,28 @@ export function likeSlug(pathname: string): string | null {
   return new RegExp(`^/writing/${SLUG}/like$`).exec(pathname)?.[1] ?? null;
 }
 
+/** "/writing/some-post/interest" → "some-post"; anything else → null. */
+export function interestSlug(pathname: string): string | null {
+  return new RegExp(`^/writing/${SLUG}/interest$`).exec(pathname)?.[1] ?? null;
+}
+
 export function isLive(request: Request): boolean {
   return new URL(request.url).hostname === LIVE_HOST;
 }
 
 /**
  * A View is a real browser navigation to the live site. Crawlers and curl
- * don't send Sec-Fetch-Mode. `?liked` is the redirect back after a Like,
- * which isn't a new View.
+ * don't send Sec-Fetch-Mode. `?liked` and `?interested` are redirects back
+ * after a form, which aren't new Views.
  */
 export function shouldCount(request: Request): boolean {
+  const params = new URL(request.url).searchParams;
   return (
     request.method === "GET" &&
     request.headers.get("sec-fetch-mode") === "navigate" &&
     isLive(request) &&
-    !new URL(request.url).searchParams.has("liked")
+    !params.has("liked") &&
+    !params.has("interested")
   );
 }
 
@@ -41,10 +57,22 @@ export function isSameOrigin(request: Request): boolean {
   return request.headers.get("origin") === new URL(request.url).origin;
 }
 
+function hasCookie(request: Request, name: string): boolean {
+  const cookies = request.headers.get("cookie") ?? "";
+  return cookies.split(";").some((c) => c.trim() === `${name}=1`);
+}
+
 /** The cookie is path-scoped to one Post, so its presence means this browser liked this Post. */
 export function hasLiked(request: Request): boolean {
-  const cookies = request.headers.get("cookie") ?? "";
-  return cookies.split(";").some((c) => c.trim() === `${LIKED_COOKIE}=1`);
+  return hasCookie(request, LIKED_COOKIE);
+}
+
+export function hasAnsweredInterest(request: Request): boolean {
+  return hasCookie(request, INTERESTED_COOKIE);
+}
+
+export function interestedCookie(): string {
+  return `${INTERESTED_COOKIE}=1; Path=/writing/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`;
 }
 
 export function likedCookie(slug: string): string {
