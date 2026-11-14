@@ -31,3 +31,7 @@ _Avoid_: unpublished post, WIP
 **Recent writing**:
 The Homepage block listing the latest three Posts. It doesn't exist until the first Post does.
 _Avoid_: blog section, latest posts
+
+**View**:
+One browser visit to a Post on the live site. Crawlers, previews and local runs don't count. A Post's View count is shown in its header once it has one.
+_Avoid_: hit, pageview, read count

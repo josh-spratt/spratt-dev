@@ -18,4 +18,4 @@ npm run lhci    # Lighthouse CI on dist/ (build first)
 
 ## Deploy
 
-Workers Builds deploys `main` to production and gives every other branch a preview URL. `wrangler.jsonc` serves `dist/` with no Worker script. The dashboard setup is in [docs/launch-checklist.md](docs/launch-checklist.md).
+Workers Builds deploys `main` to production and gives every other branch a preview URL. `wrangler.jsonc` serves `dist/`. A small Worker script (`worker/`) runs only for `/writing/*`, where it counts Views in a D1 database: see [docs/database.md](docs/database.md). The dashboard setup is in [docs/launch-checklist.md](docs/launch-checklist.md).

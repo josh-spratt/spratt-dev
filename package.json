@@ -9,7 +9,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check",
+    "check": "astro check && npm run check:worker",
+    "check:worker": "wrangler types worker/worker-configuration.d.ts > /dev/null && tsc -p worker",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "check:links": "node scripts/check-links.mjs dist",
     "lhci": "lhci autorun"
