@@ -576,6 +576,10 @@ span.logo {
   font-size: 0.95rem;
 }
 
+.post-head [data-stats]:empty {
+  display: none;
+}
+
 .post-head .cover {
   grid-row: 1 / span 2;
   width: 100%;
