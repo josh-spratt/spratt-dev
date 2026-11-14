@@ -60,12 +60,6 @@ const url = new URL(`/writing/${post.id}/`, siteUrl).href;
       <p>Would you subscribe by email if I set it up?</p>
       <button type="submit">I would</button>
     </form>
-    {/* Measures whether an email list is worth building; nothing is collected. The Worker
-        records the answer and swaps in a thank-you once this browser has answered. */}
-    <form class="interest" id="interest" method="post" action={`/writing/${post.id}/interest`}>
-      <p>Would you subscribe by email if I set it up?</p>
-      <button type="submit">I would</button>
-    </form>
   </article>
   <script is:inline data-copy-link-script>
     document.querySelector("[data-copy-link]")?.addEventListener("click", async (event) => {
