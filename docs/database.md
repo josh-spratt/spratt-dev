@@ -1,6 +1,6 @@
 # Database
 
-Views and Likes are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
+Views, Likes and Interest are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
 
 Only `/writing/*` runs the Worker script (`worker/index.ts`), and every other path is served straight from `dist/`. For a Post page, the Worker:
 
@@ -14,6 +14,8 @@ A Like is a plain form POST to `/writing/<slug>/like`. The Worker:
 3. redirects back to `/writing/<slug>/?liked`, which isn't counted as a new View
 
 A browser that already has the cookie can't like the Post again. Clearing cookies resets that, which is fine for a personal site.
+
+Interest works the same way at `/writing/<slug>/interest`, with two differences. Each answer is a row in `interest` (slug and time), not a counter, and the `interested=1` cookie is scoped to `/writing/`, so a browser answers once across all Posts. A browser with the cookie sees a thank-you in place of the question on every Post. Nobody else sees a count.
 
 Branch previews read the live counts but never write them. If D1 fails, the static page is served unchanged.
 
@@ -32,6 +34,13 @@ Add the next numbered `.sql` file to `migrations/`. Run `npx wrangler d1 migrati
 
 ```sh
 npx wrangler d1 execute spratt-dev --remote --command "SELECT * FROM post_stats ORDER BY views DESC"
+```
+
+How many browsers would subscribe, and which Posts prompted them:
+
+```sh
+npx wrangler d1 execute spratt-dev --remote --command "SELECT slug, COUNT(*) AS answers, MAX(created_at) AS latest FROM interest GROUP BY slug ORDER BY answers DESC"
+npx wrangler d1 execute spratt-dev --remote --command "SELECT COUNT(*) AS total FROM interest"
 ```
 
 ## Local

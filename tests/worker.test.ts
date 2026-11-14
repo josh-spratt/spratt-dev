@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { unstable_startWorker } from "wrangler";
 import { buildSite, type Site } from "./helpers.ts";
-import { likeLabel, likeSlug, postSlug, statsText } from "../worker/stats.ts";
+import { interestSlug, likeLabel, likeSlug, postSlug, shouldCount, statsText } from "../worker/stats.ts";
 
 type Worker = Awaited<ReturnType<typeof unstable_startWorker>>;
 
@@ -30,6 +30,7 @@ function sql(command: string): Record<string, unknown>[] {
 
 const views = (slug: string) => sql(`SELECT views FROM post_stats WHERE slug = '${slug}'`)[0]?.views;
 const likes = (slug: string) => sql(`SELECT likes FROM post_stats WHERE slug = '${slug}'`)[0]?.likes;
+const interest = (slug: string) => sql(`SELECT COUNT(*) AS n FROM interest WHERE slug = '${slug}'`)[0].n;
 
 interface Got {
   status: number;
@@ -68,7 +69,7 @@ async function send(method: string, url: string, headers: Record<string, string>
 
 const get = (url: string, headers: Record<string, string> = navigate) => send("GET", url, headers);
 
-/** A browser submitting the Like form on the page at `url`'s origin. */
+/** A browser submitting a Post form (Like or email interest) on the page at `url`'s origin. */
 const like = (url: string, headers: Record<string, string> = {}) =>
   send("POST", url, { origin: new URL(url).origin, ...headers });
 
@@ -215,4 +216,68 @@ test("a Like on a preview redirects back but never writes", async () => {
   assert.equal(res.status, 303);
   assert.equal(res.headers["set-cookie"], undefined);
   assert.equal(likes("older-post"), undefined);
+});
+
+test("interestSlug matches the email-interest action only", () => {
+  assert.equal(interestSlug("/writing/newer-post/interest"), "newer-post");
+  assert.equal(interestSlug("/writing/newer-post/"), null);
+  assert.equal(interestSlug("/writing/newer-post/interest/"), null);
+});
+
+test("the redirect back after answering isn't a View", () => {
+  const nav = (url: string) => new Request(url, { headers: navigate });
+  assert.equal(shouldCount(nav(`${LIVE}/writing/newer-post/`)), true);
+  assert.equal(shouldCount(nav(`${LIVE}/writing/newer-post/?interested`)), false);
+});
+
+test("the static Post ships the email-interest question as a plain form", () => {
+  const form = site.html("writing/newer-post/index.html").querySelector("form.interest");
+  assert.equal(form?.getAttribute("method"), "post");
+  assert.equal(form?.getAttribute("action"), "/writing/newer-post/interest");
+  assert.equal(form?.getAttribute("id"), "interest");
+  assert.equal(form?.querySelector("button")?.getAttribute("type"), "submit");
+  assert.equal(form?.querySelectorAll("input").length, 0, "nothing is collected");
+});
+
+test("answering on the live site records a row, sets a site-wide cookie and redirects to the thank-you", async () => {
+  const res = await like(`${LIVE}/writing/newer-post/interest`);
+  assert.equal(res.status, 303);
+  assert.equal(res.headers.location, "/writing/newer-post/?interested#interest");
+  const cookie = String(res.headers["set-cookie"]);
+  assert.match(cookie, /^interested=1; /);
+  assert.match(cookie, /Path=\/writing\/;/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /Secure/);
+  assert.equal(interest("newer-post"), 1);
+});
+
+test("a browser that has answered sees the thank-you on every Post, not the form", async () => {
+  for (const slug of ["newer-post", "older-post"]) {
+    const { body } = await get(`${LIVE}/writing/${slug}/`, { cookie: "interested=1" });
+    assert.doesNotMatch(body, /<form class="interest"/);
+    assert.match(body, /<p class="interest" id="interest">Thanks\./);
+  }
+  assert.match((await get(`${LIVE}/writing/older-post/`, {})).body, /<form class="interest"/);
+});
+
+test("a browser that has answered can't answer again, even on another Post", async () => {
+  const res = await like(`${LIVE}/writing/older-post/interest`, { cookie: "interested=1" });
+  assert.equal(res.status, 303);
+  assert.equal(res.headers["set-cookie"], undefined);
+  assert.equal(interest("older-post"), 0);
+});
+
+test("an answer from another site, by GET, or for an unknown slug is refused", async () => {
+  assert.equal((await like(`${LIVE}/writing/newer-post/interest`, { origin: "https://evil.example" })).status, 403);
+  assert.equal((await get(`${LIVE}/writing/newer-post/interest`)).status, 405);
+  assert.equal((await like(`${LIVE}/writing/not-a-post/interest`)).status, 404);
+  assert.equal(interest("newer-post"), 1);
+  assert.equal(interest("not-a-post"), 0);
+});
+
+test("an answer on a preview redirects back but never writes", async () => {
+  const res = await like("https://views.spratt-dev.example.workers.dev/writing/older-post/interest");
+  assert.equal(res.status, 303);
+  assert.equal(res.headers["set-cookie"], undefined);
+  assert.equal(interest("older-post"), 0);
 });

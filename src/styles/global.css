@@ -611,6 +611,49 @@ span.logo {
   outline-offset: 3px;
 }
 
+/* Email interest: quieter than Like, so it reads as a question, not a second call to action. */
+.interest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin: 2rem 0 0;
+  padding: 1rem 0 0;
+  border-top: var(--border);
+  font: 700 1rem var(--font-body);
+}
+
+.interest p {
+  margin: 0;
+}
+
+.interest button {
+  padding: 0.35rem 0.75rem;
+  color: var(--ink);
+  background: var(--card);
+  font: inherit;
+  font-size: 0.9rem;
+  border: var(--border);
+  border-radius: 8px;
+  box-shadow: 0 3px 0 var(--line);
+  cursor: pointer;
+}
+
+.interest button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--line);
+}
+
+.interest button:active {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+.interest button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .post-head .cover {
   grid-row: 1 / span 2;
   width: 100%;
