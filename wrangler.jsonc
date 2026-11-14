@@ -11,8 +11,18 @@
 	"workers_dev": false,
 	"preview_urls": true,
 	// Workers Builds runs `wrangler preview` (open beta) on non-main branches,
-	// which refuses to run without this block. Empty means "inherit everything".
-	"previews": {},
+	// which refuses to run without this block. Previews get only the bindings
+	// listed here, not the top-level ones, so DB is repeated. Previews read the
+	// live counts but never write them (the Worker checks the hostname).
+	"previews": {
+		"d1_databases": [
+			{
+				"binding": "DB",
+				"database_name": "spratt-dev",
+				"database_id": "b398c392-0df0-411b-a720-3813a07e3a3f"
+			}
+		]
+	},
 	"assets": {
 		"directory": "./dist",
 		"binding": "ASSETS",
