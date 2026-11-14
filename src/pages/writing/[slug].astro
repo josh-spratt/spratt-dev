@@ -15,15 +15,7 @@ const { Content } = await render(post);
 const { title, description, date, updated, image } = post.data;
 // Drawn by `npm run cards`; until a Post has one, it shares the site's card.
 const card = `/cards/${post.id}.png`;
-// Plain links to each service's own share page: no script, nothing loads until a reader clicks.
 const url = new URL(`/writing/${post.id}/`, siteUrl).href;
-const q = encodeURIComponent;
-const shares = [
-  { name: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${q(url)}` },
-  { name: "X", href: `https://x.com/intent/post?url=${q(url)}&text=${q(title)}` },
-  { name: "Bluesky", href: `https://bsky.app/intent/compose?text=${q(`${title} ${url}`)}` },
-  { name: "Email", href: `mailto:?subject=${q(title)}&body=${q(url)}` },
-];
 const hasCard = existsSync(resolve(`public${card}`));
 ---
 
@@ -59,16 +51,8 @@ const hasCard = existsSync(resolve(`public${card}`));
       <form class="like" method="post" action={`/writing/${post.id}/like`}>
         <button type="submit"><span aria-hidden="true">♥</span> <span data-like-label>Like</span></button>
       </form>
-      <p class="share">
-        Share on
-        {
-          shares.map((s) => (
-            <a href={s.href} {...(s.name === "Email" ? {} : { target: "_blank", rel: "noopener" })}>
-              {s.name}
-            </a>
-          ))
-        }
-      </p>
+      {/* A real link, so right-click "Copy link address" works without script; the script makes a click copy it. */}
+      <a class="copy-link" href={url} data-copy-link><span aria-live="polite">Copy link</span></a>
     </div>
     {/* Measures whether an email list is worth building; nothing is collected. The Worker
         records the answer and swaps in a thank-you once this browser has answered. */}
@@ -77,4 +61,19 @@ const hasCard = existsSync(resolve(`public${card}`));
       <button type="submit">I would</button>
     </form>
   </article>
+  <script is:inline data-copy-link-script>
+    document.querySelector("[data-copy-link]")?.addEventListener("click", async (event) => {
+      if (!navigator.clipboard) return;
+      event.preventDefault();
+      const link = event.currentTarget;
+      const label = link.querySelector("span");
+      try {
+        await navigator.clipboard.writeText(link.href);
+        label.textContent = "Link copied";
+      } catch {
+        label.textContent = "Couldn’t copy. Use the address bar.";
+      }
+      setTimeout(() => (label.textContent = "Copy link"), 2500);
+    });
+  </script>
 </Page>

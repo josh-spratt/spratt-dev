@@ -592,31 +592,23 @@ span.logo {
   margin: 0;
 }
 
-.share {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  font: 700 0.9rem var(--font-body);
-}
-
-.share a {
-  padding: 0.3rem 0.6rem;
+.copy-link {
+  padding: 0.35rem 0.75rem;
   color: var(--ink);
   background: var(--card);
+  font: 700 0.9rem var(--font-body);
   text-decoration: none;
   border: var(--border);
   border-radius: 8px;
   box-shadow: 0 3px 0 var(--line);
 }
 
-.share a:hover {
+.copy-link:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 0 var(--line);
 }
 
-.share a:active {
+.copy-link:active {
   transform: translateY(3px);
   box-shadow: none;
 }

@@ -58,7 +58,7 @@ test("/writing builds with zero Posts", () => {
 test("Code blocks are highlighted at build time with no client JS", () => {
   const page = buildSite(fixtures("production")).html("writing/newer-post/index.html");
   assert.ok(page.querySelector("pre.astro-code"));
-  assert.equal(page.querySelectorAll("script:not([data-cf-beacon])").length, 0);
+  assert.equal(page.querySelectorAll("script:not([data-cf-beacon]):not([data-copy-link-script])").length, 0);
 });
 
 test("Homepage does not link to /writing when there are no Posts", () => {
@@ -79,20 +79,16 @@ test("A Post's thumbnail shows on /writing and in Recent writing when it has one
   }
 });
 
-test("A Post ends with share links carrying its canonical URL, and ships no script", () => {
+test("A Post ends with a Copy link that is a real link to its canonical URL", () => {
   const page = buildSite(fixtures("production")).html("writing/newer-post/index.html");
-  const links = page.querySelectorAll(".share a");
-  const href = (name: string) => links.find((a) => a.text.trim() === name)?.getAttribute("href");
-  const url = encodeURIComponent("https://jspratt.dev/writing/newer-post/");
-  assert.equal(href("LinkedIn"), `https://www.linkedin.com/sharing/share-offsite/?url=${url}`);
-  assert.equal(href("X"), `https://x.com/intent/post?url=${url}&text=Newer%20Post`);
-  assert.equal(href("Bluesky"), `https://bsky.app/intent/compose?text=Newer%20Post%20${url}`);
-  assert.equal(href("Email"), `mailto:?subject=Newer%20Post&body=${url}`);
-  for (const a of links.filter((a) => a.text.trim() !== "Email")) {
-    assert.equal(a.getAttribute("target"), "_blank");
-    assert.equal(a.getAttribute("rel"), "noopener");
-  }
-  // The production analytics beacon is the only script.
-  const scripts = page.querySelectorAll("script").map((s) => s.getAttribute("src"));
-  assert.deepEqual(scripts, ["https://static.cloudflareinsights.com/beacon.min.js"]);
+  const link = page.querySelector(".post-actions a[data-copy-link]");
+  assert.equal(link?.getAttribute("href"), "https://jspratt.dev/writing/newer-post/");
+  assert.equal(link?.text.trim(), "Copy link");
+  assert.equal(link?.querySelector("[aria-live]")?.getAttribute("aria-live"), "polite");
+  // Besides the production analytics beacon, the only script is the inline copy handler.
+  assert.deepEqual(
+    page.querySelectorAll("script").map((s) => s.getAttribute("src")).filter(Boolean),
+    ["https://static.cloudflareinsights.com/beacon.min.js"],
+  );
+  assert.match(page.querySelector("script[data-copy-link-script]")?.text ?? "", /navigator\.clipboard\.writeText/);
 });
