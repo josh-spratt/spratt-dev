@@ -174,10 +174,12 @@ test("the brick stack is in the Homepage Intro only, aria-hidden and with nothin
   }
 });
 
-test("no page ships a script, apart from the analytics beacon", () => {
+test("no page ships a script, apart from the analytics beacon and a Post's Copy link handler", () => {
   const beacon = /^https:\/\/static\.cloudflareinsights\.com\//;
   for (const page of pages) {
+    const isPost = /^writing\/[^/]+\/index\.html$/.test(page);
     for (const s of site.html(page).querySelectorAll("script")) {
+      if (isPost && s.hasAttribute("data-copy-link-script")) continue;
       assert.match(s.getAttribute("src") ?? "", beacon, `${page} ships a script`);
     }
   }

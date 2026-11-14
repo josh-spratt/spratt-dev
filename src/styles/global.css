@@ -580,8 +580,37 @@ span.logo {
   display: none;
 }
 
-.like {
+.post-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
   margin: 2.5rem 0 0;
+}
+
+.like {
+  margin: 0;
+}
+
+.copy-link {
+  padding: 0.35rem 0.75rem;
+  color: var(--ink);
+  background: var(--card);
+  font: 700 0.9rem var(--font-body);
+  text-decoration: none;
+  border: var(--border);
+  border-radius: 8px;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.copy-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--line);
+}
+
+.copy-link:active {
+  transform: translateY(3px);
+  box-shadow: none;
 }
 
 .like button {

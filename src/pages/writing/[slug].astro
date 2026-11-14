@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "astro:content";
 import Page from "../../layouts/Page.astro";
-import { site, getPosts, formatDate } from "../../lib/site";
+import { site, siteUrl, getPosts, formatDate } from "../../lib/site";
 
 export async function getStaticPaths() {
   const posts = await getPosts();
@@ -16,6 +16,7 @@ const { title, description, date, updated, image } = post.data;
 // Drawn by `npm run cards`; until a Post has one, it shares the site's card.
 const card = `/cards/${post.id}.png`;
 const hasCard = existsSync(resolve(`public${card}`));
+const url = new URL(`/writing/${post.id}/`, siteUrl).href;
 ---
 
 <Page
@@ -45,9 +46,19 @@ const hasCard = existsSync(resolve(`public${card}`));
       </p>
     </header>
     <Content />
-    {/* A plain form: the Worker handles the POST and fills in the label (worker/index.ts). */}
-    <form class="like" method="post" action={`/writing/${post.id}/like`}>
-      <button type="submit"><span aria-hidden="true">♥</span> <span data-like-label>Like</span></button>
+    <div class="post-actions">
+      {/* A plain form: the Worker handles the POST and fills in the label (worker/index.ts). */}
+      <form class="like" method="post" action={`/writing/${post.id}/like`}>
+        <button type="submit"><span aria-hidden="true">♥</span> <span data-like-label>Like</span></button>
+      </form>
+      {/* A real link, so right-click "Copy link address" works without script; the script makes a click copy it. */}
+      <a class="copy-link" href={url} data-copy-link><span aria-live="polite">Copy link</span></a>
+    </div>
+    {/* Measures whether an email list is worth building; nothing is collected. The Worker
+        records the answer and swaps in a thank-you once this browser has answered. */}
+    <form class="interest" id="interest" method="post" action={`/writing/${post.id}/interest`}>
+      <p>Would you subscribe by email if I set it up?</p>
+      <button type="submit">I would</button>
     </form>
     {/* Measures whether an email list is worth building; nothing is collected. The Worker
         records the answer and swaps in a thank-you once this browser has answered. */}
@@ -56,4 +67,19 @@ const hasCard = existsSync(resolve(`public${card}`));
       <button type="submit">I would</button>
     </form>
   </article>
+  <script is:inline data-copy-link-script>
+    document.querySelector("[data-copy-link]")?.addEventListener("click", async (event) => {
+      if (!navigator.clipboard) return;
+      event.preventDefault();
+      const link = event.currentTarget;
+      const label = link.querySelector("span");
+      try {
+        await navigator.clipboard.writeText(link.href);
+        label.textContent = "Link copied";
+      } catch {
+        label.textContent = "Couldn’t copy. Use the address bar.";
+      }
+      setTimeout(() => (label.textContent = "Copy link"), 2500);
+    });
+  </script>
 </Page>
