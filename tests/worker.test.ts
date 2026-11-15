@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { unstable_startWorker } from "wrangler";
 import { buildSite, type Site } from "./helpers.ts";
-import { interestSlug, likeLabel, likeSlug, postSlug, shouldCount, statsText } from "../worker/stats.ts";
+import { interestSlug, likeLabel, likeSlug, postSlug, refTag, referrerHost, shouldCount, statsText } from "../worker/stats.ts";
 
 type Worker = Awaited<ReturnType<typeof unstable_startWorker>>;
 
@@ -30,6 +30,8 @@ function sql(command: string): Record<string, unknown>[] {
 
 const views = (slug: string) => sql(`SELECT views FROM post_stats WHERE slug = '${slug}'`)[0]?.views;
 const likes = (slug: string) => sql(`SELECT likes FROM post_stats WHERE slug = '${slug}'`)[0]?.likes;
+const viewLog = (slug: string) =>
+  sql(`SELECT referrer, ref, is_me FROM view_log WHERE slug = '${slug}' ORDER BY id`);
 const interest = (slug: string) => sql(`SELECT COUNT(*) AS n FROM interest WHERE slug = '${slug}'`)[0].n;
 
 interface Got {
@@ -282,4 +284,57 @@ test("an answer on a preview redirects back but never writes", async () => {
   assert.equal(res.status, 303);
   assert.equal(res.headers["set-cookie"], undefined);
   assert.equal(interest("older-post"), 0);
+});
+
+test("referrerHost keeps only the hostname", () => {
+  const req = (referer?: string) => new Request(LIVE, { headers: referer ? { referer } : {} });
+  assert.equal(referrerHost(req("https://news.ycombinator.com/item?id=1")), "news.ycombinator.com");
+  assert.equal(referrerHost(req("not a url")), null);
+  assert.equal(referrerHost(req()), null);
+});
+
+test("refTag is cleaned and capped", () => {
+  assert.equal(refTag(new URL(`${LIVE}/writing/newer-post/?ref=BlueSky`)), "bluesky");
+  assert.equal(refTag(new URL(`${LIVE}/writing/newer-post/?ref=<script>`)), "script");
+  assert.equal(refTag(new URL(`${LIVE}/writing/newer-post/?ref=${"a".repeat(100)}`))?.length, 40);
+  assert.equal(refTag(new URL(`${LIVE}/writing/newer-post/?ref=`)), null);
+  assert.equal(refTag(new URL(`${LIVE}/writing/newer-post/`)), null);
+});
+
+test("every counted View is logged with where it came from", async () => {
+  const slug = "older-post";
+  await get(`${LIVE}/writing/${slug}/?ref=bluesky`, { ...navigate, referer: "https://bsky.app/" });
+  await get(`${LIVE}/writing/${slug}/`);
+  await get(`${LIVE}/writing/${slug}/`, {}); // a crawler: neither counted nor logged
+  assert.deepEqual(viewLog(slug), [
+    { referrer: "bsky.app", ref: "bluesky", is_me: 0 },
+    { referrer: null, ref: null, is_me: 0 },
+  ]);
+  assert.equal(views(slug), 2);
+});
+
+test("a preview never logs a View", async () => {
+  await get("https://views.spratt-dev.example.workers.dev/writing/older-post/");
+  assert.equal(viewLog("older-post").length, 2);
+});
+
+test("/writing/?me marks the browser as the owner's", async () => {
+  const res = await get(`${LIVE}/writing/?me`);
+  assert.equal(res.status, 200);
+  assert.match(res.body, /marked as yours/);
+  assert.equal(res.headers["cache-control"], "no-store");
+  const cookie = String(res.headers["set-cookie"]);
+  assert.match(cookie, /^me=1; /);
+  assert.match(cookie, /Path=\/writing\/;/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /Secure/);
+  assert.equal((await get(`${LIVE}/writing/`)).body, site.read("writing/index.html"), "plain /writing/ is unchanged");
+});
+
+test("the owner's Views are logged as theirs but leave the public count alone", async () => {
+  const slug = "older-post";
+  const { body } = await get(`${LIVE}/writing/${slug}/`, { ...navigate, cookie: "me=1" });
+  assert.equal(stats(body), " · Read 2 times");
+  assert.equal(views(slug), 2);
+  assert.deepEqual(viewLog(slug).at(-1), { referrer: null, ref: null, is_me: 1 });
 });

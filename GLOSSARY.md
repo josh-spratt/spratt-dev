@@ -33,7 +33,7 @@ The Homepage block listing the latest three Posts. It doesn't exist until the fi
 _Avoid_: blog section, latest posts
 
 **View**:
-One browser visit to a Post on the live site. Crawlers, previews and local runs don't count. A Post's View count is shown in its header once it has one.
+One browser visit to a Post on the live site. Crawlers, previews and local runs don't count, and Josh's own Views (from a browser marked with `/writing/?me`) are logged but not counted. A Post's View count is shown in its header once it has one. Each View's source is its `?ref=` tag, else the site that linked to it, else direct.
 _Avoid_: hit, pageview, read count
 
 **Like**:

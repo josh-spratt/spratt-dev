@@ -14,7 +14,8 @@
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "check:links": "node scripts/check-links.mjs dist",
     "lhci": "lhci autorun",
-    "cards": "node scripts/post-cards.mjs"
+    "cards": "node scripts/post-cards.mjs",
+    "views": "node scripts/views.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
