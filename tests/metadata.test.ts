@@ -13,28 +13,28 @@ const pages = [
   {
     file: "index.html",
     url: "https://jspratt.dev/",
-    title: "Fixture Person — Fixture role line",
+    title: "Fixture Person",
     description: "Fixture homepage description.",
     type: "website",
   },
   {
     file: "writing/index.html",
     url: "https://jspratt.dev/writing/",
-    title: "Writing — Fixture Person",
+    title: "Writing | Fixture Person",
     description: "Writing by Fixture Person.",
     type: "website",
   },
   {
     file: "writing/newer-post/index.html",
     url: "https://jspratt.dev/writing/newer-post/",
-    title: "Newer Post — Fixture Person",
+    title: "Newer Post | Fixture Person",
     description: "The newer one.",
     type: "article",
   },
   {
     file: "404.html",
     url: undefined, // served at any URL, so there is nothing to canonicalise
-    title: "Not found — Fixture Person",
+    title: "Not found | Fixture Person",
     description: undefined,
     type: "website",
   },
