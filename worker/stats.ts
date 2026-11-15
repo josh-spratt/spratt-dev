@@ -12,6 +12,12 @@ export const LIKED_COOKIE = "liked";
  */
 export const INTERESTED_COOKIE = "interested";
 
+/**
+ * Marks a browser as the site owner's. Set by visiting /writing/?me. Its Views
+ * are still logged (flagged) but don't add to the public count.
+ */
+export const ME_COOKIE = "me";
+
 /** Where the redirect back after answering lands, so the thank-you is in view. */
 export const INTEREST_ANCHOR = "interest";
 
@@ -77,6 +83,41 @@ export function interestedCookie(): string {
 
 export function likedCookie(slug: string): string {
   return `${LIKED_COOKIE}=1; Path=/writing/${slug}/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export function isMe(request: Request): boolean {
+  return hasCookie(request, ME_COOKIE);
+}
+
+/** 400 days is the longest any browser keeps a cookie. */
+export function meCookie(): string {
+  return `${ME_COOKIE}=1; Path=/writing/; Max-Age=34560000; HttpOnly; Secure; SameSite=Lax`;
+}
+
+/** "/writing/?me" is the address that sets the owner cookie. */
+export function isMeSetup(url: URL): boolean {
+  return url.pathname === "/writing/" && url.searchParams.has("me");
+}
+
+/** Hostname of the linking page, or null. Browsers send only the origin cross-site by default. */
+export function referrerHost(request: Request): string | null {
+  const referer = request.headers.get("referer");
+  if (!referer) return null;
+  try {
+    return new URL(referer).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The ?ref= tag on a shared link, cleaned so arbitrary input can't fill the log. */
+export function refTag(url: URL): string | null {
+  const tag = url.searchParams
+    .get("ref")
+    ?.toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "")
+    .slice(0, 40);
+  return tag || null;
 }
 
 export function statsText(views: number): string {

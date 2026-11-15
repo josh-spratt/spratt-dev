@@ -21,4 +21,4 @@ Each Post shares its own 1200×630 card from `public/cards/<slug>.png`. Run `npm
 
 ## Deploy
 
-Workers Builds deploys `main` to production and gives every other branch a preview URL. `wrangler.jsonc` serves `dist/`. A small Worker script (`worker/`) runs only for `/writing/*`, where it counts Views in a D1 database: see [docs/database.md](docs/database.md). The dashboard setup is in [docs/launch-checklist.md](docs/launch-checklist.md).
+Workers Builds deploys `main` to production and gives every other branch a preview URL. `wrangler.jsonc` serves `dist/`. A small Worker script (`worker/`) runs only for `/writing/*`, where it counts and logs Views in a D1 database (`npm run views` shows where they came from): see [docs/database.md](docs/database.md). The dashboard setup is in [docs/launch-checklist.md](docs/launch-checklist.md).

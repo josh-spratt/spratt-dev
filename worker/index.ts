@@ -12,11 +12,16 @@ import {
   interestSlug,
   interestedCookie,
   isLive,
+  isMe,
+  isMeSetup,
   isSameOrigin,
   likeLabel,
   likeSlug,
   likedCookie,
+  meCookie,
   postSlug,
+  refTag,
+  referrerHost,
   shouldCount,
   statsText,
 } from "./stats.ts";
@@ -33,14 +38,31 @@ const COUNT_LIKE =
   "INSERT INTO post_stats (slug, likes) VALUES (?1, 1) ON CONFLICT (slug) DO UPDATE SET likes = likes + 1";
 const READ = "SELECT views, likes FROM post_stats WHERE slug = ?1";
 const RECORD_INTEREST = "INSERT INTO interest (slug) VALUES (?1)";
+const LOG_VIEW = "INSERT INTO view_log (slug, referrer, ref, is_me) VALUES (?1, ?2, ?3, ?4)";
 
 const INTEREST_THANKS =
   `<p class="interest" id="${INTEREST_ANCHOR}">Thanks. If enough people say so, I’ll set up email.</p>`;
 
-async function readStats(env: Env, slug: string, count: boolean): Promise<Stats> {
-  const row = await env.DB.prepare(count ? COUNT_VIEW : READ).bind(slug).first<Stats>();
-  return row ?? { views: 0, likes: 0 };
+/**
+ * Reads a Post's counts, and for a View also logs it. The owner's Views are
+ * logged (flagged) but not added to the total. The batch is one transaction,
+ * so the total and the log can't disagree.
+ */
+async function readStats(env: Env, request: Request, slug: string): Promise<Stats> {
+  if (!shouldCount(request)) {
+    return (await env.DB.prepare(READ).bind(slug).first<Stats>()) ?? { views: 0, likes: 0 };
+  }
+  const me = isMe(request);
+  const url = new URL(request.url);
+  const [stats] = await env.DB.batch<Stats>([
+    env.DB.prepare(me ? READ : COUNT_VIEW).bind(slug),
+    env.DB.prepare(LOG_VIEW).bind(slug, referrerHost(request), refTag(url), me ? 1 : 0),
+  ]);
+  return stats.results[0] ?? { views: 0, likes: 0 };
 }
+
+const ME_SET =
+  "This browser is now marked as yours. Its Views of Posts are logged as yours and don't add to the public count.\n";
 
 /** Only Posts that really exist get rows, so made-up URLs can't create them. */
 async function postExists(env: Env, request: Request, slug: string): Promise<boolean> {
@@ -82,7 +104,7 @@ async function submit(request: Request, env: Env, slug: string, action: FormActi
 async function post(request: Request, env: Env, slug: string, page: Response): Promise<Response> {
   let stats: Stats | undefined;
   try {
-    stats = await readStats(env, slug, shouldCount(request));
+    stats = await readStats(env, request, slug);
   } catch (err) {
     // D1 down or overloaded: no counts; the empty placeholder is hidden.
     console.error("post_stats failed", err);
@@ -122,7 +144,14 @@ async function post(request: Request, env: Env, slug: string, page: Response): P
 
 export default {
   async fetch(request, env): Promise<Response> {
-    const { pathname } = new URL(request.url);
+    const url = new URL(request.url);
+    const { pathname } = url;
+
+    if (isMeSetup(url)) {
+      return new Response(ME_SET, {
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "set-cookie": meCookie() },
+      });
+    }
 
     const liking = likeSlug(pathname);
     if (liking) {
