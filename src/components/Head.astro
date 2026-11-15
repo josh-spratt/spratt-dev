@@ -4,7 +4,7 @@ import FeedLink from "./FeedLink.astro";
 import "../styles/global.css";
 
 interface Props {
-  /** Full document title, e.g. "Writing — Josh Spratt". */
+  /** Full document title, e.g. "Writing | Josh Spratt". */
   title: string;
   description?: string;
   type?: "website" | "article";
@@ -20,7 +20,7 @@ interface Props {
 const { title, description, type = "website", noindex = false, published, modified } = Astro.props;
 const canonical = new URL(Astro.url.pathname, siteUrl).href;
 const image = `${siteUrl}${Astro.props.image ?? "/social.png"}`;
-const imageAlt = Astro.props.image ? (Astro.props.imageAlt ?? title) : `${site.name} — ${site.role}`;
+const imageAlt = Astro.props.image ? (Astro.props.imageAlt ?? title) : `${site.name} | ${site.role}`;
 const beacon =
   buildMode === "production" && site.analyticsToken
     ? JSON.stringify({ token: site.analyticsToken })
