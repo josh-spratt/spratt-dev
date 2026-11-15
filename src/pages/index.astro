@@ -1,6 +1,7 @@
 ---
 import { site, projects, getPosts, formatDate } from "../lib/site";
 import Page from "../layouts/Page.astro";
+import Tags from "../components/Tags.astro";
 
 const posts = await getPosts();
 const recent = posts.slice(0, 3);
@@ -36,6 +37,7 @@ const recent = posts.slice(0, 3);
                   <span class="meta">
                     <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
                   </span>
+                  <Tags tags={p.data.tags} />
                 </span>
               </a>
             </li>
@@ -64,13 +66,7 @@ const recent = posts.slice(0, 3);
               <span class="body">
                 <strong>{p.title}</strong>
                 <span class="detail">{p.description}</span>
-                {p.tags && (
-                  <span class="tags">
-                    {p.tags.map((t) => (
-                      <span data-tag>{t}</span>
-                    ))}
-                  </span>
-                )}
+                <Tags tags={p.tags} />
               </span>
             </a>
           </li>

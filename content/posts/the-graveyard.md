@@ -4,6 +4,7 @@ description: Every project I’ve shipped lately is dead. That doesn’t mean I 
 date: 2026-11-13
 draft: false
 image: /writing/the-graveyard.png
+tags: [AI, Side projects]
 ---
 
 “Why do I never finish projects?”

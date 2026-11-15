@@ -1,9 +1,23 @@
 /**
- * Runs only for /writing/* (see run_worker_first in wrangler.jsonc). Every page
- * is still built statically. For a Post page this counts the View in D1 and
- * writes the View and Like counts into the HTML. A Like and the email-interest
- * answer are plain form POSTs, so the page ships no client script.
+ * Runs only for /writing/* and /stats* (see run_worker_first in wrangler.jsonc).
+ * Every page is still built statically. For a Post page this counts the View in
+ * D1 and writes the View and Like counts into the HTML. A Like and the
+ * email-interest answer are plain form POSTs, so the page ships no client
+ * script. /stats/ is the owner's private traffic dashboard.
  */
+
+import {
+  STATS_COOKIE,
+  cookieValue,
+  dashboardQuery,
+  isDashboard,
+  renderDashboard,
+  sameString,
+  statsCookie,
+  statsToken,
+  type DashboardData,
+  type PostMeta,
+} from "./dashboard.ts";
 
 import {
   INTEREST_ANCHOR,
@@ -142,10 +156,95 @@ async function post(request: Request, env: Env, slug: string, page: Response): P
   return new Response(res.body, { status: res.status, headers });
 }
 
+/**
+ * Anyone without the key gets the ordinary 404 page, so /stats/ looks like it
+ * isn't there. The path is one no asset has, so the assets serve the 404 page.
+ */
+async function notFound(env: Env, request: Request): Promise<Response> {
+  const page = await env.ASSETS.fetch(new URL("/stats/not-found/", request.url));
+  const headers = new Headers(page.headers);
+  headers.set("cache-control", "no-store");
+  return new Response(page.body, { status: 404, headers });
+}
+
+// The window is the last N UTC days including today: ?1 is "-(N-1) days".
+// ?2 = 1 includes the owner's Views.
+const IN_WINDOW = "created_at >= date('now', ?1) AND (?2 = 1 OR is_me = 0)";
+const SOURCE = "COALESCE(ref, referrer, 'direct')";
+const DASHBOARD_SQL = [
+  `SELECT date(created_at) AS day, COUNT(*) AS views FROM view_log WHERE ${IN_WINDOW} GROUP BY day`,
+  `SELECT slug, COUNT(*) AS views FROM view_log WHERE ${IN_WINDOW} GROUP BY slug`,
+  `SELECT ${SOURCE} AS source, COUNT(*) AS views FROM view_log WHERE ${IN_WINDOW} GROUP BY source ORDER BY views DESC, source LIMIT 25`,
+  `SELECT created_at, slug, ${SOURCE} AS source, is_me FROM view_log WHERE ${IN_WINDOW} ORDER BY created_at DESC, id DESC LIMIT 25`,
+  "SELECT slug, views, likes FROM post_stats",
+  "SELECT slug, COUNT(*) AS answers FROM interest GROUP BY slug",
+];
+
+/** The Posts in this build (src/pages/stats/posts.json.ts), read straight from the assets. */
+async function buildPosts(env: Env, request: Request): Promise<PostMeta[]> {
+  try {
+    const res = await env.ASSETS.fetch(new URL("/stats/posts.json", request.url));
+    return res.ok ? await res.json<PostMeta[]>() : [];
+  } catch {
+    return [];
+  }
+}
+
+const PRIVATE_HEADERS = {
+  "cache-control": "no-store",
+  "referrer-policy": "no-referrer",
+  "x-robots-tag": "noindex, nofollow",
+};
+
+/**
+ * /stats/?key=<STATS_KEY> once per browser sets a cookie holding a hash of the
+ * key, then redirects to /stats/ so the key leaves the address bar. With no
+ * STATS_KEY set (branch previews, local runs without .dev.vars) nothing opens.
+ */
+async function dashboard(request: Request, env: Env, url: URL): Promise<Response> {
+  // A secret, so not in wrangler.jsonc; `wrangler types` only knows it when .dev.vars has it.
+  const key = (env as Env & { STATS_KEY?: string }).STATS_KEY;
+  if (!key || request.method !== "GET" || !isDashboard(url.pathname)) return notFound(env, request);
+  const token = await statsToken(key);
+
+  const given = url.searchParams.get("key");
+  if (given !== null) {
+    if (!sameString(await statsToken(given), token)) return notFound(env, request);
+    return new Response(null, {
+      status: 303,
+      headers: { ...PRIVATE_HEADERS, location: "/stats/", "set-cookie": statsCookie(token) },
+    });
+  }
+  if (!sameString(cookieValue(request, STATS_COOKIE) ?? "", token)) return notFound(env, request);
+
+  const q = dashboardQuery(url);
+  const since = `-${q.days - 1} days`;
+  const withMe = q.withMe ? 1 : 0;
+  const [posts, results] = await Promise.all([
+    buildPosts(env, request),
+    env.DB.batch(
+      DASHBOARD_SQL.map((sql, i) => (i < 4 ? env.DB.prepare(sql).bind(since, withMe) : env.DB.prepare(sql))),
+    ),
+  ]);
+  const [daily, windowViews, sources, recent, totals, interest] = results.map((r) => r.results);
+  const data = { posts, daily, windowViews, sources, recent, totals, interest } as DashboardData;
+
+  return new Response(renderDashboard(q, data), {
+    headers: {
+      ...PRIVATE_HEADERS,
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy":
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    },
+  });
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
+
+    if (pathname === "/stats" || pathname.startsWith("/stats/")) return dashboard(request, env, url);
 
     if (isMeSetup(url)) {
       return new Response(ME_SET, {

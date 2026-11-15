@@ -92,3 +92,26 @@ test("A Post ends with a Copy link that is a real link to its canonical URL", ()
   );
   assert.match(page.querySelector("script[data-copy-link-script]")?.text ?? "", /navigator\.clipboard\.writeText/);
 });
+
+test("A Post's tags show on /writing, in Recent writing and in its header when it has them and not otherwise", () => {
+  const site = buildSite(fixtures("production"));
+  const tags = (el: { querySelectorAll(s: string): { text: string }[] } | null) =>
+    el!.querySelectorAll("[data-tag]").map((t) => t.text);
+  for (const rows of [
+    site.html("writing/index.html").querySelectorAll("main li"),
+    site.html("index.html").querySelectorAll("section.recent-writing li"),
+  ]) {
+    assert.deepEqual(tags(rows[0]), ["AI", "Career"]);
+    assert.deepEqual(tags(rows[1]), []);
+  }
+  assert.deepEqual(tags(site.html("writing/newer-post/index.html").querySelector(".post-head")), ["AI", "Career"]);
+  assert.equal(site.html("writing/older-post/index.html").querySelector(".post-head .tags"), null);
+});
+
+test("The build lists its published Posts, with tags, for the stats dashboard", () => {
+  const posts = JSON.parse(buildSite(fixtures("production")).read("stats/posts.json"));
+  assert.deepEqual(posts, [
+    { slug: "newer-post", title: "Newer Post", date: "2026-03-10", tags: ["AI", "Career"] },
+    { slug: "older-post", title: "Older Post", date: "2026-01-05", tags: [] },
+  ]);
+});

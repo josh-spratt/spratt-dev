@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { unstable_startWorker } from "wrangler";
+import { parse } from "node-html-parser";
 import { buildSite, type Site } from "./helpers.ts";
+import { dashboardQuery, renderDashboard, sameString, windowDays } from "../worker/dashboard.ts";
 import { interestSlug, likeLabel, likeSlug, postSlug, refTag, referrerHost, shouldCount, statsText } from "../worker/stats.ts";
 
 type Worker = Awaited<ReturnType<typeof unstable_startWorker>>;
@@ -16,6 +18,7 @@ let worker: Worker;
 let persist: string;
 
 const LIVE = "https://jspratt.dev";
+const STATS_KEY = "test-stats-key";
 const navigate = { "sec-fetch-mode": "navigate" };
 
 /** Run SQL against the same local D1 the Worker uses. */
@@ -88,6 +91,7 @@ before(async () => {
   worker = await unstable_startWorker({
     config: "wrangler.jsonc",
     assets: site.outDir,
+    bindings: { STATS_KEY: { type: "secret_text", value: STATS_KEY } },
     dev: { persist, server: { port: 0 }, inspector: false, watch: false, logLevel: "none" },
   });
 });
@@ -337,4 +341,100 @@ test("the owner's Views are logged as theirs but leave the public count alone", 
   assert.equal(stats(body), " · Read 2 times");
   assert.equal(views(slug), 2);
   assert.deepEqual(viewLog(slug).at(-1), { referrer: null, ref: null, is_me: 1 });
+});
+
+/** Opens the dashboard with the key and returns the cookie it sets. */
+async function statsLogin(): Promise<string> {
+  const res = await get(`${LIVE}/stats/?key=${STATS_KEY}`, {});
+  assert.equal(res.status, 303);
+  assert.equal(res.headers.location, "/stats/");
+  return String(res.headers["set-cookie"]).split(";")[0];
+}
+
+test("/stats/ is the ordinary 404 page without the key, with a wrong key or wrong cookie", async () => {
+  for (const [url, headers] of [
+    [`${LIVE}/stats/`, {}],
+    [`${LIVE}/stats/?key=wrong`, {}],
+    [`${LIVE}/stats/`, { cookie: "stats=nope" }],
+    [`${LIVE}/stats/posts.json`, {}],
+  ] as const) {
+    const res = await get(url, headers);
+    assert.equal(res.status, 404, url);
+    assert.equal(res.body, site.read("404.html"));
+    assert.equal(res.headers["set-cookie"], undefined);
+  }
+});
+
+test("the key sets a hashed, /stats/-scoped cookie and redirects the key out of the address bar", async () => {
+  const res = await get(`${LIVE}/stats/?key=${STATS_KEY}`, {});
+  assert.equal(res.headers["cache-control"], "no-store");
+  const cookie = String(res.headers["set-cookie"]);
+  assert.match(cookie, /^stats=[0-9a-f]{64}; /);
+  assert.doesNotMatch(cookie, new RegExp(STATS_KEY));
+  assert.match(cookie, /Path=\/stats\/;/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /Secure/);
+  assert.match(cookie, /SameSite=Strict/);
+});
+
+test("the dashboard shows Views, Likes, sources and tags from D1, uncached and unindexed", async () => {
+  const cookie = await statsLogin();
+  const res = await get(`${LIVE}/stats/`, { cookie });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers["cache-control"], "no-store");
+  assert.match(String(res.headers["x-robots-tag"]), /noindex/);
+  assert.match(String(res.headers["content-security-policy"]), /default-src 'none'/);
+  const page = parse(res.body);
+  assert.equal(page.querySelectorAll("script").length, 0, "no client script");
+  const row = (title: string) =>
+    page.querySelectorAll("tbody tr").find((tr) => tr.querySelector("td")?.text.startsWith(title))!;
+  // Earlier tests: newer-post had 2 counted Views and 1 Like; older-post 2 Views plus one of the owner's.
+  const newer = row("Newer Post").querySelectorAll("td").map((td) => td.text.trim());
+  assert.deepEqual(newer, ["Newer Post", "AI Career", "2", "2", "1", "1"]);
+  const older = row("Older Post").querySelectorAll("td").map((td) => td.text.trim());
+  assert.deepEqual(older.slice(2), ["2", "2", "0", "0"], "the owner's View is left out");
+  assert.ok(row("bluesky"), "a ?ref= tag is a source");
+  assert.ok(row("AI"), "tags are listed");
+});
+
+test("the dashboard can include the owner's Views", async () => {
+  const cookie = await statsLogin();
+  const page = parse((await get(`${LIVE}/stats/?me`, { cookie })).body);
+  const older = page.querySelectorAll("tbody tr").find((tr) => tr.querySelector("td")?.text.startsWith("Older Post"))!;
+  assert.equal(older.querySelectorAll("td")[2].text.trim(), "3");
+  assert.match(page.text, /\(you\)/);
+});
+
+test("dashboardQuery only accepts the offered windows", () => {
+  assert.deepEqual(dashboardQuery(new URL(`${LIVE}/stats/`)), { days: 30, withMe: false });
+  assert.deepEqual(dashboardQuery(new URL(`${LIVE}/stats/?days=7&me`)), { days: 7, withMe: true });
+  assert.equal(dashboardQuery(new URL(`${LIVE}/stats/?days=1000`)).days, 30);
+});
+
+test("windowDays ends today and has one entry per day", () => {
+  const days = windowDays(7, new Date("2026-03-10T12:00:00Z"));
+  assert.deepEqual([days.length, days[0], days.at(-1)], [7, "2026-03-04", "2026-03-10"]);
+});
+
+test("sameString compares whole strings", () => {
+  assert.equal(sameString("abc", "abc"), true);
+  assert.equal(sameString("abc", "abd"), false);
+  assert.equal(sameString("abc", "ab"), false);
+});
+
+test("the dashboard escapes everything that came from a reader", () => {
+  const html = renderDashboard(
+    { days: 7, withMe: false },
+    {
+      posts: [],
+      daily: [],
+      windowViews: [{ slug: "<b>x</b>", views: 1 }],
+      totals: [],
+      interest: [],
+      sources: [{ source: "<script>alert(1)</script>", views: 1 }],
+      recent: [{ created_at: "2026-03-10 12:00:00", slug: "<i>", source: "\"><img>", is_me: 0 }],
+    },
+  );
+  assert.doesNotMatch(html, /<script>|<img>|<b>x|<i>/);
+  assert.match(html, /&lt;script&gt;/);
 });

@@ -24,6 +24,10 @@ _Avoid_: portfolio item, work, repo
 A single piece of writing published under `/writing`. A long-form write-up about a Project is a Post that links to the Project, not a page of the Project.
 _Avoid_: article, blog entry
 
+**Tag**:
+A short topic label on a Project or a Post (e.g. "Rust", "AI"), shown as a chip. Projects set them in `projects.json`, Posts in their frontmatter.
+_Avoid_: category, label
+
 **Draft**:
 A Post that isn't published yet. It can be seen while writing and reviewing, but never on the live site, in the feed or in Recent writing. A Draft is unlisted, not secret: anyone can read its source, so writing that must stay private isn't a Draft yet.
 _Avoid_: unpublished post, WIP

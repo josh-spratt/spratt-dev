@@ -1,0 +1,19 @@
+---
+/** The tag chips under a Project or Post. Renders nothing for no tags. */
+interface Props {
+  tags?: string[];
+  /** The wrapper element; a span inside a link card, a p elsewhere. */
+  as?: "span" | "p";
+}
+const { tags, as: Tag = "span" } = Astro.props;
+---
+
+{
+  tags && tags.length > 0 && (
+    <Tag class="tags">
+      {tags.map((t) => (
+        <span data-tag>{t}</span>
+      ))}
+    </Tag>
+  )
+}
