@@ -40,9 +40,23 @@ Branch previews read the live counts but never write them. If D1 fails, the stat
 
 Add the next numbered `.sql` file to `migrations/`. Run `npx wrangler d1 migrations apply spratt-dev --remote` **before** merging the PR that uses it, because the deploy from `main` expects the new schema to already be there. Every migration should be safe to run while the old code is still live, e.g. adding a column with a default.
 
+## The dashboard
+
+`https://jspratt.dev/stats/` shows Views per day, per Post, per source and per tag, plus Likes, Interest and the latest Views. The Worker renders it straight from D1 on each load, with no client script. Tags come from each Post's frontmatter via `/stats/posts.json`, which the build writes, so no migration was needed for them.
+
+It's private. Without a `STATS_KEY` secret, `/stats/` (and everything under it) is the ordinary 404 page.
+
+- [ ] Pick a long random key, e.g. `openssl rand -hex 32`, and keep it in your password manager.
+- [ ] `npx wrangler secret put STATS_KEY` and paste it.
+- [ ] Visit `https://jspratt.dev/stats/?key=<the key>` once in each browser you use. It sets a `stats` cookie on `/stats/` holding a hash of the key, not the key, for 400 days, then redirects to `/stats/`.
+
+Changing the secret signs every browser out. Branch previews don't get the secret, so they show the 404. Locally, put `STATS_KEY=...` in `.dev.vars` (gitignored) before `npx wrangler dev`.
+
+The window is 7, 30 or 90 UTC days (`?days=7`), and `?me` includes your own Views. The all-time numbers come from `post_stats`, which never includes yours.
+
 ## Reading the counts
 
-Where Views came from, by source, by Post and by day:
+From the terminal, where Views came from, by source, by Post and by day:
 
 ```sh
 npm run views                 # last 14 days, your own Views left out

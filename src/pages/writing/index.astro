@@ -1,5 +1,6 @@
 ---
 import Page from "../../layouts/Page.astro";
+import Tags from "../../components/Tags.astro";
 import { site, getPosts, formatDate } from "../../lib/site";
 
 const posts = await getPosts();
@@ -17,6 +18,7 @@ const posts = await getPosts();
           <a href={`/writing/${p.id}/`}>{p.data.title}</a>
           <p>{p.data.description}</p>
           <time datetime={p.data.date.toISOString()}>{formatDate(p.data.date)}</time>
+          <Tags tags={p.data.tags} as="p" />
         </li>
       ))
     }

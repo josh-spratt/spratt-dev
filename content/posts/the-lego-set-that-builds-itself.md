@@ -3,6 +3,7 @@ title: The Lego set that builds itself
 description: Why I'm writing, for every engineer who misses building things by hand.
 date: 2026-11-08
 image: /writing/the-lego-set-that-builds-itself.png
+tags: [AI, Career]
 ---
 
 Engineering has never felt more isolating.

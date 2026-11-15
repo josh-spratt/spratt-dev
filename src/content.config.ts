@@ -18,6 +18,8 @@ const posts = defineCollection({
     draft: z.boolean().default(false),
     /** Optional thumbnail, a path under public/ such as /writing/slug.png. */
     image: z.string().min(1).optional(),
+    /** Optional topic chips, shown like a Project's tags, e.g. [AI, Career]. */
+    tags: z.array(z.string().trim().min(1)).optional(),
   }),
 });
 
