@@ -201,13 +201,30 @@ test("preview builds, and sites without a token, ship no beacon", () => {
   assert.equal(noToken.html("index.html").querySelectorAll("script").length, 0);
 });
 
+/** Screenshots inside a Post, at writing/<slug>/<file>. */
+const isPostImage = (p: string): boolean =>
+  /^writing\/[^/]+\/[^/]+\.(webp|png|jpe?g)$/.test(relative(site.outDir, p));
+
 test("Lighthouse budget: the built site stays under 100 KB", () => {
   // Share cards are only fetched by link-preview crawlers, never by a page load.
+  // Post images load lazily below the fold, so they have their own cap below.
   const total = (dir: string): number =>
     readdirSync(dir).reduce((sum, f) => {
       const p = join(dir, f);
-      if (f === "social.png" || f === "cards") return sum;
+      if (f === "social.png" || f === "cards" || isPostImage(p)) return sum;
       return sum + (statSync(p).isDirectory() ? total(p) : statSync(p).size);
     }, 0);
   assert.ok(total(site.outDir) < 100 * 1024);
+});
+
+test("Lighthouse budget: each image inside a Post stays under 80 KB", () => {
+  const writing = join(site.outDir, "writing");
+  const images = readdirSync(writing, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .flatMap((e) => readdirSync(join(writing, e.name)).map((f) => join(writing, e.name, f)))
+    .filter(isPostImage);
+  for (const p of images) {
+    const kb = statSync(p).size / 1024;
+    assert.ok(kb < 80, `${relative(site.outDir, p)} is ${kb.toFixed(1)} KB`);
+  }
 });
