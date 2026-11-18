@@ -34,6 +34,7 @@ const data = dataNames.map((name) => `${base}data/${name}.json?v=${version}`);
       themeColor="#efe7d6"
       themeColorDark="#1c1915"
     />
+    <link rel="preload" as="style" href={`${base}twenty-boats.css?v=${version}`} />
     {modules.map((href) => <link rel="modulepreload" href={href} />)}
     {data.map((href) => <link rel="preload" as="fetch" crossorigin="anonymous" href={href} />)}
     <style is:global>
