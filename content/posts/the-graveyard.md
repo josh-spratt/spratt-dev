@@ -35,14 +35,14 @@ They were all fun to build. Every single one of them is dead now. I built them, 
 
 <figure>
   <img src="/writing/the-graveyard/twenty-boats.webp" width="1600" height="1000" loading="lazy" alt="Twenty Boats: the Titanic at 01:25, listing by the bow, with a deck plan of every lifeboat’s status and the starboard boats loading under Murdoch." />
-  <figcaption>The Titanic game, Twenty Boats</figcaption>
+  <figcaption>The Titanic game, <a href="/games/twenty-boats/?ref=graveyard">Twenty Boats</a></figcaption>
 </figure>
 
-If you read [my last post](/writing/the-lego-set-that-builds-itself), you know I struggle to get the same fulfillment out of building with AI. But AI is the reason most of these projects got finished at all. Back in the old days, they would have died a half-baked repo on my GitHub profile. These projects still got built. We started with an idea, and shipped a real working version of that idea. That counts for something.
+If you read [my last post](/writing/the-lego-set-that-builds-itself/), you know I struggle to get the same fulfillment out of building with AI. But AI is the reason most of these projects got finished at all. Back in the old days, they would have died a half-baked repo on my GitHub profile. These projects still got built. We started with an idea, and shipped a real working version of that idea. That counts for something.
 
 Building used to be the hard part. It was also the fun part. Now, building is fast and easy. Most of the fun is gone. Finding the right thing to build is the new hard part.
 
-I loved building the Titanic game. I loved playing it too. I’m a huge history and shipwrecks nerd. But you can only play your own game so many times. If I can’t get anyone else interested in it, what’s the point? I used to feel rewarded twice: the work, and then the people using it. AI took the first. Nobody showed up for the second.
+I loved building the Titanic game. I loved [playing it](/games/twenty-boats/?ref=graveyard) too. I’m a huge history and shipwrecks nerd. But you can only play your own game so many times. If I can’t get anyone else interested in it, what’s the point? I used to feel rewarded twice: the work, and then the people using it. AI took the first. Nobody showed up for the second.
 
 So, where does this leave me? What were my takeaways?
 

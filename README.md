@@ -21,7 +21,7 @@ Each Post shares its own 1200×630 card from `public/cards/<slug>.png`. Run `npm
 
 ## Games
 
-Twenty Boats is plain JavaScript modules in `public/games/twenty-boats/`, with no build step, served at `/games/twenty-boats/`. It moved here from the private `games-jspratt` repo, whose `games.jspratt.dev` is gone. `public/_headers` serves it with `Cache-Control: no-store`, so a deploy is live on the next load. Its imports also carry a `?v=` cache key (`grep -rn '2026-11-17-v1'`): bump them together on a release, as a second guard. The page preloads every module and data file, reading the list from the game's source. Its game-logic tests are in `tests/twenty-boats/`.
+Twenty Boats is plain JavaScript modules in `public/games/twenty-boats/`, with no build step, served at `/games/twenty-boats/`. It moved here from the private `games-jspratt` repo, whose `games.jspratt.dev` is gone. `public/_headers` serves it with `Cache-Control: no-store`, so a deploy is live on the next load. Its imports also carry a `?v=` cache key (`grep -rn '2026-11-17-v2'`): bump them together on a release, as a second guard. The page preloads every module and data file, reading the list from the game's source. Its game-logic tests are in `tests/twenty-boats/`.
 
 ## Deploy
 

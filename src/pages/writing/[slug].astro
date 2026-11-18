@@ -8,10 +8,14 @@ import { site, siteUrl, getPosts, formatDate } from "../../lib/site";
 
 export async function getStaticPaths() {
   const posts = await getPosts();
-  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+  // Newest first, so the Post before this one in the list is newer.
+  return posts.map((post, i) => ({
+    params: { slug: post.id },
+    props: { post, newer: posts[i - 1], older: posts[i + 1] },
+  }));
 }
 
-const { post } = Astro.props;
+const { post, newer, older } = Astro.props;
 const { Content } = await render(post);
 const { title, description, date, updated, image, tags } = post.data;
 // Drawn by `npm run cards`; until a Post has one, it shares the site's card.
@@ -62,6 +66,26 @@ const url = new URL(`/writing/${post.id}/`, siteUrl).href;
       <p>Would you subscribe by email if I set it up?</p>
       <button type="submit">I would</button>
     </form>
+    {/* Where to go once the Post is read: its neighbours, then the full list. */}
+    <nav class="post-nav" aria-label="More writing">
+      {
+        older && (
+          <a data-older href={`/writing/${older.id}/`}>
+            <span>Older</span>
+            <strong>{older.data.title}</strong>
+          </a>
+        )
+      }
+      {
+        newer && (
+          <a data-newer href={`/writing/${newer.id}/`}>
+            <span>Newer</span>
+            <strong>{newer.data.title}</strong>
+          </a>
+        )
+      }
+      <a class="all-writing" href="/writing/">All writing</a>
+    </nav>
   </article>
   <script is:inline data-copy-link-script>
     document.querySelector("[data-copy-link]")?.addEventListener("click", async (event) => {

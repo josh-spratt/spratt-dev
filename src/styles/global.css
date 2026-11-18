@@ -239,12 +239,18 @@ main {
   box-shadow: 0 4px 0 var(--line);
 }
 
-.navs nav[aria-label="Site"] a:hover,
-.navs nav[aria-label="Site"] a[aria-current] {
+.navs nav[aria-label="Site"] a:hover {
   background: var(--key-hover);
 }
 
 .navs a:active {
+  transform: translateY(3px);
+  box-shadow: none;
+}
+
+/* The section you're in is the key held down: pressed flat, and it stays that way. */
+.navs nav[aria-label="Site"] a[aria-current] {
+  background: var(--key-hover);
   transform: translateY(3px);
   box-shadow: none;
 }
@@ -695,6 +701,71 @@ time + .tags {
   outline-offset: 3px;
 }
 
+/* ---- After a Post: older and newer as two bricks, then the full list ---- */
+.post-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1.25rem;
+  margin: 3rem 0 0;
+  font-family: var(--font-body);
+}
+
+.post-nav a[data-older],
+.post-nav a[data-newer] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 1.1rem;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--card);
+  border: var(--border);
+  border-radius: 14px;
+  box-shadow: 6px 6px 0 var(--red);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+/* Newer sits on the right, as it would in a list read left to right in time. */
+.post-nav a[data-newer] {
+  grid-column: -2;
+  text-align: right;
+}
+
+.post-nav a[data-older] span,
+.post-nav a[data-newer] span {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.post-nav strong {
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.post-nav a[data-older]:hover,
+.post-nav a[data-newer]:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 var(--red);
+}
+
+.post-nav a[data-older]:hover strong,
+.post-nav a[data-newer]:hover strong {
+  text-decoration: underline;
+}
+
+.post-nav a[data-older]:active,
+.post-nav a[data-newer]:active {
+  transform: translate(3px, 3px);
+  box-shadow: 2px 2px 0 var(--red);
+}
+
+.post-nav .all-writing {
+  grid-column: 1 / -1;
+  justify-self: start;
+  font-weight: 700;
+}
+
 .post-head .cover {
   grid-row: 1 / span 3;
   width: 100%;
@@ -948,6 +1019,10 @@ time + .tags {
   }
 
   .post-list li {
+    transition: none;
+  }
+
+  .post-nav a {
     transition: none;
   }
 
