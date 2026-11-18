@@ -60,7 +60,7 @@ test("Building with a Project missing url fails", () => {
 test("Real content has the Projects and a real mailto", () => {
   const html = buildSite().html("index.html");
   const hrefs = html.querySelectorAll('section[aria-labelledby="projects"] li > a').map((a) => a.getAttribute("href"));
-  assert.deepEqual(hrefs, ["https://jspratt.dev/games/twenty-boats/", "https://github.com/josh-spratt/marinaraDB"]);
+  assert.deepEqual(hrefs, ["/games/twenty-boats/", "https://github.com/josh-spratt/marinaraDB"]);
   assert.ok(html.querySelector('a[href="mailto:josh@jspratt.dev"]'));
 });
 

@@ -1,0 +1,8 @@
+# Response headers for static assets, read by Cloudflare's asset server.
+
+# Games ship as plain modules with no content-hashed filenames, and Safari has
+# served stale module and JSON bodies across deploys even when told to
+# revalidate. Not storing them means a deploy is live on the next load, even if
+# a change forgets to bump the game's ?v= cache keys.
+/games/*
+  Cache-Control: no-store

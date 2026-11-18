@@ -1,7 +1,6 @@
 ---
 import { buildMode, site, siteUrl } from "../lib/site";
 import FeedLink from "./FeedLink.astro";
-import "../styles/global.css";
 
 interface Props {
   /** Full document title, e.g. "Writing | Josh Spratt". */
@@ -15,9 +14,22 @@ interface Props {
   /** Post dates, for article:published_time and article:modified_time. */
   published?: Date;
   modified?: Date;
+  /** Browser chrome colour. Defaults to the site's yellow. */
+  themeColor?: string;
+  /** Browser chrome colour in dark mode, when the page has a dark theme. */
+  themeColorDark?: string;
 }
 
-const { title, description, type = "website", noindex = false, published, modified } = Astro.props;
+const {
+  title,
+  description,
+  type = "website",
+  noindex = false,
+  published,
+  modified,
+  themeColor = "#f2c230",
+  themeColorDark,
+} = Astro.props;
 const canonical = new URL(Astro.url.pathname, siteUrl).href;
 const image = `${siteUrl}${Astro.props.image ?? "/social.png"}`;
 const imageAlt = Astro.props.image ? (Astro.props.imageAlt ?? title) : `${site.name} | ${site.role}`;
@@ -33,7 +45,9 @@ const beacon =
 {description && <meta name="description" content={description} />}
 {noindex && <meta name="robots" content="noindex" />}
 {!noindex && <link rel="canonical" href={canonical} />}
-<meta name="theme-color" content="#f2c230" />
+{/* Browsers use the first theme-color whose media matches, so the dark one goes first. */}
+{themeColorDark && <meta name="theme-color" media="(prefers-color-scheme: dark)" content={themeColorDark} />}
+<meta name="theme-color" content={themeColor} />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" sizes="32x32" href="/favicon.ico" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

@@ -42,7 +42,7 @@ test("every module import and data file the game loads is in the build", () => {
   const modules = files(dir).filter((f) => f.endsWith(".js"));
   assert.ok(modules.length > 5);
   for (const file of modules) {
-    for (const [, spec] of readFileSync(file, "utf8").matchAll(/from\s+'([^']+)'/g)) {
+    for (const [, spec] of readFileSync(file, "utf8").matchAll(/(?:from\s+|import\()'([^']+)'/g)) {
       assert.ok(spec.startsWith("./"), `${relative(dir, file)} imports ${spec}: keep imports relative`);
       const target = join(dirname(file), spec.replace(/\?.*$/, ""));
       assert.ok(existsSync(target), `${relative(dir, file)} imports ${spec}, which isn't built`);
@@ -77,4 +77,33 @@ test("the game reports Plays and Finishes to an address the Worker runs for", ()
   for (const path of ["/games/twenty-boats/", "/games/twenty-boats/event"]) {
     assert.ok(config.includes(`"${path}"`), `${path} is in run_worker_first`);
   }
+});
+
+test("the page preloads every module and data file the game loads", () => {
+  const doc = site.html(page);
+  const modules = doc.querySelectorAll('link[rel="modulepreload"]').map((l) => l.getAttribute("href"));
+  assert.ok(modules.some((h) => /^\/games\/twenty-boats\/twenty-boats\.js\?v=/.test(h ?? "")), "the game's entry module");
+  assert.ok(modules.some((h) => /^\/games\/twenty-boats\/story\.js\?v=/.test(h ?? "")));
+  for (const href of modules) assert.ok(existsSync(join(site.outDir, href!.replace(/\?.*$/, ""))), `${href} is built`);
+  const data = doc.querySelectorAll('link[rel="preload"][as="fetch"]');
+  assert.equal(data.length, 7);
+  for (const l of data) {
+    assert.equal(l.getAttribute("crossorigin"), "anonymous", "matches fetch()'s mode, or the preload is wasted");
+    assert.ok(existsSync(join(site.outDir, l.getAttribute("href")!.replace(/\?.*$/, ""))));
+  }
+});
+
+test("the game page loads none of the site's styles and sets the game's own colours", () => {
+  const doc = site.html(page);
+  assert.equal(doc.querySelectorAll('link[rel="stylesheet"]').length, 0, "no site stylesheet to restyle the game");
+  assert.doesNotMatch(doc.querySelector("style")?.text ?? "", /(^|[\s,}])(main|ul|h1|h2|a)\s*[{,]/, "no element rules that reach into the game");
+  const colours = doc.querySelectorAll('meta[name="theme-color"]');
+  assert.deepEqual(
+    colours.map((m) => [m.getAttribute("media") ?? null, m.getAttribute("content")]),
+    [["(prefers-color-scheme: dark)", "#1c1915"], [null, "#efe7d6"]],
+  );
+});
+
+test("games are served without being stored, so a deploy is live on the next load", () => {
+  assert.match(readFileSync(join(site.outDir, "_headers"), "utf8"), /^\/games\/\*\n\s+Cache-Control: no-store$/m);
 });

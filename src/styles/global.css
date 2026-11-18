@@ -959,27 +959,3 @@ time + .tags {
     animation: none;
   }
 }
-
-/* ---- A Game page ----
-   The game fills the screen and brings its own styles, so the frame steps
-   aside. The paper colour matches Twenty Boats, so loading doesn't flash. */
-body.game-page {
-  display: block;
-  background: #efe7d6;
-}
-
-body.game-page::before {
-  content: none;
-}
-
-.game {
-  position: fixed;
-  inset: 0;
-}
-
-.game-status {
-  margin: 0;
-  padding: 2rem var(--gutter);
-  color: #5b4d3d;
-  font-family: var(--font-prose);
-}

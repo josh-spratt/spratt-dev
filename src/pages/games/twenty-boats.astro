@@ -1,9 +1,26 @@
 ---
-// A Game page: the game takes the whole screen, so there's no yellow column or
-// header. The game's own jspratt.dev button leads back to the Homepage.
-// The game itself is plain modules in public/games/twenty-boats/.
+// A Game page: the game takes the whole screen, so there's no yellow column,
+// header or site stylesheet. The game's own jspratt.dev button leads back to the
+// Homepage. The game itself is plain modules in public/games/twenty-boats/.
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import Head from "../../components/Head.astro";
 import { site } from "../../lib/site";
+
+// Preload every module and data file the game loads, so they arrive in
+// parallel rather than one import at a time. Read from the game's own source,
+// so the list can't drift from what it actually requests.
+const base = "/games/twenty-boats/";
+const dir = join("public", base);
+const sources = readdirSync(dir)
+  .filter((f) => f.endsWith(".js"))
+  .map((f) => readFileSync(join(dir, f), "utf8"));
+const modules = [...new Set(sources.flatMap((s) => [...s.matchAll(/(?:from\s+|import\()'\.\/([^']+)'/g)].map((m) => base + m[1])))];
+const main = readFileSync(join(dir, "twenty-boats.js"), "utf8");
+const version = main.match(/const CACHE_BUST = '([^']+)'/)?.[1];
+const dataNames = [...(main.match(/const DATA = \[([^\]]+)\]/)?.[1].matchAll(/'([^']+)'/g) ?? [])].map((m) => m[1]);
+if (!version || dataNames.length === 0) throw new Error("twenty-boats.js: couldn't find CACHE_BUST or DATA to preload");
+const data = dataNames.map((name) => `${base}data/${name}.json?v=${version}`);
 ---
 
 <!doctype html>
@@ -14,13 +31,49 @@ import { site } from "../../lib/site";
       description="14 April 1912, 23:40. Twenty boats, 2,200 aboard. Play the night the Titanic sank as a randomly drawn passenger."
       image="/games/twenty-boats/card.png"
       imageAlt="Twenty Boats at 01:25: the Titanic listing by the bow, above the deck plan of its lifeboats"
+      themeColor="#efe7d6"
+      themeColorDark="#1c1915"
     />
+    {modules.map((href) => <link rel="modulepreload" href={href} />)}
+    {data.map((href) => <link rel="preload" as="fetch" crossorigin="anonymous" href={href} />)}
+    <style is:global>
+      /* The game's paper and ink, light and dark, so loading doesn't flash. */
+      :root {
+        color-scheme: light dark;
+        --game-paper: #efe7d6;
+        --game-ink: #5b4d3d;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --game-paper: #1c1915;
+          --game-ink: #b3a68f;
+        }
+      }
+
+      body {
+        margin: 0;
+        background: var(--game-paper);
+      }
+
+      .game {
+        position: fixed;
+        inset: 0;
+      }
+
+      .game-status {
+        margin: 0;
+        padding: 2rem clamp(1rem, 4vw, 2.5rem);
+        color: var(--game-ink);
+        font: 1.0625rem/1.55 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      }
+    </style>
   </head>
-  <body class="game-page">
+  <body>
     <div id="game" class="game">
       <p id="game-status" class="game-status" role="status">Loading Twenty Boats…</p>
     </div>
     <noscript><p class="game-status">Twenty Boats needs JavaScript to run.</p></noscript>
-    <script is:inline type="module" src="/games/twenty-boats/play.js?v=2026-11-17-v1" data-game-script></script>
+    <script is:inline type="module" src={`${base}play.js?v=${version}`} data-game-script></script>
   </body>
 </html>

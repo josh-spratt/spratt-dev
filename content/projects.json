@@ -2,7 +2,7 @@
   {
     "title": "Twenty Boats",
     "description": "The night the Titanic sank, played as a randomly drawn passenger. Twenty lifeboats, 2,200 people aboard, and every boat timed from the historical record.",
-    "url": "https://jspratt.dev/games/twenty-boats/",
+    "url": "/games/twenty-boats/",
     "image": "/projects/twenty-boats.webp",
     "tags": [
       "Games",

@@ -17,7 +17,7 @@ The row of contact and profile links (GitHub, LinkedIn, email) in the header on 
 _Avoid_: socials, footer links
 
 **Project**:
-A piece of Josh's work shown on the Homepage, with a title, one-line description and one public link. Something without a public link is not a Project.
+A piece of Josh's work shown on the Homepage, with a title, one-line description and one public link (on this site, as for a Game, or elsewhere). Something without a public link is not a Project.
 _Avoid_: portfolio item, work, repo
 
 **Post**:
