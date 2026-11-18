@@ -4,7 +4,7 @@
 // missed, and the wreck confirmed). The pure part (poseAt) is tested; the
 // rest builds SVG.
 
-import { minuteOf } from './rules.js?v=2026-10-07-v1';
+import { minuteOf } from './rules.js?v=2026-11-17-v1';
 
 const SVG = 'http://www.w3.org/2000/svg';
 export const WATER_Y = 78;

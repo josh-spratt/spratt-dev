@@ -9,7 +9,19 @@ import { unstable_startWorker } from "wrangler";
 import { parse } from "node-html-parser";
 import { buildSite, type Site } from "./helpers.ts";
 import { dashboardQuery, renderDashboard, sameString, windowDays } from "../worker/dashboard.ts";
-import { interestSlug, likeLabel, likeSlug, postSlug, refTag, referrerHost, shouldCount, statsText } from "../worker/stats.ts";
+import {
+  gameEventPath,
+  gamePage,
+  interestSlug,
+  likeLabel,
+  likeSlug,
+  parseGameEvent,
+  postSlug,
+  refTag,
+  referrerHost,
+  shouldCount,
+  statsText,
+} from "../worker/stats.ts";
 
 type Worker = Awaited<ReturnType<typeof unstable_startWorker>>;
 
@@ -35,6 +47,7 @@ const views = (slug: string) => sql(`SELECT views FROM post_stats WHERE slug = '
 const likes = (slug: string) => sql(`SELECT likes FROM post_stats WHERE slug = '${slug}'`)[0]?.likes;
 const viewLog = (slug: string) =>
   sql(`SELECT referrer, ref, is_me FROM view_log WHERE slug = '${slug}' ORDER BY id`);
+const gameLog = () => sql("SELECT game, event, ending, survived, referrer, ref, is_me FROM game_log ORDER BY id");
 const interest = (slug: string) => sql(`SELECT COUNT(*) AS n FROM interest WHERE slug = '${slug}'`)[0].n;
 
 interface Got {
@@ -48,7 +61,7 @@ interface Got {
  * overwrites Sec-Fetch-Mode with "cors", so fetch can't act like a browser
  * navigation. The Host header stands in for the site's hostname.
  */
-async function send(method: string, url: string, headers: Record<string, string>): Promise<Got> {
+async function send(method: string, url: string, headers: Record<string, string>, body?: string): Promise<Got> {
   const target = new URL(url);
   const local = await worker.url;
   return new Promise((resolve, reject) => {
@@ -68,7 +81,7 @@ async function send(method: string, url: string, headers: Record<string, string>
       },
     );
     req.on("error", reject);
-    req.end();
+    req.end(body);
   });
 }
 
@@ -77,6 +90,10 @@ const get = (url: string, headers: Record<string, string> = navigate) => send("G
 /** A browser submitting a Post form (Like or email interest) on the page at `url`'s origin. */
 const like = (url: string, headers: Record<string, string> = {}) =>
   send("POST", url, { origin: new URL(url).origin, ...headers });
+
+/** The game's own script reporting a Play or a Finish from a page on `url`'s origin. */
+const report = (url: string, event: object, headers: Record<string, string> = {}) =>
+  send("POST", url, { origin: new URL(url).origin, "content-type": "application/json", ...headers }, JSON.stringify(event));
 
 const stats = (body: string) => /<span data-stats[^>]*>([^<]*)<\/span>/.exec(body)?.[1];
 const likeText = (body: string) => /<span data-like-label[^>]*>([^<]*)<\/span>/.exec(body)?.[1];
@@ -329,7 +346,7 @@ test("/writing/?me marks the browser as the owner's", async () => {
   assert.equal(res.headers["cache-control"], "no-store");
   const cookie = String(res.headers["set-cookie"]);
   assert.match(cookie, /^me=1; /);
-  assert.match(cookie, /Path=\/writing\/;/);
+  assert.match(cookie, /Path=\/;/, "the whole site, so it reaches the Games too");
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /Secure/);
   assert.equal((await get(`${LIVE}/writing/`)).body, site.read("writing/index.html"), "plain /writing/ is unchanged");
@@ -341,6 +358,90 @@ test("the owner's Views are logged as theirs but leave the public count alone", 
   assert.equal(stats(body), " · Read 2 times");
   assert.equal(views(slug), 2);
   assert.deepEqual(viewLog(slug).at(-1), { referrer: null, ref: null, is_me: 1 });
+});
+
+test("gamePage and gameEventPath match a known Game only", () => {
+  assert.equal(gamePage("/games/twenty-boats/"), "twenty-boats");
+  assert.equal(gamePage("/games/twenty-boats/play.js"), null);
+  assert.equal(gamePage("/games/not-a-game/"), null);
+  assert.equal(gameEventPath("/games/twenty-boats/event"), "twenty-boats");
+  assert.equal(gameEventPath("/games/not-a-game/event"), null);
+  assert.equal(gameEventPath("/games/twenty-boats/event/"), null);
+});
+
+test("parseGameEvent keeps a Play or a Finish and cleans where it came from", () => {
+  assert.deepEqual(parseGameEvent(JSON.stringify({ event: "play", ref: "HN", referrer: "https://news.ycombinator.com/item?id=1" })), {
+    event: "play",
+    ending: null,
+    survived: null,
+    referrer: "news.ycombinator.com",
+    ref: "hn",
+  });
+  assert.deepEqual(parseGameEvent(JSON.stringify({ event: "finish", ending: "boat-7", survived: true })), {
+    event: "finish",
+    ending: "boat-7",
+    survived: 1,
+    referrer: null,
+    ref: null,
+  });
+  for (const bad of [
+    "not json",
+    "null",
+    JSON.stringify({ event: "view" }),
+    JSON.stringify({ event: "finish", ending: "<b>", survived: true }),
+    JSON.stringify({ event: "finish", ending: "boat-7" }),
+    JSON.stringify({ event: "play", ref: "x".repeat(2000) }),
+  ]) {
+    assert.equal(parseGameEvent(bad), null, bad);
+  }
+});
+
+test("a browser View of a Game's page is logged with its source, and the page is served as built", async () => {
+  const res = await get(`${LIVE}/games/twenty-boats/?ref=hn`, { ...navigate, referer: "https://news.ycombinator.com/" });
+  assert.equal(res.status, 200);
+  assert.equal(res.body, site.read("games/twenty-boats/index.html"));
+  await get(`${LIVE}/games/twenty-boats/`, {}); // a crawler: not logged
+  await get("https://views.spratt-dev.example.workers.dev/games/twenty-boats/"); // a preview: not logged
+  await get(`${LIVE}/games/twenty-boats/`, { ...navigate, cookie: "me=1" });
+  assert.deepEqual(gameLog(), [
+    { game: "twenty-boats", event: "view", ending: null, survived: null, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
+    { game: "twenty-boats", event: "view", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
+  ]);
+});
+
+test("the game's other files don't run the Worker's logging", async () => {
+  const before = gameLog().length;
+  const res = await get(`${LIVE}/games/twenty-boats/play.js`);
+  assert.equal(res.status, 200);
+  assert.equal(gameLog().length, before);
+});
+
+test("the game reports Plays and Finishes on the live site, the owner's flagged", async () => {
+  const url = `${LIVE}/games/twenty-boats/event`;
+  const from = { ref: "hn", referrer: "https://news.ycombinator.com/" };
+  const play = await report(url, { event: "play", ...from });
+  assert.equal(play.status, 204);
+  assert.equal(play.headers["cache-control"], "no-store");
+  assert.equal((await report(url, { event: "finish", ending: "water-lost", survived: false, ...from })).status, 204);
+  assert.equal((await report(url, { event: "play" }, { cookie: "me=1" })).status, 204);
+  assert.deepEqual(gameLog().slice(-3), [
+    { game: "twenty-boats", event: "play", ending: null, survived: null, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
+    { game: "twenty-boats", event: "finish", ending: "water-lost", survived: 0, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
+    { game: "twenty-boats", event: "play", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
+  ]);
+});
+
+test("a game report from another site, by GET, malformed, or on a preview writes nothing", async () => {
+  const before = gameLog().length;
+  const url = `${LIVE}/games/twenty-boats/event`;
+  assert.equal((await report(url, { event: "play" }, { origin: "https://evil.example" })).status, 403);
+  assert.equal((await send("POST", url, {}, JSON.stringify({ event: "play" }))).status, 403);
+  assert.equal((await get(url)).status, 405);
+  assert.equal((await report(url, { event: "finish" })).status, 400);
+  assert.equal((await report("https://views.spratt-dev.example.workers.dev/games/twenty-boats/event", { event: "play" })).status, 204);
+  // Not a Game, so the Worker doesn't run and the assets refuse the POST.
+  assert.equal((await report(`${LIVE}/games/not-a-game/event`, { event: "play" })).status, 405);
+  assert.equal(gameLog().length, before);
 });
 
 /** Opens the dashboard with the key and returns the cookie it sets. */
@@ -395,6 +496,12 @@ test("the dashboard shows Views, Likes, sources and tags from D1, uncached and u
   assert.deepEqual(older.slice(2), ["2", "2", "0", "0"], "the owner's View is left out");
   assert.ok(row("bluesky"), "a ?ref= tag is a source");
   assert.ok(row("AI"), "tags are listed");
+  // Earlier tests: one counted View, one Play and one Finish of Twenty Boats, all from hn; the owner's left out.
+  const game = row("Twenty Boats").querySelectorAll("td").map((td) => td.text.trim());
+  assert.deepEqual(game, ["Twenty Boats", "1", "1", "1", "0"]);
+  const hn = row("hn").querySelectorAll("td").map((td) => td.text.trim());
+  assert.deepEqual(hn, ["hn", "1", "1", "1"]);
+  assert.deepEqual(row("water-lost").querySelectorAll("td").map((td) => td.text.trim()), ["water-lost", "no", "1"]);
 });
 
 test("the dashboard can include the owner's Views", async () => {
@@ -433,8 +540,11 @@ test("the dashboard escapes everything that came from a reader", () => {
       interest: [],
       sources: [{ source: "<script>alert(1)</script>", views: 1 }],
       recent: [{ created_at: "2026-03-10 12:00:00", slug: "<i>", source: "\"><img>", is_me: 0 }],
+      games: [{ game: "<u>", views: 1, plays: 1, finishes: 0, lived: 0 }],
+      gameSources: [{ source: "<s>", views: 1, plays: 1, finishes: 0 }],
+      endings: [{ ending: "<em>", survived: 0, finishes: 1 }],
     },
   );
-  assert.doesNotMatch(html, /<script>|<img>|<b>x|<i>/);
+  assert.doesNotMatch(html, /<script>|<img>|<b>x|<i>|<u>|<s>|<em>/);
   assert.match(html, /&lt;script&gt;/);
 });

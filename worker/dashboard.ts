@@ -75,7 +75,16 @@ export interface DashboardData {
   interest: { slug: string; answers: number }[];
   sources: { source: string; views: number }[];
   recent: { created_at: string; slug: string; source: string; is_me: number }[];
+  /** Per Game in the window: Views of its page, Plays, Finishes, and Finishes the passenger lived through. */
+  games: { game: string; views: number; plays: number; finishes: number; lived: number }[];
+  /** Game Views, Plays and Finishes in the window, by source. */
+  gameSources: { source: string; views: number; plays: number; finishes: number }[];
+  /** Finishes in the window, by Ending. */
+  endings: { ending: string; survived: number; finishes: number }[];
 }
+
+/** Display names for the Games in game_log. */
+const GAME_TITLES: Record<string, string> = { "twenty-boats": "Twenty Boats" };
 
 /** Every UTC day in the window, oldest first, ending today. */
 export function windowDays(days: number, now = new Date()): string[] {
@@ -258,6 +267,8 @@ export function renderDashboard(q: DashboardQuery, data: DashboardData, now = ne
     </section>
   </div>
 
+  ${gamesSection(data, q)}
+
   <section class="card">
     <h2>Latest Views</h2>
     <div class="scroll"><table>
@@ -275,6 +286,54 @@ export function renderDashboard(q: DashboardQuery, data: DashboardData, now = ne
 </main>
 </body>
 </html>`;
+}
+
+/** Views, Plays and Finishes of the Games, by Game, by source and by Ending. */
+function gamesSection(data: DashboardData, q: DashboardQuery): string {
+  const games = data.games.length ? data.games : Object.keys(GAME_TITLES).map((game) => ({ game, views: 0, plays: 0, finishes: 0, lived: 0 }));
+  const maxSource = Math.max(0, ...data.gameSources.map((s) => s.views));
+  const maxEnding = Math.max(0, ...data.endings.map((e) => e.finishes));
+  const none = (cols: number) => `<tr><td colspan="${cols}" class="muted">Nothing in this window.</td></tr>`;
+  return `<section class="card">
+    <h2>Games</h2>
+    <p class="hint">A Play is a run started, a Finish a run that reached its Ending. Last ${q.days} days.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Game</th><th class="n">Views</th><th class="n">Plays</th><th class="n">Finishes</th><th class="n">Lived</th></tr></thead>
+      <tbody>${games
+        .map(
+          (g) =>
+            `<tr><td><a href="/games/${esc(g.game)}/">${esc(GAME_TITLES[g.game] ?? g.game)}</a></td><td class="n">${num(g.views)}</td><td class="n">${num(g.plays)}</td><td class="n">${num(g.finishes)}</td><td class="n">${num(g.lived)}</td></tr>`,
+        )
+        .join("")}</tbody>
+    </table></div>
+  </section>
+
+  <div class="split">
+    <section class="card">
+      <h2>Game sources</h2>
+      <p class="hint">The same as for Posts: the <code>?ref=</code> tag, else the linking site, else direct.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Source</th><th class="n">Views</th><th class="n">Plays</th><th class="n">Finishes</th></tr></thead>
+        <tbody>${
+          data.gameSources
+            .map((s) => `<tr><td>${esc(s.source)}</td>${barCell(s.views, maxSource)}<td class="n">${num(s.plays)}</td><td class="n">${num(s.finishes)}</td></tr>`)
+            .join("") || none(4)
+        }</tbody>
+      </table></div>
+    </section>
+    <section class="card">
+      <h2>Endings</h2>
+      <p class="hint">Which Ending each Finish reached.</p>
+      <table>
+        <thead><tr><th>Ending</th><th>Lived</th><th class="n">Finishes</th></tr></thead>
+        <tbody>${
+          data.endings
+            .map((e) => `<tr><td>${esc(e.ending)}</td><td>${e.survived ? "yes" : "no"}</td>${barCell(e.finishes, maxEnding)}</tr>`)
+            .join("") || none(3)
+        }</tbody>
+      </table>
+    </section>
+  </div>`;
 }
 
 /** The site's tokens (src/styles/global.css), trimmed to what this page uses. Light only, like the site. */

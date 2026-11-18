@@ -1,6 +1,7 @@
 {
 	// Static build output, plus a small Worker script that runs only for /writing/*
-	// to count Views in D1, and for /stats* to serve the private traffic dashboard
+	// to count Views in D1, for a Game's page and its event address to log Views,
+	// Plays and Finishes, and for /stats* to serve the private traffic dashboard
 	// (see worker/index.ts). Every other path is served straight from the assets
 	// without running the script. The dashboard needs the STATS_KEY secret
 	// (`npx wrangler secret put STATS_KEY`); without it /stats/ is a 404.
@@ -31,6 +32,8 @@
 		"not_found_handling": "404-page",
 		"run_worker_first": [
 			"/writing/*",
+			"/games/twenty-boats/",
+			"/games/twenty-boats/event",
 			"/stats",
 			"/stats/*"
 		]

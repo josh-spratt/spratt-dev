@@ -23,8 +23,8 @@ import {
   menOdds,
   FLOAT_ODDS,
   waterRoll,
-} from './rules.js?v=2026-10-07-v1';
-import { homeCabin } from './cards.js?v=2026-10-07-v1';
+} from './rules.js?v=2026-11-17-v1';
+import { homeCabin } from './cards.js?v=2026-11-17-v1';
 
 // By 01:00 the list is plain to anyone; before it, only a word from an
 // officer or Andrews makes the first boats look worth getting into.

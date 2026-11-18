@@ -41,8 +41,16 @@ The Homepage block listing the latest three Posts. It doesn't exist until the fi
 _Avoid_: blog section, latest posts
 
 **View**:
-One browser visit to a Post on the live site. Crawlers, previews and local runs don't count, and Josh's own Views (from a browser marked with `/writing/?me`) are logged but not counted. A Post's View count is shown in its header once it has one. Each View's source is its `?ref=` tag, else the site that linked to it, else direct.
+One browser visit to a Post, or to a Game's page, on the live site. Crawlers, previews and local runs don't count, and Josh's own Views (from a browser marked with `/writing/?me`) are logged but not counted. A Post's View count is shown in its header once it has one. Each View's source is its `?ref=` tag, else the site that linked to it, else direct.
 _Avoid_: hit, pageview, read count
+
+**Play**:
+One run of a Game started: in Twenty Boats, a Draw (Draw a passenger, Draw again) or Live this night again. One View can lead to many Plays. A Play's source is that of the page's View. Only the live site records them, and Josh's are logged but flagged, like his Views.
+_Avoid_: session, game start, run (in counts)
+
+**Finish**:
+A Play that reached its Ending. Each Finish records which Ending, and whether the passenger lived.
+_Avoid_: completion, win, game over
 
 **Like**:
 A reader's thumbs-up on a Post, given with the button at the end of it. Each browser can Like a Post once; there is no unlike. Only the live site records them.
