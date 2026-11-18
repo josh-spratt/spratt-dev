@@ -1,0 +1,17 @@
+{
+  "_note": "Passengers aboard and saved by class, sex and age band. Child = under 12. Authority: British report, Numbers Saved (BR-Saved). The Draw is weighted by aboard. et = Encyclopedia Titanica recount where it differs (ET-Stats; ET gives children unsplit by sex).",
+  "groups": [
+    { "cls": 1, "sex": "m", "age": "adult", "aboard": 175, "saved": 57,  "cite": ["BR-Saved"], "et": { "aboard": 176, "saved": 58 } },
+    { "cls": 1, "sex": "f", "age": "adult", "aboard": 144, "saved": 140, "cite": ["BR-Saved"], "et": { "aboard": 143, "saved": 139 } },
+    { "cls": 1, "sex": "m", "age": "child", "aboard": 5,   "saved": 5,   "cite": ["BR-Saved"] },
+    { "cls": 1, "sex": "f", "age": "child", "aboard": 1,   "saved": 1,   "cite": ["BR-Saved"] },
+    { "cls": 2, "sex": "m", "age": "adult", "aboard": 168, "saved": 14,  "cite": ["BR-Saved"], "et": { "aboard": 167, "saved": 13 } },
+    { "cls": 2, "sex": "f", "age": "adult", "aboard": 93,  "saved": 80,  "cite": ["BR-Saved"], "et": { "aboard": 95, "saved": 83 } },
+    { "cls": 2, "sex": "m", "age": "child", "aboard": 11,  "saved": 11,  "cite": ["BR-Saved"] },
+    { "cls": 2, "sex": "f", "age": "child", "aboard": 13,  "saved": 13,  "cite": ["BR-Saved"] },
+    { "cls": 3, "sex": "m", "age": "adult", "aboard": 462, "saved": 75,  "cite": ["BR-Saved"], "et": { "aboard": 450, "saved": 60 } },
+    { "cls": 3, "sex": "f", "age": "adult", "aboard": 165, "saved": 76,  "cite": ["BR-Saved"], "et": { "aboard": 179, "saved": 91 } },
+    { "cls": 3, "sex": "m", "age": "child", "aboard": 48,  "saved": 13,  "cite": ["BR-Saved"] },
+    { "cls": 3, "sex": "f", "age": "child", "aboard": 31,  "saved": 14,  "cite": ["BR-Saved"] }
+  ]
+}

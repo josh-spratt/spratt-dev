@@ -1,6 +1,8 @@
 ---
 import Head from "../components/Head.astro";
 import { site, getPosts } from "../lib/site";
+// Only the site's own pages get its styles: a Game page brings its own.
+import "../styles/global.css";
 
 interface Props {
   /** Full document title, e.g. "Writing | Josh Spratt". */

@@ -1,5 +1,15 @@
 [
   {
+    "title": "Twenty Boats",
+    "description": "The night the Titanic sank, played as a randomly drawn passenger. Twenty lifeboats, 2,200 people aboard, and every boat timed from the historical record.",
+    "url": "/games/twenty-boats/",
+    "image": "/projects/twenty-boats.webp",
+    "tags": [
+      "Games",
+      "History"
+    ]
+  },
+  {
     "title": "MarinaraDB",
     "description": "A toy relational database written in Rust, with pasta-themed terminology and its own query language.",
     "url": "https://github.com/josh-spratt/marinaraDB",

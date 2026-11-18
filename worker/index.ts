@@ -1,7 +1,9 @@
 /**
- * Runs only for /writing/* and /stats* (see run_worker_first in wrangler.jsonc).
- * Every page is still built statically. For a Post page this counts the View in
- * D1 and writes the View and Like counts into the HTML. A Like and the
+ * Runs only for /writing/*, /stats* and a Game's page and event address (see
+ * run_worker_first in wrangler.jsonc). Every page is still built statically.
+ * For a Post page this counts the View in D1 and writes the View and Like
+ * counts into the HTML. For a Game it logs the page's Views and the Plays and
+ * Finishes the game reports. A Like and the
  * email-interest answer are plain form POSTs, so the page ships no client
  * script. /stats/ is the owner's private traffic dashboard.
  */
@@ -21,6 +23,8 @@ import {
 
 import {
   INTEREST_ANCHOR,
+  gameEventPath,
+  gamePage,
   hasAnsweredInterest,
   hasLiked,
   interestSlug,
@@ -33,11 +37,13 @@ import {
   likeSlug,
   likedCookie,
   meCookie,
+  parseGameEvent,
   postSlug,
   refTag,
   referrerHost,
   shouldCount,
   statsText,
+  type Game,
 } from "./stats.ts";
 
 interface Stats {
@@ -53,6 +59,8 @@ const COUNT_LIKE =
 const READ = "SELECT views, likes FROM post_stats WHERE slug = ?1";
 const RECORD_INTEREST = "INSERT INTO interest (slug) VALUES (?1)";
 const LOG_VIEW = "INSERT INTO view_log (slug, referrer, ref, is_me) VALUES (?1, ?2, ?3, ?4)";
+const LOG_GAME =
+  "INSERT INTO game_log (game, event, ending, survived, referrer, ref, is_me) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
 
 const INTEREST_THANKS =
   `<p class="interest" id="${INTEREST_ANCHOR}">Thanks. If enough people say so, I’ll set up email.</p>`;
@@ -76,7 +84,7 @@ async function readStats(env: Env, request: Request, slug: string): Promise<Stat
 }
 
 const ME_SET =
-  "This browser is now marked as yours. Its Views of Posts are logged as yours and don't add to the public count.\n";
+  "This browser is now marked as yours. Its Views of Posts and Games, and its Plays, are logged as yours and don't add to the public count.\n";
 
 /** Only Posts that really exist get rows, so made-up URLs can't create them. */
 async function postExists(env: Env, request: Request, slug: string): Promise<boolean> {
@@ -157,6 +165,46 @@ async function post(request: Request, env: Env, slug: string, page: Response): P
 }
 
 /**
+ * A Game's page: served as built, with a View logged under the same rules as
+ * a Post's (a browser navigation to the live site; the owner's flagged).
+ */
+async function gameView(request: Request, env: Env, game: Game): Promise<Response> {
+  const page = await env.ASSETS.fetch(request);
+  const isHtml = page.headers.get("content-type")?.startsWith("text/html");
+  if (page.status !== 200 || !isHtml || !shouldCount(request)) return page;
+  try {
+    await env.DB.prepare(LOG_GAME)
+      .bind(game, "view", null, null, referrerHost(request), refTag(new URL(request.url)), isMe(request) ? 1 : 0)
+      .run();
+  } catch (err) {
+    console.error("game view failed", err);
+  }
+  return page;
+}
+
+/**
+ * A Play or a Finish, POSTed by the game's own script (play.js). Same-site
+ * only, and only the live site writes. Always 204, so the game never waits
+ * on it or shows an error.
+ */
+async function gameEvent(request: Request, env: Env, game: Game): Promise<Response> {
+  if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: { allow: "POST" } });
+  if (!isSameOrigin(request)) return new Response("Forbidden", { status: 403 });
+  const event = parseGameEvent(await request.text());
+  if (!event) return new Response("Bad Request", { status: 400 });
+  if (isLive(request)) {
+    try {
+      await env.DB.prepare(LOG_GAME)
+        .bind(game, event.event, event.ending, event.survived, event.referrer, event.ref, isMe(request) ? 1 : 0)
+        .run();
+    } catch (err) {
+      console.error("game event failed", err);
+    }
+  }
+  return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+}
+
+/**
  * Anyone without the key gets the ordinary 404 page, so /stats/ looks like it
  * isn't there. The path is one no asset has, so the assets serve the 404 page.
  */
@@ -178,7 +226,12 @@ const DASHBOARD_SQL = [
   `SELECT created_at, slug, ${SOURCE} AS source, is_me FROM view_log WHERE ${IN_WINDOW} ORDER BY created_at DESC, id DESC LIMIT 25`,
   "SELECT slug, views, likes FROM post_stats",
   "SELECT slug, COUNT(*) AS answers FROM interest GROUP BY slug",
+  `SELECT game, SUM(event = 'view') AS views, SUM(event = 'play') AS plays, SUM(event = 'finish') AS finishes, SUM(event = 'finish' AND survived = 1) AS lived FROM game_log WHERE ${IN_WINDOW} GROUP BY game ORDER BY game`,
+  `SELECT ${SOURCE} AS source, SUM(event = 'view') AS views, SUM(event = 'play') AS plays, SUM(event = 'finish') AS finishes FROM game_log WHERE ${IN_WINDOW} GROUP BY source ORDER BY views DESC, plays DESC, source LIMIT 25`,
+  `SELECT ending, survived, COUNT(*) AS finishes FROM game_log WHERE event = 'finish' AND ${IN_WINDOW} GROUP BY ending, survived ORDER BY finishes DESC, ending LIMIT 25`,
 ];
+/** The queries above that take the window (?1) and the owner switch (?2). */
+const WINDOWED = new Set([0, 1, 2, 3, 6, 7, 8]);
 
 /** The Posts in this build (src/pages/stats/posts.json.ts), read straight from the assets. */
 async function buildPosts(env: Env, request: Request): Promise<PostMeta[]> {
@@ -223,11 +276,11 @@ async function dashboard(request: Request, env: Env, url: URL): Promise<Response
   const [posts, results] = await Promise.all([
     buildPosts(env, request),
     env.DB.batch(
-      DASHBOARD_SQL.map((sql, i) => (i < 4 ? env.DB.prepare(sql).bind(since, withMe) : env.DB.prepare(sql))),
+      DASHBOARD_SQL.map((sql, i) => (WINDOWED.has(i) ? env.DB.prepare(sql).bind(since, withMe) : env.DB.prepare(sql))),
     ),
   ]);
-  const [daily, windowViews, sources, recent, totals, interest] = results.map((r) => r.results);
-  const data = { posts, daily, windowViews, sources, recent, totals, interest } as DashboardData;
+  const [daily, windowViews, sources, recent, totals, interest, games, gameSources, endings] = results.map((r) => r.results);
+  const data = { posts, daily, windowViews, sources, recent, totals, interest, games, gameSources, endings } as DashboardData;
 
   return new Response(renderDashboard(q, data), {
     headers: {
@@ -245,6 +298,11 @@ export default {
     const { pathname } = url;
 
     if (pathname === "/stats" || pathname.startsWith("/stats/")) return dashboard(request, env, url);
+
+    const playing = gamePage(pathname);
+    if (playing) return gameView(request, env, playing);
+    const reporting = gameEventPath(pathname);
+    if (reporting) return gameEvent(request, env, reporting);
 
     if (isMeSetup(url)) {
       return new Response(ME_SET, {

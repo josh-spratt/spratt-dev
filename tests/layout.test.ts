@@ -19,7 +19,8 @@ function htmlFiles(dir: string): string[] {
   );
 }
 
-const pages = htmlFiles(site.outDir);
+// Game pages fill the screen with the game and have their own tests (games.test.ts).
+const pages = htmlFiles(site.outDir).filter((p) => !p.startsWith("games/"));
 
 test("every kind of page is built", () => {
   for (const p of ["index.html", "404.html", "writing/index.html", "writing/newer-post/index.html"]) {
@@ -208,10 +209,11 @@ const isPostImage = (p: string): boolean =>
 test("Lighthouse budget: the built site stays under 100 KB", () => {
   // Share cards are only fetched by link-preview crawlers, never by a page load.
   // Post images load lazily below the fold, so they have their own cap below.
+  // Games load only on their own page, so they have their own cap (games.test.ts).
   const total = (dir: string): number =>
     readdirSync(dir).reduce((sum, f) => {
       const p = join(dir, f);
-      if (f === "social.png" || f === "cards" || isPostImage(p)) return sum;
+      if (f === "social.png" || f === "cards" || f === "games" || isPostImage(p)) return sum;
       return sum + (statSync(p).isDirectory() ? total(p) : statSync(p).size);
     }, 0);
   assert.ok(total(site.outDir) < 100 * 1024);
