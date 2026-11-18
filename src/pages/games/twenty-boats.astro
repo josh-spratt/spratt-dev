@@ -1,0 +1,26 @@
+---
+// A Game page: the game takes the whole screen, so there's no yellow column or
+// header. The game's own jspratt.dev button leads back to the Homepage.
+// The game itself is plain modules in public/games/twenty-boats/.
+import Head from "../../components/Head.astro";
+import { site } from "../../lib/site";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <Head
+      title={`Twenty Boats | ${site.name}`}
+      description="14 April 1912, 23:40. Twenty boats, 2,200 aboard. Play the night the Titanic sank as a randomly drawn passenger."
+      image="/games/twenty-boats/card.png"
+      imageAlt="Twenty Boats at 01:25: the Titanic listing by the bow, above the deck plan of its lifeboats"
+    />
+  </head>
+  <body class="game-page">
+    <div id="game" class="game">
+      <p id="game-status" class="game-status" role="status">Loading Twenty Boats…</p>
+    </div>
+    <noscript><p class="game-status">Twenty Boats needs JavaScript to run.</p></noscript>
+    <script is:inline type="module" src="/games/twenty-boats/play.js?v=2026-10-07-v1" data-game-script></script>
+  </body>
+</html>

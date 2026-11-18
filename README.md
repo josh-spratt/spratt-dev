@@ -19,6 +19,10 @@ npm run cards   # draw a share card for any Post that lacks one (-- --all redraw
 
 Each Post shares its own 1200×630 card from `public/cards/<slug>.png`. Run `npm run cards` after adding a Post and commit the image. The tests fail until you do.
 
+## Games
+
+Twenty Boats is plain JavaScript modules in `public/games/twenty-boats/`, with no build step, served at `/games/twenty-boats/`. It moved here from the private `games-jspratt` repo, whose `games.jspratt.dev` is gone. Its imports carry a `?v=` cache key: bump every one together (`grep -rn '2026-10-07-v1'`) when a change must reach browsers that cached the old files. Its game-logic tests are in `tests/twenty-boats/`.
+
 ## Deploy
 
 Workers Builds deploys `main` to production and gives every other branch a preview URL. `wrangler.jsonc` serves `dist/`. A small Worker script (`worker/`) runs only for `/writing/*`, where it counts and logs Views in a D1 database (`npm run views` shows where they came from, and the private dashboard at `/stats/` charts them): see [docs/database.md](docs/database.md). The dashboard setup is in [docs/launch-checklist.md](docs/launch-checklist.md).

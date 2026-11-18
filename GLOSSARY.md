@@ -24,6 +24,10 @@ _Avoid_: portfolio item, work, repo
 A single piece of writing published under `/writing`. A long-form write-up about a Project is a Post that links to the Project, not a page of the Project.
 _Avoid_: article, blog entry
 
+**Game**:
+A Project you play in the browser, served from this site at `/games/<name>/`. Its page is the game alone, full screen, with no header or yellow column. The game's code lives in `public/games/<name>/`, and its own tests in `tests/<name>/`.
+_Avoid_: cart, app, demo
+
 **Tag**:
 A short topic label on a Project or a Post (e.g. "Rust", "AI"), shown as a chip. Projects set them in `projects.json`, Posts in their frontmatter.
 _Avoid_: category, label

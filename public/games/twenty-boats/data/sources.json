@@ -1,0 +1,33 @@
+{
+  "_note": "Citation keys used in the other data files, resolved to a title and URL for the Sources screen. Exact keys first; then patterns for inquiry testimony (US Senate by day, British inquiry by question number). Source: docs/twenty-boats-research.md, Sources.",
+  "keys": {
+    "BR-Boats":      { "title": "British Wreck Commissioner's report (1912): the boats", "url": "https://www.titanicinquiry.org/BOTInq/BOTReport/BOTRepBoats.php" },
+    "BR-Saved":      { "title": "British Wreck Commissioner's report (1912): numbers saved", "url": "https://www.titanicinquiry.org/BOTInq/BOTReport/botRepSaved.php" },
+    "BR-Collision":  { "title": "British Wreck Commissioner's report (1912): the collision", "url": "https://www.titanicinquiry.org/BOTInq/BOTReport/botRepCollision.php" },
+    "BR-FinEff":     { "title": "British Wreck Commissioner's report (1912): final effect of the damage", "url": "https://www.titanicinquiry.org/BOTInq/BOTReport/botRepFinEff.php" },
+    "BR-Rescue":     { "title": "British Wreck Commissioner's report (1912): rescue by the Carpathia", "url": "https://www.titanicinquiry.org/BOTInq/BOTReport/botRepRescue.php" },
+    "ET-Stats":      { "title": "Encyclopedia Titanica: Lester Mitcham, \"The Statistics of the Disaster\"", "url": "https://www.encyclopedia-titanica.org/titanic-statistics.html" },
+    "ET-Smith":      { "title": "Encyclopedia Titanica: Edward John Smith", "url": "https://www.encyclopedia-titanica.org/titanic-victim/edward-john-smith.html" },
+    "ET-Murdoch":    { "title": "Encyclopedia Titanica: William McMaster Murdoch", "url": "https://www.encyclopedia-titanica.org/titanic-victim/william-mcmaster-murdoch.html" },
+    "ET-Lightoller": { "title": "Encyclopedia Titanica: Charles Herbert Lightoller", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/charles-herbert-lightoller.html" },
+    "ET-Lowe":       { "title": "Encyclopedia Titanica: Harold Godfrey Lowe", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/harold-godfrey-lowe.html" },
+    "ET-Andrews":    { "title": "Encyclopedia Titanica: Thomas Andrews", "url": "https://www.encyclopedia-titanica.org/titanic-victim/thomas-andrews.html" },
+    "ET-Joughin":    { "title": "Encyclopedia Titanica: Charles John Joughin", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/charles-john-joughin.html" },
+    "ET-Bride":      { "title": "Encyclopedia Titanica: Harold Sydney Bride", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/harold-sydney-bride.html" },
+    "ET-IStraus":    { "title": "Encyclopedia Titanica: Isidor Straus", "url": "https://www.encyclopedia-titanica.org/titanic-victim/isidor-straus.html" },
+    "ET-IdaStraus":  { "title": "Encyclopedia Titanica: Ida Straus", "url": "https://www.encyclopedia-titanica.org/titanic-victim/ida-straus.html" },
+    "ET-Brown":      { "title": "Encyclopedia Titanica: Margaret (Molly) Brown", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/molly-brown.html" },
+    "ET-Astor":      { "title": "Encyclopedia Titanica: John Jacob Astor", "url": "https://www.encyclopedia-titanica.org/titanic-victim/john-jacob-astor.html" },
+    "ET-MAstor":     { "title": "Encyclopedia Titanica: Madeleine Talmage Astor", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/madeleine-talmage-astor.html" },
+    "ET-Buckley":    { "title": "Encyclopedia Titanica: Daniel Buckley", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/daniel-buckley.html" },
+    "ET-Abelseth":   { "title": "Encyclopedia Titanica: Olaus Jørgensen Abelseth", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/olaus-jorgensen-abelseth.html" },
+    "ET-Pickard":    { "title": "Encyclopedia Titanica: Berk Pickard", "url": "https://www.encyclopedia-titanica.org/titanic-survivor/berk-pickard.html" },
+    "WFL-2026":      { "title": "Fitch, Layton and Wormstedt, \"Launch Times Re-Examined\" (2026)", "url": "https://wormstedt.com/titanic/lifeboats/2026%20Launch%20Times.html" },
+    "WF-Occupancy":  { "title": "Wormstedt and Fitch, \"Titanic Lifeboat Occupancy Totals\" (rev. 2022)", "url": "https://www.wormstedt.com/Titanic/lifeboats/occupancy.pdf" },
+    "Bullock-1912":  { "title": "Shan F. Bullock, Thomas Andrews, Shipbuilder (1912; a memorial biography, secondary)", "url": "https://www.gutenberg.org/ebooks/32166" }
+  },
+  "patterns": [
+    { "match": "^US D(\\d+) ", "title": "US Senate inquiry (1912), testimony, day $1", "url": "https://www.titanicinquiry.org/USInq/AmInq$1header.php", "pad": 2 },
+    { "match": "^BI Q", "title": "British Wreck Commissioner's inquiry (1912), minutes of evidence", "url": "https://www.titanicinquiry.org/BOTInq/BOT01.php" }
+  ]
+}

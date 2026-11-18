@@ -1,0 +1,371 @@
+/* Twenty Boats — period print: paper, ink, one rust accent. Everything is
+   scoped under .tb so the hub's styles and this cart's never meet. */
+
+.tb {
+  --paper: #efe7d6;
+  --paper-deep: #e3d8c1;
+  --ink: #241c14;
+  --ink-soft: #5b4d3d;
+  --rule: #b9a88c;
+  --faint: #b9a88c; /* marks that must stay legible but recede: unseen and gone boats */
+  --rust: #8a321d;
+  --sea: #1f2a33;
+  --sky: #e8dfcc;
+  --sea-ink: #c9bda6;
+
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tb {
+    --paper: #1c1915;
+    --paper-deep: #26221c;
+    --ink: #e9e0cd;
+    --ink-soft: #b3a68f;
+    --rule: #4e4536;
+    --faint: #7d715e;
+    --rust: #d0785a;
+    --sea: #0d1419;
+    --sky: #2a261f;
+    --sea-ink: #9a8f7c;
+  }
+}
+
+.tb-page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3.25rem 16px 3rem;
+  outline: none;
+}
+
+/* Sound and Shelf, side by side in the top-right corner. */
+.tb-corner {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 2;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.tb-sound,
+.tb-shelf {
+  font: inherit;
+  font-size: 0.8125rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.tb h1, .tb h2, .tb h3 { font-weight: normal; margin: 0; }
+.tb p { margin: 0 0 0.75rem; }
+
+.tb-kicker {
+  font-size: 0.8125rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rust);
+}
+
+.tb-title {
+  font-size: clamp(2.25rem, 8vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  margin-bottom: 0.75rem !important;
+}
+
+.tb-masthead {
+  text-align: center;
+  border-top: 3px double var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding: 1.25rem 0 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.tb-lede { font-style: italic; color: var(--ink-soft); }
+.tb-fine { font-size: 0.875rem; color: var(--ink-soft); margin-top: 2rem !important; }
+
+.tb-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.25rem 0; }
+
+.tb-btn {
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--ink);
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+}
+.tb-btn--main { background: var(--ink); color: var(--paper); }
+.tb-btn:hover { border-color: var(--rust); }
+.tb-btn--main:hover { background: var(--rust); }
+.tb button:focus-visible, .tb a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* --- collection --- */
+
+.tb-collection h2 { font-size: 1.15rem; margin-bottom: 0.6rem; }
+.tb-collection h3 { font-size: 1rem; margin: 1.25rem 0 0.4rem; color: var(--ink-soft); }
+
+.tb-tiles {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0.35rem;
+}
+@media (max-width: 30rem) { .tb-tiles { grid-template-columns: repeat(5, 1fr); } }
+
+.tb-tile {
+  aspect-ratio: 1 / 1.15;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--rule);
+  color: var(--rule);
+  font-variant-numeric: lining-nums;
+}
+.tb-tile--got { border: 1px solid var(--ink); background: var(--paper-deep); color: var(--ink); }
+
+.tb-others { padding-left: 1.1rem; margin: 0; color: var(--rule); }
+.tb-others .tb-got { color: var(--ink); }
+
+.tb-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- Draw card --- */
+
+.tb-card {
+  border: 1px solid var(--ink);
+  outline: 1px solid var(--ink);
+  outline-offset: 4px;
+  background: var(--paper-deep);
+  padding: 1.25rem 1.5rem 0.75rem;
+  margin: 1rem 4px 1.5rem;
+}
+.tb-card-name { font-size: 2rem; margin-bottom: 0.75rem !important; }
+.tb-card dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 1rem; margin: 0 0 0.5rem; }
+.tb-card dt { color: var(--ink-soft); font-size: 0.875rem; letter-spacing: 0.08em; text-transform: uppercase; align-self: baseline; }
+.tb-card dd { margin: 0; }
+
+/* --- scene --- */
+
+.tb-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: 0.75rem;
+}
+.tb-clock {
+  font-size: 2.25rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0 !important;
+  padding-bottom: 0.4rem;
+}
+.tb-where { font-style: italic; color: var(--ink-soft); text-align: right; margin: 0 !important; }
+.tb-bar-right { padding-bottom: 0.4rem; }
+.tb-who { font-size: 0.8125rem; color: var(--ink-soft); text-align: right; letter-spacing: 0.04em; margin: 0.15rem 0 0 !important; }
+
+.tb-ship { display: block; width: 100%; height: auto; margin: 0 0 1rem; }
+.tb-sky { fill: var(--sky); }
+.tb-hull { fill: var(--ink); }
+.tb-house { fill: var(--ink); }
+.tb-funnel { fill: var(--ink); }
+.tb-mast { stroke: var(--ink); stroke-width: 1; }
+.tb-sea { fill: var(--sea); }
+.tb-sea-line { stroke: var(--rule); stroke-width: 0.5; }
+.tb-end-label { fill: var(--sea-ink); font-size: 7px; letter-spacing: 0.04em; }
+.tb-you { fill: var(--rust); stroke: var(--sky); stroke-width: 1.2; }
+
+/* The scene: where you are (pinned) beside what is happening. */
+.tb-page--scene { max-width: 72rem; }
+.tb-scene-where { background: var(--paper); }
+
+@media (min-width: 860px) {
+  .tb-scene {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: start;
+  }
+  .tb-scene-where { position: sticky; top: 1rem; }
+  .tb-scene-what { padding-top: 3.1rem; }
+}
+
+/* Phones: only the clock bar and the ship are pinned, under the corner
+   buttons; the deck plan follows the choices, so the scene's text starts
+   high on the screen. */
+@media (max-width: 859px) {
+  .tb-page--scene { padding-top: 0; }
+  .tb-scene { display: flex; flex-direction: column; }
+  .tb-scene-where { display: contents; }
+  .tb-pin {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    order: 1;
+    background: var(--paper);
+    padding-top: 2.6rem;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 0.75rem;
+  }
+  .tb-scene-what { order: 2; }
+  .tb-scene-where .tb-plan-fig { order: 3; margin: 0 0 1rem; }
+  .tb-pin .tb-bar { margin-bottom: 0.4rem; }
+  .tb-pin .tb-clock { font-size: 1.75rem; }
+  .tb-pin .tb-ship { margin-bottom: 0.25rem; max-height: 22vh; }
+  .tb-scene-where .tb-plan-caption { font-size: 0.8125rem; margin: 0.15rem 0 0.25rem !important; }
+}
+
+/* What your last choice did: set apart, above the scene. */
+.tb-outcome {
+  border-left: 3px solid var(--ink);
+  background: var(--paper-deep);
+  padding: 0.5rem 0.75rem;
+  font-style: italic;
+}
+
+.tb-about { font-size: 0.9rem; color: var(--ink-soft); }
+
+.tb-text { min-height: 3rem; }
+.tb-figure { border-left: 2px solid var(--rust); padding-left: 0.75rem; }
+.tb-figure--again { font-size: 0.9rem; color: var(--ink-soft); }
+.tb-secondary { font-size: 0.875rem; color: var(--ink-soft); }
+
+.tb-choices { list-style: none; padding: 0; margin: 1rem 0; border-top: 1px solid var(--rule); }
+.tb-choices li { border-bottom: 1px solid var(--rule); }
+
+.tb-choice {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.5rem 1fr auto;
+  align-items: baseline;
+  column-gap: 0.5rem;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0.6rem 0.25rem;
+  cursor: pointer;
+}
+.tb-choice:hover { background: var(--paper-deep); }
+.tb-key { color: var(--rust); font-size: 0.875rem; }
+.tb-cost { color: var(--ink-soft); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.tb-way { grid-column: 2 / -1; font-size: 0.875rem; color: var(--ink-soft); }
+.tb-note { grid-column: 2 / -1; font-size: 0.875rem; font-style: italic; color: var(--rust); }
+
+.tb-flags { font-size: 0.875rem; color: var(--ink-soft); letter-spacing: 0.04em; }
+
+/* --- deck plan --- */
+
+.tb-plan-fig { margin: -0.5rem 0 1rem; }
+.tb-plan { display: block; width: 100%; height: auto; }
+.tb-plan-hull { fill: var(--paper-deep); stroke: var(--ink); stroke-width: 0.8; }
+.tb-plan-house { fill: none; stroke: var(--rule); stroke-width: 0.6; }
+.tb-plan-funnel { fill: var(--ink-soft); }
+.tb-plan-label { fill: var(--ink-soft); font-size: 6.5px; letter-spacing: 0.03em; }
+.tb-plan-num { fill: var(--ink); font-size: 7px; font-variant-numeric: lining-nums; }
+.tb-plan-sea { fill: var(--sea); opacity: 0.85; }
+.tb-plan-you { fill: var(--rust); stroke: var(--paper); stroke-width: 1; }
+.tb-plan-you--below { fill: var(--paper); stroke: var(--rust); stroke-width: 1.4; }
+.tb-plan-caption { font-size: 0.875rem; color: var(--ink-soft); margin: 0.4rem 0 0.3rem !important; }
+
+/* One look per boat status, shared by the plan and its legend. */
+.tb-plan-boat rect { fill: var(--paper); stroke: var(--ink); stroke-width: 0.7; }
+.tb-plan-boat[data-status="loading"] rect { fill: var(--rust); stroke: var(--rust); }
+.tb-plan-boat[data-status="turned"] rect { fill: none; stroke: var(--rust); stroke-width: 1; }
+.tb-plan-boat[data-status="turned"] text { fill: var(--rust); }
+.tb-plan-boat[data-status="full"] rect { fill: var(--ink); }
+.tb-plan-boat[data-status="gone"] rect { fill: none; stroke: var(--faint); stroke-dasharray: 1.2 1.2; }
+.tb-plan-boat[data-status="gone"] text { fill: var(--faint); text-decoration: line-through; }
+.tb-plan-boat[data-status="unknown"] rect { fill: none; stroke: var(--faint); }
+.tb-plan-boat[data-status="unknown"] text { fill: var(--faint); }
+
+.tb-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; padding: 0; margin: 0; font-size: 0.8125rem; color: var(--ink-soft); }
+.tb-legend li { display: flex; align-items: center; gap: 0.35rem; }
+.tb-key-boat { display: inline-block; width: 1.1rem; height: 0.5rem; border-radius: 0.25rem; border: 1px solid var(--ink); background: var(--paper); }
+.tb-key-boat[data-status="loading"] { background: var(--rust); border-color: var(--rust); }
+.tb-key-boat[data-status="turned"] { background: none; border-color: var(--rust); }
+.tb-key-boat[data-status="full"] { background: var(--ink); }
+.tb-key-boat[data-status="gone"] { background: none; border: 1px dashed var(--faint); }
+.tb-key-boat[data-status="unknown"] { background: none; border-color: var(--faint); }
+
+/* --- Ending and End card --- */
+
+.tb-rate strong { font-size: 1.6rem; font-weight: normal; color: var(--rust); margin-right: 0.15rem; }
+.tb-foot { font-size: 0.9rem; color: var(--ink-soft); }
+.tb-met { padding-left: 1.1rem; margin: 0; }
+.tb-met li { margin-bottom: 0.45rem; }
+
+/* The End card: your Ending, the way back in, then the record. */
+.tb-ending { margin: 0.5rem 0 0; }
+
+.tb-stack { display: grid; gap: 0.6rem; margin: 1.5rem 0; }
+.tb-stack .tb-btn { width: 100%; padding: 0.7rem 1.1rem; }
+
+.tb-strip { margin-bottom: 1.25rem; }
+.tb-strip .tb-rate { margin-bottom: 0.5rem !important; }
+.tb-groups {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.3rem;
+  text-align: center;
+}
+@media (max-width: 34rem) { .tb-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tb-group {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.4rem 0.15rem;
+  border: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+.tb-group-pct { font-size: 1.05rem; color: var(--ink); font-variant-numeric: tabular-nums lining-nums; }
+.tb-group--mine { border-color: var(--rust); background: var(--paper-deep); color: var(--ink); }
+.tb-group--mine .tb-group-pct { color: var(--rust); }
+
+.tb-more { border-top: 1px solid var(--rule); padding-top: 0.6rem; }
+.tb-more summary { cursor: pointer; color: var(--ink-soft); margin-bottom: 0.5rem; }
+.tb-more summary:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+.tb-more h3 { font-size: 1.05rem; margin: 1rem 0 0.4rem; }
+
+.tb-links { text-align: center; color: var(--ink-soft); font-size: 0.9rem; margin-top: 1.5rem !important; }
+.tb-link {
+  font: inherit;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  padding: 0.2rem;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  cursor: pointer;
+}
+.tb-link:hover { color: var(--rust); }
+
+.tb-sources { padding-left: 1.1rem; }
+.tb-sources li { margin-bottom: 0.4rem; }
+.tb-sources a { color: var(--ink); text-decoration-color: var(--rule); }
+.tb-sources a:hover { color: var(--rust); }

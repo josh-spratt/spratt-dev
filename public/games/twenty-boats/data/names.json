@@ -1,0 +1,39 @@
+{
+  "_note": "Placeholder name lists for the Draw card, by class and nationality. Invented, period-plausible. Not yet checked against the full manifest (Encyclopedia Titanica); the test only excludes Real figures so far. embarked: the port this group's passengers usually boarded at.",
+  "classes": {
+    "1": [
+      { "embarked": "Southampton",
+        "m": ["Arthur", "Edmund", "Walter", "Herbert", "Clarence", "Rupert", "Howard", "Lionel"],
+        "f": ["Edith", "Beatrice", "Winifred", "Constance", "Adelaide", "Muriel", "Lavinia", "Cora"],
+        "surnames": ["Ashcombe", "Pellingham", "Thorncliffe", "Marchbanks", "Hollister", "Fairbairn", "Ellsworth", "Wexcombe"] },
+      { "embarked": "Cherbourg",
+        "m": ["Clarence", "Everett", "Warren", "Lucius", "Thaddeus", "Russell"],
+        "f": ["Josephine", "Augusta", "Cornelia", "Harriet", "Philippa", "Lucinda"],
+        "surnames": ["Van Alstyne", "Pemberton", "Whitcombe", "Ravensworth", "Delafield", "Brackett"] }
+    ],
+    "2": [
+      { "embarked": "Southampton",
+        "m": ["Albert", "Frederick", "Leonard", "Sidney", "Cyril", "Ernest", "Horace", "Wilfred"],
+        "f": ["Ada", "Lilian", "Gertrude", "Mabel", "Ethel", "Elsie", "Hilda", "Maud"],
+        "surnames": ["Pennock", "Treharne", "Garside", "Brimble", "Coombes", "Hadlow", "Pargeter", "Lintott"] }
+    ],
+    "3": [
+      { "embarked": "Queenstown",
+        "m": ["Patrick", "Michael", "Denis", "Cornelius", "Timothy", "Bartholomew"],
+        "f": ["Bridget", "Honora", "Nora", "Delia", "Kate", "Ellen"],
+        "surnames": ["Moynihan", "Galvin", "Scanlon", "Hegarty", "Lenihan", "Tierney"] },
+      { "embarked": "Southampton",
+        "m": ["Anders", "Nils", "Johan", "Olof", "Einar", "Sigurd"],
+        "f": ["Ingrid", "Signe", "Karin", "Elin", "Astrid", "Sigrid"],
+        "surnames": ["Bergstrand", "Hedlund", "Rosvall", "Ekholm", "Sandvik", "Lövgren"] },
+      { "embarked": "Southampton",
+        "m": ["George", "Harry", "Alfred", "Thomas", "Walter", "Reginald"],
+        "f": ["Annie", "Rose", "Lizzie", "Florence", "Edie", "Violet"],
+        "surnames": ["Pockett", "Dunstan", "Mabey", "Truscott", "Penhaligon", "Woolgar"] },
+      { "embarked": "Cherbourg",
+        "m": ["Youssef", "Elias", "Boutros", "Khalil", "Tannous", "Mikhail"],
+        "f": ["Mariam", "Warda", "Zahia", "Hanneh", "Latifa", "Sultana"],
+        "surnames": ["Haddad", "Khoury", "Saab", "Nassar", "Karam", "Daher"] }
+    ]
+  }
+}

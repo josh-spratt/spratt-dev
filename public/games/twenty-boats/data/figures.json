@@ -1,0 +1,174 @@
+{
+  "_note": "Real figures: where and when the record puts them, and how their night ended. A sighting shows to a player standing at `place` between `from` and `to` (ship's time). serious: an officer or Andrews, overheard, tells you it is serious. secondary: the only source is secondary and the game says so. leads: a crewman taking a group up; a woman or child may follow, arriving at `to` by `arrive` by way of the places in `via` (Hart BI Q9931-9951), and the group is put into `boat` even if it looks full. Source: docs/twenty-boats-research.md section 3.",
+  "figures": [
+    {
+      "id": "smith", "name": "Captain Edward J. Smith",
+      "fate": "Lost. His body was never identified.", "cite": ["ET-Smith"],
+      "sightings": [
+        { "place": "boat-deck-fwd-stbd", "from": "00:25", "to": "00:40", "serious": true, "cite": ["BI Q16523-16527"],
+          "text": "Captain Smith stands by the boats on the right-hand (starboard) side, telling the crew to fill them and lower away." },
+        { "place": "boat-deck-fwd-port", "from": "00:55", "to": "01:00", "serious": true, "cite": ["US D9 Crawford"],
+          "text": "Captain Smith asks how many men are in Boat 8, and orders a steward in to row." },
+        { "place": "boat-deck-fwd-stbd", "from": "01:55", "to": "02:00", "serious": true, "cite": ["US D7 Rowe"],
+          "text": "Captain Smith tells the quartermaster to stop firing rockets and get into Collapsible C." }
+      ]
+    },
+    {
+      "id": "murdoch", "name": "First Officer William M. Murdoch",
+      "fate": "Lost. His body was never identified.", "cite": ["ET-Murdoch"],
+      "sightings": [
+        { "place": "boat-deck-fwd-stbd", "from": "00:00", "to": "00:24", "serious": true, "cite": ["US D7 Buley"],
+          "text": "First Officer Murdoch has seamen stripping the covers from the boats and swinging them out over the side." },
+        { "place": "boat-deck-fwd-stbd", "from": "00:25", "to": "01:05", "serious": true, "cite": ["US D7 Hogg", "US D7 Moore", "US D7 Symons"],
+          "text": "Murdoch is filling the right-hand (starboard) boats: women first, then any man standing near once no more women come forward." },
+        { "place": "boat-deck-aft-stbd", "from": "01:20", "to": "01:40", "serious": true, "cite": ["US D7 Haines", "US D7 Wheelton"],
+          "text": "Murdoch has come to the back of the deck and is loading the right-hand boats there one after another." },
+        { "place": "boat-deck-aft-port", "from": "01:45", "to": "01:50", "serious": true, "cite": ["US D7 Evans", "US D7 Buley"],
+          "text": "Murdoch, across at Boat 10, is making women jump the gap between the rail and the boat." },
+        { "place": "boat-deck-fwd-stbd", "from": "02:05", "to": "02:15", "serious": true, "cite": ["BI Q14047-14050"],
+          "text": "Murdoch is at the lowering ropes, trying to hook Collapsible A on as the water comes up the deck." }
+      ]
+    },
+    {
+      "id": "lightoller", "name": "Second Officer Charles H. Lightoller",
+      "fate": "Survived. Walked into the water as the deck went under, reached the upturned Collapsible B, and was taken off it into Boat 12 at dawn.",
+      "cite": ["ET-Lightoller", "BI Q14052-14070"],
+      "sightings": [
+        { "place": "boat-deck-fwd-port", "from": "00:05", "to": "00:24", "serious": true, "cite": ["BI Q13800-13809"],
+          "text": "Second Officer Lightoller is stripping the cover from Boat 4 and sending men to the left-hand (port) boats." },
+        { "place": "boat-deck-fwd-port", "from": "00:25", "to": "00:35", "serious": true, "cite": ["BI Q13872"],
+          "text": "You hear the Captain give Lightoller his answer: \"Yes, put the women and children in and lower away.\"" },
+        { "place": "boat-deck-fwd-port", "from": "00:55", "to": "01:10", "serious": true, "cite": ["BI Q13876-13914"],
+          "text": "Lightoller is handing women into Boats 8 and 6 himself. Women and children only; he sends no men." },
+        { "place": "boat-deck-aft-port", "from": "01:15", "to": "01:30", "serious": true, "cite": ["US D7 Clench"],
+          "text": "Lightoller is loading the left-hand boats at the back of the deck. Women and children only." },
+        { "place": "promenade-a", "from": "01:45", "to": "01:50", "serious": true, "cite": ["US D11 Gracie"],
+          "text": "At the open windows of Boat 4, Lightoller tells a man who asks to go with his wife that no men are allowed." },
+        { "place": "boat-deck-fwd-port", "from": "02:00", "to": "02:05", "serious": true, "cite": ["BI Q13984-14024"],
+          "text": "Lightoller loads Collapsible D. Twice he puts men out to make room for women." }
+      ]
+    },
+    {
+      "id": "lowe", "name": "Fifth Officer Harold G. Lowe",
+      "fate": "Survived (Boat 14). He went back among the wreckage for survivors and took four men from the water alive.",
+      "cite": ["ET-Lowe", "BI Q15878"],
+      "sightings": [
+        { "place": "boat-deck-fwd-stbd", "from": "00:40", "to": "01:05", "serious": true, "cite": ["US D5 Lowe", "BI Q15809-15817"],
+          "text": "Fifth Officer Lowe is lowering the right-hand boats with Murdoch, and snaps at a passenger who keeps urging the crew to hurry." },
+        { "place": "boat-deck-aft-port", "from": "01:20", "to": "01:25", "serious": true, "cite": ["BI Q15828-15858"],
+          "text": "Lowe goes down with Boat 14. As it passes each deck he fires his revolver along the ship's side, to stop men jumping in." }
+      ]
+    },
+    {
+      "id": "andrews", "name": "Thomas Andrews, of Harland & Wolff",
+      "fate": "Lost. His body was never identified.", "cite": ["ET-Andrews"],
+      "sightings": [
+        { "place": "grand-staircase", "from": "00:15", "to": "00:30", "serious": true, "cite": ["US D9 Etches"],
+          "text": "Thomas Andrews, who designed the ship, is at the purser's office telling the stewards to get every passenger into a lifebelt, and to leave none behind in the rooms." },
+        { "place": "smoking-room", "from": "02:05", "to": "02:20", "secondary": true, "cite": ["Bullock-1912"],
+          "text": "Thomas Andrews stands alone in the smoking room, arms folded, his lifebelt on a table. He does not answer when a steward speaks to him." }
+      ]
+    },
+    {
+      "id": "joughin", "name": "Chief Baker Charles Joughin",
+      "fate": "Survived. Rode the stern down, trod water for more than two hours, and was taken into a boat.",
+      "cite": ["ET-Joughin", "BI Q6078-6117"],
+      "sightings": [
+        { "place": "scotland-road", "from": "00:15", "to": "00:30", "cite": ["BI Q5961-5978", "BI Q6175-6184"],
+          "text": "The emergency door to second class stands open. A man is passing third-class passengers through, some carrying their bags. The chief baker, Charles Joughin, watches them go." },
+        { "place": "boat-deck-aft-port", "from": "00:30", "to": "00:50", "cite": ["BI Q5946-6000"],
+          "text": "Chief Baker Joughin and his men are fetching women up from A deck to Boat 10 and lifting them in bodily." },
+        { "place": "stern", "from": "02:10", "to": "02:20", "cite": ["BI Q6052-6076"],
+          "text": "Chief Baker Joughin climbs outside the rail at the stern and holds on, waiting." }
+      ]
+    },
+    {
+      "id": "bride", "name": "Harold Bride, junior wireless operator",
+      "fate": "Survived. Swept off with Collapsible B, he came up under it, then got onto it, and was taken into a boat at dawn.",
+      "cite": ["ET-Bride", "US D2 Bride"],
+      "sightings": [
+        { "place": "boat-deck-fwd-stbd", "from": "00:30", "to": "00:40", "cite": ["BI Q16523-16527"],
+          "text": "The junior wireless operator, Harold Bride, comes along the deck to tell the Captain that the Carpathia has answered and is coming." },
+        { "place": "boat-deck-fwd-port", "from": "02:10", "to": "02:15", "cite": ["BI Q16571-16602"],
+          "text": "Harold Bride and a few others are heaving Collapsible B down from the roof of the officers' quarters." }
+      ]
+    },
+    {
+      "id": "straus", "name": "Isidor and Ida Straus",
+      "fate": "Both lost. Isidor's body was recovered; Ida's was never identified.", "cite": ["ET-IStraus", "ET-IdaStraus"],
+      "sightings": [
+        { "place": "promenade-a", "from": "00:40", "to": "00:50", "cite": ["US D11 Gracie"],
+          "text": "An elderly couple, Mr and Mrs Straus, stand together by the rail. You hear them say they will not be parted." },
+        { "place": "boat-deck-fwd-port", "from": "00:55", "to": "01:00", "cite": ["US D9 Crawford", "US D10 Woolner"],
+          "text": "At Boat 8, Ida Straus puts her maid in and steps back. \"We have been together all these years. Where you go, I go.\" Her husband will not go before the other men." }
+      ]
+    },
+    {
+      "id": "brown", "name": "Margaret (Molly) Brown",
+      "fate": "Survived (Boat 6). The women in it rowed.", "cite": ["ET-Brown"],
+      "sightings": [
+        { "place": "boat-deck-fwd-port", "from": "01:00", "to": "01:10", "secondary": true, "cite": ["ET-Brown", "WF-Occupancy"],
+          "text": "Mrs Brown, of Denver, is helping other women into the boats before she is put into Boat 6 herself." }
+      ]
+    },
+    {
+      "id": "astor", "name": "John Jacob Astor IV and Madeleine Astor",
+      "fate": "He was lost; his body was recovered. Madeleine survived in Boat 4.", "cite": ["ET-Astor", "ET-MAstor"],
+      "sightings": [
+        { "place": "grand-staircase", "from": "23:45", "to": "23:55", "cite": ["US D13 Harder"],
+          "text": "At the foot of the first-class stairs, Colonel and Mrs Astor are talking quietly. They do not seem alarmed." },
+        { "place": "promenade-a", "from": "00:40", "to": "00:50", "cite": ["US D11 Gracie"],
+          "text": "Colonel Astor is at the rail, looking at the light of a ship ahead." },
+        { "place": "promenade-a", "from": "01:45", "to": "01:50", "cite": ["US D11 Gracie"],
+          "text": "Colonel Astor helps his wife through a window into Boat 4, asks whether he may go with her, is refused, and asks the boat's number." }
+      ]
+    },
+    {
+      "id": "hart", "name": "Third-class Steward John Edward Hart",
+      "fate": "Survived. Murdoch ordered him into Boat 15 with the second group he had brought up.", "cite": ["BI Q10024-10026"],
+      "sightings": [
+        { "place": "cabin-3-aft", "from": "00:30", "to": "00:40", "serious": true, "cite": ["BI Q9921-9929", "BI Q9952-9955"],
+          "leads": { "via": ["well-deck-aft", "stairs-2", "grand-staircase"], "to": "boat-deck-fwd-port", "arrive": "00:57", "boat": "8" },
+          "text": "Steward Hart is gathering women and children in the passage to take them up to the boats. He means to take them the long way: out across the open deck at the back, forward past the second-class library, and up the first-class stairs." },
+        { "place": "cabin-3-aft", "from": "01:05", "to": "01:15", "serious": true, "cite": ["BI Q9965-9975"],
+          "leads": { "via": ["well-deck-aft", "stairs-2"], "to": "boat-deck-aft-stbd", "arrive": "01:33", "boat": "15" },
+          "text": "Steward Hart is back for a second group of women and children. The men in the passage want to go up with them; the stewards keep them back." }
+      ]
+    },
+    {
+      "id": "buckley", "name": "Daniel Buckley, third class",
+      "fate": "Survived. Killed in action in France, October 1918.", "cite": ["ET-Buckley"],
+      "sightings": [
+        { "place": "cabin-3-fwd", "from": "23:40", "to": "23:50", "cite": ["US D13 Buckley"],
+          "text": "A young Irishman across the cabin, Daniel Buckley, is out of his bunk: there is water coming in under the door. The others laugh at him. \"You are not in Ireland now.\"" },
+        { "place": "well-deck-fwd", "from": "00:15", "to": "00:45", "cite": ["US D13 Buckley"],
+          "text": "At the top of the stairs to the first-class deck, a seaman throws a man back down. The gate is locked. Daniel Buckley is in the crowd below it." }
+      ]
+    },
+    {
+      "id": "abelseth", "name": "Olaus Abelseth, third class",
+      "fate": "Survived. Swam to Collapsible A and stood in the flooded boat all night. His brother-in-law and cousin were lost.",
+      "cite": ["ET-Abelseth", "US D13 Abelseth"],
+      "sightings": [
+        { "place": "well-deck-fwd", "from": "23:45", "to": "23:55", "cite": ["US D13 Abelseth"],
+          "text": "There is ice on the open deck at the front. A Norwegian, Olaus Abelseth, asks an officer if there is any danger. \"No.\" The officer wants everyone below." },
+        { "place": "well-deck-aft", "from": "00:30", "to": "01:35", "cite": ["US D13 Abelseth"],
+          "text": "Olaus Abelseth waits on the open deck at the back with his relatives, lifebelts on. Men are climbing a cargo crane to get past the shut gate above." },
+        { "place": "boat-deck-aft-stbd", "from": "02:10", "to": "02:18", "cite": ["US D13 Abelseth"],
+          "text": "Abelseth holds a lifeboat rope at the right-hand rail, waiting for the water to come close enough to jump." }
+      ]
+    },
+    {
+      "id": "pickard", "name": "Berk Pickard, third class",
+      "fate": "Survived; most likely in Boat 9, though his own account fits it badly.", "cite": ["ET-Pickard"],
+      "sightings": [
+        { "place": "cabin-3-aft", "from": "23:50", "to": "00:05", "cite": ["US D14 Pickard"],
+          "text": "A man from along the passage, Berk Pickard, is dressed and going out. The stewards will not let anyone go back for their things." },
+        { "place": "stairs-2", "from": "00:15", "to": "01:00", "cite": ["US D14 Pickard"],
+          "text": "Berk Pickard has found the door from third class to second standing open, and goes on up a ladder into first." },
+        { "place": "boat-deck-aft-stbd", "from": "01:28", "to": "01:32", "cite": ["US D14 Pickard"],
+          "text": "No women are near the boat. Berk Pickard and the men around him spring in." }
+      ]
+    }
+  ]
+}
