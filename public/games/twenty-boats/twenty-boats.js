@@ -2,27 +2,30 @@
 // passenger. Text-first DOM in period style, a clock, and one ship
 // silhouette over a deck plan of the boats, with short quiet sound cues
 // (M mutes).
-// mount(container, { onRequestClose }) -> destroy. onRequestClose runs when
-// the player presses the jspratt.dev button in the corner.
+// mount(container, { onRequestClose, onEvent }) -> destroy. onRequestClose
+// runs when the player presses the jspratt.dev button in the corner. onEvent
+// gets { event: 'play' } when a run starts (a Draw, or Live this night again)
+// and { event: 'finish', ending, survived } once when that run reaches its
+// Ending.
 //
 // Screens: title (collected Endings) → Draw card → scenes → Ending and End
 // card. Every run state lives inside mount, and a new Draw (or a Relive of
 // the same card) makes a fresh run, so nothing carries from one run (or one
 // mount) to the next.
 
-import { drawIdentity } from './draw.js?v=2026-10-07-v1';
-import { dealCard } from './cards.js?v=2026-10-07-v1';
-import { newRun, relive, sceneOf, choose, endings, endCard, planOf } from './story.js?v=2026-10-07-v1';
-import { sourceList } from './sources.js?v=2026-10-07-v1';
-import { createShip } from './ship.js?v=2026-10-07-v1';
-import { loadCollection, addToCollection } from './collection.js?v=2026-10-07-v1';
-import { createPlan } from './plan.js?v=2026-10-07-v1';
-import { createSound, cueFor } from './sound.js?v=2026-10-07-v1';
+import { drawIdentity } from './draw.js?v=2026-11-17-v1';
+import { dealCard } from './cards.js?v=2026-11-17-v1';
+import { newRun, relive, sceneOf, choose, endings, endCard, planOf } from './story.js?v=2026-11-17-v1';
+import { sourceList } from './sources.js?v=2026-11-17-v1';
+import { createShip } from './ship.js?v=2026-11-17-v1';
+import { loadCollection, addToCollection } from './collection.js?v=2026-11-17-v1';
+import { createPlan } from './plan.js?v=2026-11-17-v1';
+import { createSound, cueFor } from './sound.js?v=2026-11-17-v1';
 
 // Matches the ?v= on the imports above (and in ship.js and play.js). Bump them
 // together when a deploy must beat a stale browser cache: there's no build
 // step to hash the filenames.
-const CACHE_BUST = '2026-10-07-v1';
+const CACHE_BUST = '2026-11-17-v1';
 
 const MUTE_KEY = 'twenty-boats:muted';
 const CLASS_WORD = { 1: 'first', 2: 'second', 3: 'third' };
@@ -84,7 +87,7 @@ function safeStorage() {
 }
 
 export async function mountTwentyBoats(container, opts = {}) {
-  const { onRequestClose } = opts;
+  const { onRequestClose, onEvent } = opts;
   const { world, names } = await loadWorld();
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const storage = safeStorage();
@@ -175,6 +178,7 @@ export async function mountTwentyBoats(container, opts = {}) {
     const draw = drawIdentity(world.groups, Math.random);
     const card = dealCard(draw, names, Math.random);
     run = newRun(draw, card, Math.random);
+    onEvent?.({ event: 'play' });
     lastScene = null;
     lastRocket = -Infinity;
     sound.deal();
@@ -270,6 +274,7 @@ export async function mountTwentyBoats(container, opts = {}) {
   // Live the same night again: same card and start, fresh chance.
   function liveAgain() {
     run = relive(run, Math.random);
+    onEvent?.({ event: 'play' });
     lastScene = null;
     lastRocket = -Infinity;
     showScene({ animate: false });
@@ -279,7 +284,10 @@ export async function mountTwentyBoats(container, opts = {}) {
     const card = endCard(run, world);
     addToCollection(storage, collected, card.ending.id);
     // Once per run: coming back from Sources is silent.
-    if (heard !== run) sound.ending(card.ending.id);
+    if (heard !== run) {
+      sound.ending(card.ending.id);
+      onEvent?.({ event: 'finish', ending: card.ending.id, survived: card.survived });
+    }
     heard = run;
     const g = card.group;
     const who = `${CLASS_WORD[run.identity.cls]}-class ${run.identity.sex === 'f' ? 'women' : 'men'}`;

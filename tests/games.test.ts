@@ -61,3 +61,20 @@ test("the game stays under 300 KB, not counting its share card", () => {
     .reduce((sum, f) => sum + statSync(f).size, 0);
   assert.ok(bytes < 300 * 1024, `${(bytes / 1024).toFixed(0)} KB`);
 });
+
+test("every ?v= cache key in the game and its page is the same", () => {
+  const sources = [site.read(page), ...files(dir).filter((f) => f.endsWith(".js")).map((f) => readFileSync(f, "utf8"))];
+  const keys = new Set(sources.flatMap((s) => [...s.matchAll(/\?v=([\w-]+)/g)].map((m) => m[1])));
+  const main = readFileSync(join(dir, "twenty-boats.js"), "utf8");
+  keys.add(main.match(/const CACHE_BUST = '([^']+)'/)?.[1] ?? "missing");
+  assert.equal(keys.size, 1, [...keys].join(", "));
+});
+
+test("the game reports Plays and Finishes to an address the Worker runs for", () => {
+  const play = readFileSync(join(dir, "play.js"), "utf8");
+  assert.match(play, /fetch\('\/games\/twenty-boats\/event'/);
+  const config = readFileSync("wrangler.jsonc", "utf8");
+  for (const path of ["/games/twenty-boats/", "/games/twenty-boats/event"]) {
+    assert.ok(config.includes(`"${path}"`), `${path} is in run_worker_first`);
+  }
+});

@@ -1,4 +1,5 @@
-// Prints where Views have come from, from the live D1 view_log.
+// Prints where Views have come from, from the live D1 view_log, then the
+// Games' Views, Plays and Finishes from game_log.
 //
 //   npm run views                 last 14 days, your own Views left out
 //   npm run views -- --days 60    a longer window
@@ -57,3 +58,14 @@ console.log(`Views in the last ${days} days (UTC)${withMe ? ", including yours" 
 print("By source", bySource, ["source", "views"]);
 print("By Post and source", byPost, ["post", "source", "views"]);
 print("By day", byDay, ["day", "post", "source", "views"]);
+
+const games = query(
+  `SELECT game, ${source} AS source, SUM(event = 'view') AS views, SUM(event = 'play') AS plays, SUM(event = 'finish') AS finishes, SUM(event = 'finish' AND survived = 1) AS lived FROM game_log WHERE ${where} GROUP BY game, source ORDER BY game, views DESC, plays DESC`,
+);
+const endings = query(
+  `SELECT game, ending, survived, COUNT(*) AS finishes FROM game_log WHERE event = 'finish' AND ${where} GROUP BY game, ending, survived ORDER BY game, finishes DESC`,
+);
+
+console.log("\nGames: a Play is a run started, a Finish a run that reached its Ending");
+print("By Game and source", games, ["game", "source", "views", "plays", "finishes", "lived"]);
+print("Endings", endings, ["game", "ending", "survived", "finishes"]);
