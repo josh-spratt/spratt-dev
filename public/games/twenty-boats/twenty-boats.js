@@ -88,14 +88,21 @@ function safeStorage() {
 
 export async function mountTwentyBoats(container, opts = {}) {
   const { onRequestClose, onEvent } = opts;
-  const { world, names } = await loadWorld();
+  // The stylesheet goes in first and the game waits for it, so the first frame
+  // is never unstyled HTML. A stylesheet that fails still lets the game run.
+  const link = h('link', { rel: 'stylesheet', href: new URL(`./twenty-boats.css?v=${CACHE_BUST}`, import.meta.url).href });
+  const styled = new Promise((resolve) => {
+    link.addEventListener('load', resolve, { once: true });
+    link.addEventListener('error', resolve, { once: true });
+  });
+  container.append(link);
+  const [{ world, names }] = await Promise.all([loadWorld(), styled]);
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const storage = safeStorage();
   const allEndings = endings(world);
   const collected = loadCollection(storage, new Set(allEndings.map((e) => e.id)));
   const sources = sourceList(world);
 
-  const link = h('link', { rel: 'stylesheet', href: new URL(`./twenty-boats.css?v=${CACHE_BUST}`, import.meta.url).href });
   const root = h('div', { class: 'tb' });
   const page = h('main', { class: 'tb-page', tabindex: '-1', 'aria-live': 'polite' });
   const sound = createSound({ muted: readMuted(storage) });
@@ -103,7 +110,7 @@ export async function mountTwentyBoats(container, opts = {}) {
   const shelf = h('button', { type: 'button', class: 'tb-shelf', text: 'jspratt.dev', onclick: () => onRequestClose?.() });
   root.append(h('div', { class: 'tb-corner' }, soundBtn, shelf), page);
   showMuted();
-  container.append(link, root);
+  container.append(root);
 
   const ship = createShip(world.map);
   const plan = createPlan(world.boats);
