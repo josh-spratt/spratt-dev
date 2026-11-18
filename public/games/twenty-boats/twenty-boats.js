@@ -2,8 +2,9 @@
 // passenger. Text-first DOM in period style, a clock, and one ship
 // silhouette over a deck plan of the boats, with short quiet sound cues
 // (M mutes).
-// mount(container, { onRequestClose, onEvent }) -> destroy. onRequestClose
-// runs when the player presses the jspratt.dev button in the corner. onEvent
+// mount(container, { homeHref, onEvent }) -> destroy. homeHref is where the
+// jspratt.dev link in the corner goes (a real link, so it can open in a new
+// tab); without one the link is left out. onEvent
 // gets { event: 'play' } when a run starts (a Draw, or Live this night again)
 // and { event: 'finish', ending, survived } once when that run reaches its
 // Ending.
@@ -13,19 +14,19 @@
 // the same card) makes a fresh run, so nothing carries from one run (or one
 // mount) to the next.
 
-import { drawIdentity } from './draw.js?v=2026-11-17-v1';
-import { dealCard } from './cards.js?v=2026-11-17-v1';
-import { newRun, relive, sceneOf, choose, endings, endCard, planOf } from './story.js?v=2026-11-17-v1';
-import { sourceList } from './sources.js?v=2026-11-17-v1';
-import { createShip } from './ship.js?v=2026-11-17-v1';
-import { loadCollection, addToCollection } from './collection.js?v=2026-11-17-v1';
-import { createPlan } from './plan.js?v=2026-11-17-v1';
-import { createSound, cueFor } from './sound.js?v=2026-11-17-v1';
+import { drawIdentity } from './draw.js?v=2026-11-17-v2';
+import { dealCard } from './cards.js?v=2026-11-17-v2';
+import { newRun, relive, sceneOf, choose, endings, endCard, planOf } from './story.js?v=2026-11-17-v2';
+import { sourceList } from './sources.js?v=2026-11-17-v2';
+import { createShip } from './ship.js?v=2026-11-17-v2';
+import { loadCollection, addToCollection } from './collection.js?v=2026-11-17-v2';
+import { createPlan } from './plan.js?v=2026-11-17-v2';
+import { createSound, cueFor } from './sound.js?v=2026-11-17-v2';
 
 // Matches the ?v= on the imports above (and in ship.js and play.js). Bump them
 // together when a deploy must beat a stale browser cache: there's no build
 // step to hash the filenames.
-const CACHE_BUST = '2026-11-17-v1';
+const CACHE_BUST = '2026-11-17-v2';
 
 const MUTE_KEY = 'twenty-boats:muted';
 const CLASS_WORD = { 1: 'first', 2: 'second', 3: 'third' };
@@ -87,7 +88,7 @@ function safeStorage() {
 }
 
 export async function mountTwentyBoats(container, opts = {}) {
-  const { onRequestClose, onEvent } = opts;
+  const { homeHref, onEvent } = opts;
   // The stylesheet goes in first and the game waits for it, so the first frame
   // is never unstyled HTML. A stylesheet that fails still lets the game run.
   const link = h('link', { rel: 'stylesheet', href: new URL(`./twenty-boats.css?v=${CACHE_BUST}`, import.meta.url).href });
@@ -107,7 +108,7 @@ export async function mountTwentyBoats(container, opts = {}) {
   const page = h('main', { class: 'tb-page', tabindex: '-1', 'aria-live': 'polite' });
   const sound = createSound({ muted: readMuted(storage) });
   const soundBtn = h('button', { type: 'button', class: 'tb-sound', onclick: () => toggleMute() });
-  const shelf = h('button', { type: 'button', class: 'tb-shelf', text: 'jspratt.dev', onclick: () => onRequestClose?.() });
+  const shelf = homeHref ? h('a', { class: 'tb-shelf', href: homeHref, text: 'jspratt.dev' }) : null;
   root.append(h('div', { class: 'tb-corner' }, soundBtn, shelf), page);
   showMuted();
   container.append(root);

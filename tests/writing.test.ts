@@ -23,6 +23,18 @@ test("/writing lists published Posts newest first with title link, date and desc
   assert.equal(rows[1].querySelector("a")?.text, "Older Post");
 });
 
+test("A Post ends with links to its older and newer neighbours and to /writing", () => {
+  const site = buildSite(fixtures("production"));
+  const newer = site.html("writing/newer-post/index.html").querySelector('nav[aria-label="More writing"]');
+  assert.equal(newer?.querySelector("a[data-older]")?.getAttribute("href"), "/writing/older-post/");
+  assert.equal(newer?.querySelector("a[data-newer]"), null);
+  assert.equal(newer?.querySelector("a.all-writing")?.getAttribute("href"), "/writing/");
+  const older = site.html("writing/older-post/index.html").querySelector('nav[aria-label="More writing"]');
+  assert.equal(older?.querySelector("a[data-newer]")?.getAttribute("href"), "/writing/newer-post/");
+  assert.match(older?.querySelector("a[data-newer]")?.text ?? "", /Newer Post/);
+  assert.equal(older?.querySelector("a[data-older]"), null);
+});
+
 test("An updated date is shown only when set", () => {
   const site = buildSite(fixtures("production"));
   const withUpdate = site.html("writing/newer-post/index.html");

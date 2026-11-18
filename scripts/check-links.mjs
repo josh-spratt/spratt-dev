@@ -1,4 +1,5 @@
-// Fails if any internal link or asset reference in the built output is broken.
+// Fails if any internal link or asset reference in the built output is broken,
+// or if a link to a page leaves off its trailing slash.
 import { existsSync, readdirSync, statSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse } from "node-html-parser";
@@ -30,7 +31,10 @@ for (const file of htmlFiles(dir)) {
     const url = new URL(ref, pageUrl);
     if (url.origin !== "http://local" && url.origin !== "https://jspratt.dev") continue;
     const path = decodeURIComponent(url.pathname);
-    if (!exists(path)) broken.push(`${file.slice(dir.length)}: ${ref}`);
+    // The site uses trailing slashes: a page link without one 404s locally and redirects live.
+    const isPage = el.tagName === "A" && !/\.[a-z0-9]+$/i.test(path);
+    if (isPage && !path.endsWith("/")) broken.push(`${file.slice(dir.length)}: ${ref} (needs a trailing slash)`);
+    else if (!exists(path)) broken.push(`${file.slice(dir.length)}: ${ref}`);
     else if (url.hash && url.hash.length > 1) {
       const target = path.endsWith("/") ? join(dir, path, "index.html") : join(dir, path);
       if (target.endsWith(".html") && !parse(readFileSync(target, "utf8")).querySelector(`[id="${decodeURIComponent(url.hash.slice(1))}"]`))

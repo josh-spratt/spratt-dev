@@ -1,5 +1,5 @@
 // Starts Twenty Boats on its page (src/pages/games/twenty-boats.astro).
-// The game fills #game; its jspratt.dev button goes back to the Homepage.
+// The game fills #game; its jspratt.dev link goes back to the Homepage.
 // Each Play and Finish is reported to the Worker (worker/index.ts), with the
 // page's ?ref= tag and referrer so it has the same source as the page's View.
 
@@ -24,8 +24,8 @@ function report(event) {
 try {
   // Imported here rather than at the top, so a module that fails to download
   // shows the message below instead of leaving the page on "Loading".
-  const { mountTwentyBoats } = await import('./twenty-boats.js?v=2026-11-17-v1');
-  await mountTwentyBoats(game, { onRequestClose: () => location.assign('/'), onEvent: report });
+  const { mountTwentyBoats } = await import('./twenty-boats.js?v=2026-11-17-v2');
+  await mountTwentyBoats(game, { homeHref: '/', onEvent: report });
   status.remove();
 } catch (error) {
   console.error(error);
