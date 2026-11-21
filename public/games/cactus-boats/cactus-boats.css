@@ -120,6 +120,11 @@
   transition: opacity 1s;
 }
 
+.cb-hint-top {
+  bottom: auto;
+  top: calc(52px + env(safe-area-inset-top, 0px));
+}
+
 .cb-hint-gone {
   opacity: 0;
 }
@@ -147,8 +152,7 @@
 .cb-msg[hidden],
 .cb-hud[hidden],
 .cb-hint[hidden],
-.cb-stick[hidden],
-.cb-knob[hidden] {
+.cb-pad[hidden] {
   display: none;
 }
 
@@ -351,27 +355,121 @@
   filter: brightness(1.15);
 }
 
-.cb-stick,
-.cb-knob {
+/* The touch pad: a stick for the left thumb, a gun button per side for the
+   right. Drawn big and labelled, so there is nothing to find out. */
+.cb-pad {
   position: absolute;
-  top: 0;
-  left: 0;
-  border-radius: 50%;
+  inset: 0;
   pointer-events: none;
 }
 
-.cb-stick {
-  width: 96px;
-  height: 96px;
-  margin: -48px 0 0 -48px;
-  border: 2px solid rgba(243, 234, 210, 0.3);
+.cb-joy {
+  position: absolute;
+  left: calc(18px + env(safe-area-inset-left, 0px));
+  bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(243, 234, 210, 0.08);
+  border: 2px solid rgba(243, 234, 210, 0.4);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* Pull past this ring for Full sail; inside it is Half. */
+.cb-ring {
+  position: absolute;
+  inset: 23px;
+  border-radius: 50%;
+  border: 2px dashed rgba(243, 234, 210, 0.3);
+  pointer-events: none;
 }
 
 .cb-knob {
-  width: 36px;
-  height: 36px;
-  margin: -18px 0 0 -18px;
-  background: rgba(243, 234, 210, 0.55);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(243, 234, 210, 0.6);
+  pointer-events: none;
+}
+
+.cb-padtag,
+.cb-sailtag {
+  position: absolute;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  color: var(--cb-dim);
+  pointer-events: none;
+}
+
+.cb-padtag {
+  left: 0;
+  right: 0;
+  top: -20px;
+  text-align: center;
+}
+
+.cb-sailtag {
+  left: calc(18px + env(safe-area-inset-left, 0px));
+  width: 150px;
+  text-align: center;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+.cb-guns {
+  position: absolute;
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 12px;
+}
+
+.cb-fire {
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-content: center;
+  gap: 2px;
+  border-radius: 50%;
+  border: 2px solid var(--cb-accent);
+  background: rgba(242, 177, 52, 0.16);
+  color: var(--cb-accent);
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cb-fire b {
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.cb-fire:active {
+  background: rgba(242, 177, 52, 0.45);
+}
+
+/* Reloading: still pressable, but you can see it isn't ready. */
+.cb-wait {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+@media (max-height: 440px) {
+  .cb-joy { width: 130px; height: 130px; bottom: 28px; }
+  .cb-ring { inset: 13px; }
+  .cb-sailtag { width: 130px; bottom: 8px; }
+  .cb-guns { bottom: 16px; }
+  .cb-fire { width: 70px; height: 70px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

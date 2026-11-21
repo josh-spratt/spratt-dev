@@ -1,5 +1,5 @@
 // Cactus Boats' drawing: the sea, islands, boats and the fight, from the simulation's
-// state, on an offscreen canvas 216 px tall that's scaled up by a whole number
+// state, on an offscreen canvas 216 px tall that's scaled up to fit
 // of device pixels so the pixel art stays sharp.
 //
 //   fitScreen(cssWidth, cssHeight, dpr, seaWidth?) -> { width, scale }
@@ -15,7 +15,7 @@
 // under a gold pennant. Animation runs on the Play's own
 // clock (state.elapsed), so a paused game is a still picture.
 
-import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, HULLS, broadsides } from './sim.js?v=2026-11-21-v6';
+import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, HULLS, broadsides } from './sim.js?v=2026-11-21-v7';
 
 // Every drawn pixel is one of these.
 export const PAL = {
@@ -28,12 +28,16 @@ export const PAL = {
   slate: '#3a4a5a', slateLt: '#6d8296', rust: '#7a2f3a', rustLt: '#c25a66',
 };
 
-/** The sea's width and the whole-number scale that fits it on a screen. */
+/** A whole-number scale keeps the pixels square, but on a small screen it can
+ *  leave the sea half its size, so below 3x it settles for quarter steps. */
+const snap = (s) => (s < 3 ? Math.max(1, Math.floor(s * 4) / 4) : Math.floor(s));
+
+/** The sea's width and the scale that fits it on a screen. */
 export function fitScreen(cssWidth, cssHeight, dpr, seaWidth) {
   const devW = Math.max(1, Math.round(cssWidth * dpr));
   const devH = Math.max(1, Math.round(cssHeight * dpr));
-  if (seaWidth) return { width: seaWidth, scale: Math.max(1, Math.floor(Math.min(devH / SEA_HEIGHT, devW / seaWidth))) };
-  const scale = Math.max(1, Math.floor(Math.min(devH / SEA_HEIGHT, devW / SEA_WIDTHS.min)));
+  if (seaWidth) return { width: seaWidth, scale: snap(Math.min(devH / SEA_HEIGHT, devW / seaWidth)) };
+  const scale = snap(Math.min(devH / SEA_HEIGHT, devW / SEA_WIDTHS.min));
   const width = Math.max(SEA_WIDTHS.min, Math.min(SEA_WIDTHS.max, Math.floor(devW / scale)));
   return { width, scale };
 }
@@ -209,8 +213,8 @@ export function createView(screen) {
     scale = f.scale;
     off.width = f.width;
     off.height = SEA_HEIGHT;
-    screen.width = f.width * scale;
-    screen.height = SEA_HEIGHT * scale;
+    screen.width = Math.round(f.width * scale);
+    screen.height = Math.round(SEA_HEIGHT * scale);
     screen.style.width = `${screen.width / dpr}px`;
     screen.style.height = `${screen.height / dpr}px`;
     ctx.imageSmoothingEnabled = false;
