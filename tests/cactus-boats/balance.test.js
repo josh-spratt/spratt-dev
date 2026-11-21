@@ -77,13 +77,13 @@ test('more enemies are afloat the longer you last', () => {
 });
 
 test('enemies arrive faster the longer you last', () => {
-  // A full sea holds arrivals back, so look at the shortest gap between them.
-  const gap = (xs) => Math.min(...xs.slice(1).map((x, i) => x.at - xs[i].at));
-  for (const w of watched()) {
-    const early = gap(within(w.captain.arrived, 0, 120));
-    const late = gap(within(w.captain.arrived, 360, LONG));
-    assert.ok(late < early * 0.85, `${early.toFixed(1)} s apart at best in the first two minutes, ${late.toFixed(1)} s after 6:00`);
-  }
+  // A full sea holds arrivals back until a boat is sunk, so in any one Play the
+  // gaps follow the sinking. Across Plays, the shortest gap shows the curve.
+  const gaps = (xs) => xs.slice(1).map((x, i) => x.at - xs[i].at);
+  const shortest = (from, to) => Math.min(...watched().flatMap((w) => gaps(within(w.captain.arrived, from, to))));
+  const early = shortest(0, 120);
+  const late = shortest(360, LONG);
+  assert.ok(late < early * 0.6, `${early.toFixed(1)} s apart at best in the first two minutes, ${late.toFixed(1)} s after 6:00`);
   // And the curve itself: arrivals come quicker and the sea holds more, never the other way.
   let last = difficultyAt(0);
   for (let t = 1; t <= 900; t++) {
