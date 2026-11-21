@@ -3,7 +3,7 @@
  * run_worker_first in wrangler.jsonc). Every page is still built statically.
  * For a Post page this counts the View in D1 and writes the View and Like
  * counts into the HTML. For a Game it logs the page's Views and the Plays and
- * Finishes the game reports. A Like and the
+ * Finishes the game reports, and keeps its Leaderboard. A Like and the
  * email-interest answer are plain form POSTs, so the page ships no client
  * script. /stats/ is the owner's private traffic dashboard.
  */
@@ -29,6 +29,13 @@ import {
   hasLiked,
   interestSlug,
   interestedCookie,
+  BOARD_SIZE,
+  LEADERBOARD_MAX_BYTES,
+  leaderboardPath,
+  parseScore,
+  parseStart,
+  scoreOf,
+  type LeaderboardGame,
   isLive,
   isMe,
   isMeSetup,
@@ -204,6 +211,108 @@ async function gameEvent(request: Request, env: Env, game: Game): Promise<Respon
   return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
 }
 
+// The Leaderboard: the board is the top Scores, highest first, the earlier
+// run winning a tie. Only submitted rows are on it.
+const START_RUN = "INSERT INTO scores (game, referrer, ref, is_me) VALUES (?1, ?2, ?3, ?4) RETURNING id";
+const SUBMIT_SCORE =
+  "UPDATE scores SET submitted_at = datetime('now'), initials = ?3, survived_ms = ?4, sinks = ?5, score = ?6, is_me = MAX(is_me, ?7) WHERE id = ?1 AND game = ?2 RETURNING id";
+const BOARD = `SELECT initials, score, survived_ms AS survivedMs, sinks, strftime('%Y-%m-%dT%H:%M:%SZ', submitted_at) AS at FROM scores WHERE game = ?1 AND submitted_at IS NOT NULL ORDER BY score DESC, id LIMIT ${BOARD_SIZE}`;
+const RANK =
+  "SELECT COUNT(*) + 1 AS rank FROM scores WHERE game = ?1 AND submitted_at IS NOT NULL AND (score > ?2 OR (score = ?2 AND id < ?3))";
+
+interface BoardEntry {
+  initials: string;
+  score: number;
+  survivedMs: number;
+  sinks: number;
+  at: string;
+}
+
+const json = (data: unknown, status = 200, cache = "no-store") =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": cache },
+  });
+
+/** The POSTs: same-site only, and a body that says it's over the cap isn't read (parsing caps it too). */
+function refuse(request: Request): Response | null {
+  if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: { allow: "POST" } });
+  if (!isSameOrigin(request)) return new Response("Forbidden", { status: 403 });
+  if (Number(request.headers.get("content-length") ?? 0) > LEADERBOARD_MAX_BYTES) {
+    return new Response("Content Too Large", { status: 413 });
+  }
+  return null;
+}
+
+/**
+ * POST /games/<name>/start → { run }. The run id the Play's Score goes
+ * against later, stamped with when it started. Off the live site, or when D1
+ * fails, there's no run, and the game shows the board as read-only.
+ */
+async function startRun(request: Request, env: Env, game: LeaderboardGame): Promise<Response> {
+  const refused = refuse(request);
+  if (refused) return refused;
+  const from = parseStart(await request.text());
+  if (!from) return new Response("Bad Request", { status: 400 });
+  if (!isLive(request)) return json({ run: null });
+  try {
+    const row = await env.DB.prepare(START_RUN)
+      .bind(game, from.referrer, from.ref, isMe(request) ? 1 : 0)
+      .first<{ id: number }>();
+    return json({ run: row?.id ?? null });
+  } catch (err) {
+    console.error("leaderboard start failed", err);
+    return json({ run: null });
+  }
+}
+
+/**
+ * POST /games/<name>/score { run, initials, survivedMs, sinks, score } →
+ * { rank, top }. The Worker stores its own scoreOf, and refuses a Score that
+ * doesn't match it or a run it never handed out. Live site only.
+ */
+async function submitScore(request: Request, env: Env, game: LeaderboardGame): Promise<Response> {
+  const refused = refuse(request);
+  if (refused) return refused;
+  const sub = parseScore(await request.text());
+  if (!sub) return new Response("Bad Request", { status: 400 });
+  const score = scoreOf(sub.survivedMs, sub.sinks);
+  if (score !== sub.score) return new Response("Bad Request", { status: 400 });
+  if (!isLive(request)) return new Response("Forbidden", { status: 403 });
+  try {
+    const row = await env.DB.prepare(SUBMIT_SCORE)
+      .bind(sub.run, game, sub.initials, sub.survivedMs, sub.sinks, score, isMe(request) ? 1 : 0)
+      .first<{ id: number }>();
+    if (!row) return new Response("Bad Request", { status: 400 });
+    const [rank, top] = await env.DB.batch([
+      env.DB.prepare(RANK).bind(game, score, row.id),
+      env.DB.prepare(BOARD).bind(game),
+    ]);
+    return json({ rank: (rank.results[0] as { rank: number }).rank, top: top.results as unknown as BoardEntry[] });
+  } catch (err) {
+    console.error("leaderboard score failed", err);
+    return new Response("Service Unavailable", { status: 503, headers: { "cache-control": "no-store" } });
+  }
+}
+
+/**
+ * GET /games/<name>/scores → { top }. Every host reads the live board, so
+ * previews show it too. Cached briefly; when D1 fails, an empty board flagged
+ * unavailable.
+ */
+async function topScores(request: Request, env: Env, game: LeaderboardGame): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
+  }
+  try {
+    const { results } = await env.DB.prepare(BOARD).bind(game).all<BoardEntry>();
+    return json({ top: results }, 200, "public, max-age=10");
+  } catch (err) {
+    console.error("leaderboard read failed", err);
+    return json({ top: [], unavailable: true });
+  }
+}
+
 /**
  * Anyone without the key gets the ordinary 404 page, so /stats/ looks like it
  * isn't there. The path is one no asset has, so the assets serve the 404 page.
@@ -303,6 +412,10 @@ export default {
     if (playing) return gameView(request, env, playing);
     const reporting = gameEventPath(pathname);
     if (reporting) return gameEvent(request, env, reporting);
+    const board = leaderboardPath(pathname);
+    if (board?.action === "start") return startRun(request, env, board.game);
+    if (board?.action === "score") return submitScore(request, env, board.game);
+    if (board?.action === "scores") return topScores(request, env, board.game);
 
     if (isMeSetup(url)) {
       return new Response(ME_SET, {

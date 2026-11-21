@@ -10,12 +10,16 @@ import { parse } from "node-html-parser";
 import { buildSite, type Site } from "./helpers.ts";
 import { dashboardQuery, renderDashboard, sameString, windowDays } from "../worker/dashboard.ts";
 import {
+  cleanInitials,
   gameEventPath,
   gamePage,
   interestSlug,
+  leaderboardPath,
   likeLabel,
   likeSlug,
   parseGameEvent,
+  parseScore,
+  parseStart,
   postSlug,
   refTag,
   referrerHost,
@@ -483,6 +487,183 @@ test("a Cactus Boats report from another site or on a preview writes nothing", a
   assert.equal((await report(url, { event: "play" }, { origin: "https://evil.example" })).status, 403);
   assert.equal((await report("https://views.spratt-dev.example.workers.dev/games/cactus-boats/event", { event: "play" })).status, 204);
   assert.equal(gameLog().length, before);
+});
+
+// The Leaderboard (Cactus Boats). scoreOf is 10 a whole second plus 250 a sink.
+
+test("leaderboardPath matches a Leaderboard Game's three addresses only", () => {
+  assert.deepEqual(leaderboardPath("/games/cactus-boats/start"), { game: "cactus-boats", action: "start" });
+  assert.deepEqual(leaderboardPath("/games/cactus-boats/score"), { game: "cactus-boats", action: "score" });
+  assert.deepEqual(leaderboardPath("/games/cactus-boats/scores"), { game: "cactus-boats", action: "scores" });
+  for (const path of ["/games/twenty-boats/score", "/games/cactus-boats/scores/", "/games/cactus-boats/", "/games/cactus-boats/event", "/games/nope/start"]) {
+    assert.equal(leaderboardPath(path), null, path);
+  }
+});
+
+test("cleanInitials keeps exactly three letters, uppercased", () => {
+  assert.equal(cleanInitials("abc"), "ABC");
+  assert.equal(cleanInitials("JoS"), "JOS");
+  for (const bad of ["AB", "ABCD", "A C", "A1C", " ABC", "ÅBC", "", null, 123, ["ABC"]]) {
+    assert.equal(cleanInitials(bad), null, String(bad));
+  }
+});
+
+test("parseScore keeps whole, non-negative numbers, a run id and clean Initials", () => {
+  const good = { run: 7, initials: "jos", survivedMs: 61_500, sinks: 3, score: 1360 };
+  assert.deepEqual(parseScore(JSON.stringify(good)), { ...good, initials: "JOS" });
+  assert.deepEqual(parseScore(JSON.stringify({ ...good, extra: "ignored" })), { ...good, initials: "JOS" });
+  for (const bad of [
+    "not json",
+    "null",
+    "[]",
+    JSON.stringify({ ...good, run: 0 }),
+    JSON.stringify({ ...good, run: "7" }),
+    JSON.stringify({ ...good, initials: "JO" }),
+    JSON.stringify({ ...good, survivedMs: -1 }),
+    JSON.stringify({ ...good, survivedMs: 1.5 }),
+    JSON.stringify({ ...good, sinks: null }),
+    JSON.stringify({ ...good, score: 1e300 }),
+    JSON.stringify({ ...good, pad: "x".repeat(600) }),
+  ]) {
+    assert.equal(parseScore(bad), null, bad.slice(0, 80));
+  }
+});
+
+test("parseStart cleans where the player came from", () => {
+  assert.deepEqual(parseStart(JSON.stringify({ ref: "HN!", referrer: "https://news.ycombinator.com/item?id=1" })), {
+    ref: "hn",
+    referrer: "news.ycombinator.com",
+  });
+  assert.deepEqual(parseStart("{}"), { ref: null, referrer: null });
+  assert.equal(parseStart("nope"), null);
+  assert.equal(parseStart(JSON.stringify({ ref: "x".repeat(600) })), null);
+});
+
+const BOARD_URL = `${LIVE}/games/cactus-boats`;
+const PREVIEW = "https://views.spratt-dev.example.workers.dev";
+const scoreRows = () =>
+  sql("SELECT id, game, initials, survived_ms, sinks, score, submitted_at IS NOT NULL AS submitted, started_at IS NOT NULL AS started, referrer, ref, is_me FROM scores ORDER BY id");
+
+/** The game's starter asking for a run id; returns it (or null). */
+async function startRun(headers: Record<string, string> = {}, url = BOARD_URL, from: object = {}): Promise<number | null> {
+  const res = await report(`${url}/start`, from, headers);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers["cache-control"], "no-store");
+  return JSON.parse(res.body).run;
+}
+
+/** A Score for `run` with the right scoreOf, unless `score` says otherwise. */
+const submitScore = (run: number | null, initials: string, survivedMs: number, sinks: number, more: object = {}, headers: Record<string, string> = {}, url = BOARD_URL) =>
+  report(`${url}/score`, { run, initials, survivedMs, sinks, score: Math.floor(survivedMs / 1000) * 10 + sinks * 250, ...more }, headers);
+
+test("a Play's run gets a Score on the live site: one row, the Worker's own Score, a rank and the top 10", async () => {
+  const run = await startRun({}, BOARD_URL, { ref: "hn", referrer: "https://news.ycombinator.com/" });
+  assert.ok(Number.isInteger(run));
+  assert.deepEqual(scoreRows(), [
+    { id: run, game: "cactus-boats", initials: null, survived_ms: null, sinks: null, score: null, submitted: 0, started: 1, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
+  ]);
+
+  const res = await submitScore(run, "jos", 61_500, 3);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers["cache-control"], "no-store");
+  const { rank, top } = JSON.parse(res.body);
+  assert.equal(rank, 1);
+  assert.equal(top.length, 1);
+  assert.deepEqual({ ...top[0], at: undefined }, { initials: "JOS", score: 1360, survivedMs: 61_500, sinks: 3, at: undefined });
+  assert.match(top[0].at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+  assert.deepEqual(scoreRows(), [
+    { id: run, game: "cactus-boats", initials: "JOS", survived_ms: 61_500, sinks: 3, score: 1360, submitted: 1, started: 1, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
+  ]);
+});
+
+test("the board is the top 10, highest first with the earlier run winning a tie, and a Score off it still gets its rank", async () => {
+  // Already on the board: JOS 1360. Eleven more, from 100 to 2100 points.
+  const ranks: number[] = [];
+  for (let i = 0; i <= 10; i++) {
+    const run = await startRun();
+    const res = await submitScore(run, String.fromCharCode(65 + i).repeat(3), i * 20_000 + 10_000, 0);
+    assert.equal(res.status, 200);
+    ranks.push(JSON.parse(res.body).rank);
+  }
+  // 100, 300 … 2100: each new best goes to the top, except below JOS's 1360 at first.
+  assert.deepEqual(ranks, [2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1]);
+  const tie = await startRun();
+  const tied = JSON.parse((await submitScore(tie, "TIE", 136_000, 0)).body);
+  assert.equal(tied.rank, 6, "behind the earlier 1360");
+
+  const res = await get(`${BOARD_URL}/scores`, {});
+  assert.equal(res.status, 200);
+  assert.match(String(res.headers["content-type"]), /^application\/json/);
+  assert.equal(res.headers["cache-control"], "public, max-age=10");
+  const { top } = JSON.parse(res.body);
+  assert.deepEqual(top, tied.top, "the board after a Score is the board everyone reads");
+  assert.deepEqual(
+    top.map((e: { initials: string; score: number }) => `${e.initials} ${e.score}`),
+    ["KKK 2100", "JJJ 1900", "III 1700", "HHH 1500", "JOS 1360", "TIE 1360", "GGG 1300", "FFF 1100", "EEE 900", "DDD 700"],
+  );
+  const low = await startRun();
+  assert.equal(JSON.parse((await submitScore(low, "LOW", 0, 0)).body).rank, 14, "off the board, after everyone");
+});
+
+test("a run nobody scores isn't on the board", async () => {
+  await startRun();
+  const { top } = JSON.parse((await get(`${BOARD_URL}/scores`, {})).body);
+  assert.ok(top.every((e: { initials: string | null }) => e.initials));
+});
+
+test("the Leaderboard refuses, and writes nothing for, another site, no Origin, GET, bad bodies, bad Initials, an unknown run or a wrong Score", async () => {
+  const run = await startRun();
+  const before = scoreRows();
+  const evil = { origin: "https://evil.example" };
+  // Node sends a Content-Length, so these are refused unread; parseStart and parseScore cap the rest.
+  const big = JSON.stringify({ ref: "x".repeat(2000) });
+  const refusals: [string, Promise<Got>, number][] = [
+    ["start from another site", report(`${BOARD_URL}/start`, {}, evil), 403],
+    ["start with no Origin", send("POST", `${BOARD_URL}/start`, {}, "{}"), 403],
+    ["start by GET", get(`${BOARD_URL}/start`, {}), 405],
+    ["start malformed", send("POST", `${BOARD_URL}/start`, { origin: LIVE }, "{nope"), 400],
+    ["start oversized", send("POST", `${BOARD_URL}/start`, { origin: LIVE }, big), 413],
+    ["score from another site", submitScore(run, "ABC", 5000, 0, {}, evil), 403],
+    ["score with no Origin", send("POST", `${BOARD_URL}/score`, {}, JSON.stringify({ run, initials: "ABC", survivedMs: 5000, sinks: 0, score: 50 })), 403],
+    ["score by GET", get(`${BOARD_URL}/score`, {}), 405],
+    ["score malformed", send("POST", `${BOARD_URL}/score`, { origin: LIVE }, "[1,2"), 400],
+    ["score oversized", submitScore(run, "ABC", 5000, 0, { pad: "x".repeat(2000) }), 413],
+    ["two Initials", submitScore(run, "AB", 5000, 0), 400],
+    ["four Initials", submitScore(run, "ABCD", 5000, 0), 400],
+    ["a digit in the Initials", submitScore(run, "A1C", 5000, 0), 400],
+    ["no Initials", submitScore(run, "", 5000, 0), 400],
+    ["an unknown run", submitScore(run! + 1000, "ABC", 5000, 0), 400],
+    ["no run", submitScore(null, "ABC", 5000, 0), 400],
+    ["a Score that isn't scoreOf", submitScore(run, "ABC", 5000, 0, { score: 51 }), 400],
+    ["a Score for time not survived", submitScore(run, "ABC", 5000, 0, { score: 1000 }), 400],
+    ["scores by POST", report(`${BOARD_URL}/scores`, {}), 405],
+  ];
+  for (const [what, res, status] of refusals) assert.equal((await res).status, status, what);
+  assert.deepEqual(scoreRows(), before);
+});
+
+test("a preview reads the live board, but start hands out no run and score writes nothing", async () => {
+  const live = JSON.parse((await get(`${BOARD_URL}/scores`, {})).body);
+  const before = scoreRows();
+  const preview = await get(`${PREVIEW}/games/cactus-boats/scores`, {});
+  assert.equal(preview.status, 200);
+  assert.deepEqual(JSON.parse(preview.body), live);
+  assert.equal(await startRun({}, `${PREVIEW}/games/cactus-boats`), null);
+  const unscored = before.find((r) => !r.submitted)!;
+  const res = await submitScore(unscored.id as number, "PRE", 999_000, 9, {}, {}, `${PREVIEW}/games/cactus-boats`);
+  assert.equal(res.status, 403);
+  assert.deepEqual(scoreRows(), before);
+});
+
+test("the owner's runs are stored as theirs and their Score still shows on the board", async () => {
+  const run = await startRun({ cookie: "me=1" });
+  const res = await submitScore(run, "JSP", 600_000, 20, {}, { cookie: "me=1" });
+  assert.equal(res.status, 200);
+  const { rank, top } = JSON.parse(res.body);
+  assert.equal(rank, 1);
+  assert.equal(top[0].initials, "JSP");
+  assert.equal("is_me" in top[0], false, "the board doesn't say whose is whose");
+  assert.equal(scoreRows().find((r) => r.id === run)?.is_me, 1);
 });
 
 /** Opens the dashboard with the key and returns the cookie it sets. */

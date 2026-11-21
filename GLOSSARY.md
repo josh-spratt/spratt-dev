@@ -60,6 +60,14 @@ _Avoid_: completion, win, game over
 The points from one Play of Cactus Boats: points for each second survived plus more for each boat sunk, from `scoreOf` in the game's `score.js`.
 _Avoid_: high score, points total
 
+**Leaderboard**:
+The top 10 Scores of a Game from everyone who has played it on the live site, kept by the Worker. Previews and local runs show it but never add to it. Josh's Scores are on it too, flagged in the database only.
+_Avoid_: high-score table, rankings, hall of fame
+
+**Initials**:
+The three letters (A–Z) a player puts against a Score that makes the Leaderboard. The only thing on the board that says who played; the game remembers the last ones used, and they can be skipped.
+_Avoid_: name, tag, handle
+
 **Like**:
 A reader's thumbs-up on a Post, given with the button at the end of it. Each browser can Like a Post once; there is no unlike. Only the live site records them.
 _Avoid_: upvote, heart, favourite

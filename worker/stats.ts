@@ -190,6 +190,80 @@ export function parseGameEvent(body: string): GameEvent | null {
   return null;
 }
 
+// The Leaderboard. Kept apart from GAMES: a Game can be logged without having
+// a Leaderboard. The Score is the game's own scoreOf, so the two can't disagree.
+
+export { scoreOf } from "../public/games/cactus-boats/score.js";
+
+/** The Games with a Leaderboard, by their name in /games/<name>/. */
+export const LEADERBOARD_GAMES = ["cactus-boats"] as const;
+export type LeaderboardGame = (typeof LEADERBOARD_GAMES)[number];
+
+/** How many Scores the board shows. */
+export const BOARD_SIZE = 10;
+
+export type LeaderboardAction = "start" | "score" | "scores";
+
+/** "/games/cactus-boats/score" → { game: "cactus-boats", action: "score" }; anything else → null. */
+export function leaderboardPath(pathname: string): { game: LeaderboardGame; action: LeaderboardAction } | null {
+  const m = /^\/games\/([a-z0-9-]+)\/(start|score|scores)$/.exec(pathname);
+  if (!m || !(LEADERBOARD_GAMES as readonly string[]).includes(m[1])) return null;
+  return { game: m[1] as LeaderboardGame, action: m[2] as LeaderboardAction };
+}
+
+/** Three letters A–Z, uppercased; anything else (spaces, digits, accents, two or four letters) → null. */
+export function cleanInitials(initials: unknown): string | null {
+  if (typeof initials !== "string") return null;
+  const up = initials.toUpperCase();
+  return /^[A-Z]{3}$/.test(up) ? up : null;
+}
+
+/** The longest body `start` or `score` reads; a real one is under 200 bytes. */
+export const LEADERBOARD_MAX_BYTES = 512;
+
+function parseObject(body: string): Record<string, unknown> | null {
+  if (body.length > LEADERBOARD_MAX_BYTES) return null;
+  try {
+    const data: unknown = JSON.parse(body);
+    return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Where the player came from, sent when a Play starts: { ref?, referrer? }, cleaned like a Play's. */
+export function parseStart(body: string): { referrer: string | null; ref: string | null } | null {
+  const d = parseObject(body);
+  if (!d) return null;
+  return { referrer: typeof d.referrer === "string" ? hostOf(d.referrer) : null, ref: cleanTag(d.ref as string) };
+}
+
+/** A Score as the game sends it when the player is sunk. */
+export interface ScoreSubmission {
+  run: number;
+  initials: string;
+  survivedMs: number;
+  sinks: number;
+  /** What the game says the Score is; the Worker checks it against scoreOf and stores its own. */
+  score: number;
+}
+
+const count = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
+
+/**
+ * Reads { run, initials, survivedMs, sinks, score }: whole, non-negative
+ * numbers, a positive run id and clean Initials, or null. Whether the Score
+ * is plausible (and matches scoreOf) is checked against the run separately.
+ */
+export function parseScore(body: string): ScoreSubmission | null {
+  const d = parseObject(body);
+  if (!d) return null;
+  const initials = cleanInitials(d.initials);
+  const { run, survivedMs, sinks, score } = d;
+  if (!initials || !count(run) || run === 0 || !count(survivedMs) || !count(sinks) || !count(score)) return null;
+  return { run, initials, survivedMs, sinks, score };
+}
+
 export function statsText(views: number): string {
   return ` · Read ${views.toLocaleString("en-GB")} ${views === 1 ? "time" : "times"}`;
 }
