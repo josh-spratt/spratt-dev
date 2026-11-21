@@ -1,8 +1,8 @@
 # Database
 
-Views, the View log, Likes, Interest and the Game log are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
+Views, the View log, Likes, Interest, the Game log and the Leaderboard are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
 
-Only `/writing/*`, `/stats*` and a Game's page and event address (`run_worker_first` in `wrangler.jsonc`) run the Worker script (`worker/index.ts`), and every other path is served straight from `dist/`. For a Post page, the Worker:
+Only `/writing/*`, `/stats*`, a Game's page and event address, and the Leaderboard's addresses (`run_worker_first` in `wrangler.jsonc`) run the Worker script (`worker/index.ts`), and every other path is served straight from `dist/`. For a Post page, the Worker:
 
 1. counts a View when the request is a browser navigation (`Sec-Fetch-Mode: navigate`) to `jspratt.dev`, and logs it as a row in `view_log` with the time, the linking site's hostname (from `Referer`) and any `?ref=` tag
 2. writes " · Read N times" into the page's `[data-stats]` placeholder
@@ -40,6 +40,32 @@ Twenty Boats (`/games/twenty-boats/`) and Cactus Boats (`/games/cactus-boats/`) 
 Each report carries the page's `?ref=` tag and `document.referrer`, which the Worker cleans the same way as a View's (tag rules above, hostname only), so a Play has the same source as the View it came from. The Worker refuses a report from another site, answers 204 and writes nothing off the live hostname, and stores no IP, address or id: a row is the Game, the event, the Ending, the time, the source and `is_me`. Someone could POST fake reports from the page's own origin; for a personal site that's fine.
 
 To log another Game, add its name to `GAMES` in `worker/stats.ts` and its title to `GAME_TITLES` in `worker/dashboard.ts`, its page and `event` address to `run_worker_first`, and an `onEvent` hook like Twenty Boats'.
+
+## Leaderboard
+
+Cactus Boats keeps a global Leaderboard in `scores`, one row per Play that asked to be scored. The game's starter (`public/games/cactus-boats/play.js`) backs its `leaderboard` option with three addresses, so the game itself never knows URLs:
+
+- `POST /games/cactus-boats/start` with `{ ref, referrer }` → `{ "run": 42 }`. The Worker adds a row stamped with `started_at` and the Play's source, cleaned like a Play's. Off the live hostname, or if D1 fails, it answers `{ "run": null }` and writes nothing, and the game shows the board as read-only.
+- `POST /games/cactus-boats/score` with `{ run, initials, survivedMs, sinks, score }` → `{ rank, top }`. The Worker fills in that run's row: `submitted_at`, the Initials (exactly three letters, uppercased), the time, the sinks, and its own `scoreOf(survivedMs, sinks)` from the game's `score.js`. It answers 400 for a Score that doesn't match, a run it never handed out, or a malformed body; 403 off the live hostname; 503 if D1 fails.
+- `GET /games/cactus-boats/scores` → `{ "top": [{ initials, score, survivedMs, sinks, at }] }`, the top 10. Every host reads the live board, previews too, cached for 10 seconds. If D1 fails it answers an empty board with `"unavailable": true`.
+
+The board is the highest Scores first, the earlier run winning a tie. Only submitted rows are on it; a Play that didn't make the board, or was skipped, leaves a row with only `started_at` and its source.
+
+The two POSTs refuse another Origin (403), anything but POST (405) and a body over 512 bytes (413). Like the Game log, a row stores no IP, address or browser id, and the owner's `me` cookie sets `is_me = 1`, but the owner's Scores still show on the board. Someone could still script a plausible Score from the page's own origin; checks on how long the run has been going and how many boats could have been sunk are to come.
+
+Read the board, the owner's included:
+
+```sh
+npx wrangler d1 execute spratt-dev --remote --command "SELECT id, initials, score, survived_ms, sinks, submitted_at, is_me FROM scores WHERE game = 'cactus-boats' AND submitted_at IS NOT NULL ORDER BY score DESC, id LIMIT 20"
+```
+
+Remove a Score by hand (rude Initials, an impossible Score), by its `id` from the query above. The row's start goes too, which is fine:
+
+```sh
+npx wrangler d1 execute spratt-dev --remote --command "DELETE FROM scores WHERE id = 42"
+```
+
+A browser that read the board just before may show it for up to 10 seconds more.
 
 ## One-time setup
 
@@ -103,4 +129,4 @@ npx wrangler d1 migrations apply spratt-dev --local
 npx wrangler dev
 ```
 
-Local requests come from `localhost`, not `jspratt.dev`, so they read counts but don't add Views, Likes, Plays or Finishes. The game still sends its reports, and the Worker answers each with 204, which is how to see them fire in the browser's network panel.
+Local requests come from `localhost`, not `jspratt.dev`, so they read counts and the Leaderboard but don't add Views, Likes, Plays, Finishes or Scores. The game still sends its reports, and the Worker answers each with 204, which is how to see them fire in the browser's network panel.

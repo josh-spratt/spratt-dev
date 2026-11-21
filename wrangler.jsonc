@@ -36,6 +36,10 @@
 			"/games/twenty-boats/event",
 			"/games/cactus-boats/",
 			"/games/cactus-boats/event",
+			// Cactus Boats' Leaderboard: a run id, a Score, and the board.
+			"/games/cactus-boats/start",
+			"/games/cactus-boats/score",
+			"/games/cactus-boats/scores",
 			"/stats",
 			"/stats/*"
 		]

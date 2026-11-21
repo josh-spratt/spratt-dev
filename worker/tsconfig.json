@@ -8,6 +8,8 @@
     "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
+    // The Worker imports the game's own scoreOf (public/games/cactus-boats/score.js).
+    "allowJs": true,
     "skipLibCheck": true
   },
   "include": ["*.ts"]
