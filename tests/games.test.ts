@@ -26,8 +26,10 @@ interface Game {
   cacheBustConstant: boolean;
   /** The page's theme-color for dark and light schemes. */
   themeColours: { dark: string; light: string };
-  /** Where play.js reports Plays and Finishes. */
-  eventPath: string;
+  /** Where play.js reports Plays and Finishes, or null before the Game is logged. */
+  eventPath: string | null;
+  /** Whether the Game has its own 1200×630 share card yet (else the site's). */
+  card: boolean;
 }
 
 const games: Record<string, Game> = {
@@ -41,6 +43,20 @@ const games: Record<string, Game> = {
     cacheBustConstant: true,
     themeColours: { dark: "#1c1915", light: "#efe7d6" },
     eventPath: "/games/twenty-boats/event",
+    card: true,
+  },
+  // The share card and Game logging arrive when it launches as a Project (#72).
+  "cactus-boats": {
+    title: "Cactus Boats",
+    entry: "cactus-boats.js",
+    preloads: ["sim.js", "input.js", "draw.js"],
+    minModules: 5,
+    files: ["cactus-boats.css"],
+    dataFiles: 0,
+    cacheBustConstant: true,
+    themeColours: { dark: "#0b2e36", light: "#0b2e36" },
+    eventPath: null,
+    card: false,
   },
 };
 
@@ -75,13 +91,13 @@ for (const [name, game] of Object.entries(games)) {
     assert.equal(start?.getAttribute("type"), "module");
     assert.match(start?.getAttribute("src") ?? "", new RegExp(`^${escaped(base)}play\\.js\\?v=`));
     assert.equal(doc.querySelector("header.site-header"), null, "the game fills the screen");
+    assert.equal(doc.querySelector('link[rel="canonical"]')?.getAttribute("href"), `https://jspratt.dev${base}`);
   });
 
-  test(`${game.title} shares its own 1200×630 card`, async () => {
+  test(`${game.title} shares its own 1200×630 card`, { skip: !game.card && "no share card until it launches" }, async () => {
     const doc = site.html(page);
     const og = doc.querySelector('meta[property="og:image"]')?.getAttribute("content");
     assert.equal(og, `https://jspratt.dev${base}card.png`);
-    assert.equal(doc.querySelector('link[rel="canonical"]')?.getAttribute("href"), `https://jspratt.dev${base}`);
     const { width, height } = await sharp(join(dir, "card.png")).metadata();
     assert.deepEqual([width, height], [1200, 630]);
   });
@@ -118,11 +134,12 @@ for (const [name, game] of Object.entries(games)) {
     assert.equal(keys.size, 1, [...keys].join(", "));
   });
 
-  test(`${game.title} reports Plays and Finishes to an address the Worker runs for`, () => {
+  test(`${game.title} reports Plays and Finishes to an address the Worker runs for`, { skip: !game.eventPath && "not logged until it launches" }, () => {
+    const eventPath = game.eventPath!;
     const play = readFileSync(join(dir, "play.js"), "utf8");
-    assert.match(play, new RegExp(`fetch\\('${escaped(game.eventPath)}'`));
+    assert.match(play, new RegExp(`fetch\\('${escaped(eventPath)}'`));
     const config = readFileSync("wrangler.jsonc", "utf8");
-    for (const path of [base, game.eventPath]) {
+    for (const path of [base, eventPath]) {
       assert.ok(config.includes(`"${path}"`), `${path} is in run_worker_first`);
     }
   });
