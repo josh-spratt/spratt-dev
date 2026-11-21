@@ -1,6 +1,6 @@
 ---
 import Head from "../components/Head.astro";
-import { site, getPosts } from "../lib/site";
+import { site, games, getPosts } from "../lib/site";
 // Only the site's own pages get its styles: a Game page brings its own.
 import "../styles/global.css";
 
@@ -20,6 +20,7 @@ interface Props {
 
 const { title, description, type, noindex, image, imageAlt, published, modified, home = false } = Astro.props;
 const hasPosts = (await getPosts()).length > 0;
+const hasGames = games.length > 0;
 const path = Astro.url.pathname;
 const hasHero = Astro.slots.has("hero");
 ---
@@ -55,11 +56,18 @@ const hasHero = Astro.slots.has("hero");
       }
       <div class="navs">
         {
-          hasPosts && (
+          (hasPosts || hasGames) && (
             <nav aria-label="Site">
-              <a href="/writing/" aria-current={path.startsWith("/writing") ? "page" : undefined}>
-                Writing
-              </a>
+              {hasPosts && (
+                <a href="/writing/" aria-current={path.startsWith("/writing") ? "page" : undefined}>
+                  Writing
+                </a>
+              )}
+              {hasGames && (
+                <a href="/games/" aria-current={path === "/games/" ? "page" : undefined}>
+                  Games
+                </a>
+              )}
             </nav>
           )
         }

@@ -5,7 +5,7 @@ Josh Spratt's personal homepage: a professional calling card that grows to hold 
 ## Language
 
 **Homepage**:
-The single page at `/`, made of the Intro, Projects and (once it exists) Recent writing blocks.
+The single page at `/`, made of the Intro, Recent writing (once it exists), Games and Projects blocks.
 _Avoid_: landing page, index
 
 **Intro**:
@@ -17,7 +17,7 @@ The row of contact and profile links (GitHub, LinkedIn, email) in the header on 
 _Avoid_: socials, footer links
 
 **Project**:
-A piece of Josh's work shown on the Homepage, with a title, one-line description and one public link (on this site, as for a Game, or elsewhere). Something without a public link is not a Project.
+A piece of Josh's code or work shown in the Homepage's Projects block, with a title, one-line description and one public link, usually elsewhere (e.g. its repo). Something without a public link is not a Project. A Game is not a Project: it's listed with the Games. Projects are set in `projects.json`.
 _Avoid_: portfolio item, work, repo
 
 **Post**:
@@ -25,11 +25,15 @@ A single piece of writing published under `/writing`. A long-form write-up about
 _Avoid_: article, blog entry
 
 **Game**:
-A Project you play in the browser, served from this site at `/games/<name>/`. Its page is the game alone, full screen, with no header or yellow column. The game's code lives in `public/games/<name>/`, and its own tests in `tests/<name>/`.
-_Avoid_: cart, app, demo
+Something you play in the browser, served from this site at `/games/<name>/`. Its page is the game alone, full screen, with no header or yellow column. The game's code lives in `public/games/<name>/`, and its own tests in `tests/<name>/`. Each Game is listed in `games.json` (title, one-line description, image, Tags) and shown on the Games page and in the Homepage's Games block, not with the Projects.
+_Avoid_: cart, app, demo, project (for a Game)
+
+**Games page**:
+The page at `/games/` listing every Game, each leading to the Game's own page. It's an ordinary page of the site, with the header, and is linked as Games in the header beside Writing.
+_Avoid_: arcade, games index, games hub
 
 **Tag**:
-A short topic label on a Project or a Post (e.g. "Rust", "AI"), shown as a chip. Projects set them in `projects.json`, Posts in their frontmatter.
+A short topic label on a Project, a Game or a Post (e.g. "Rust", "AI"), shown as a chip. Projects set them in `projects.json`, Games in `games.json`, Posts in their frontmatter.
 _Avoid_: category, label
 
 **Draft**:
@@ -45,12 +49,16 @@ One browser visit to a Post, or to a Game's page, on the live site. Crawlers, pr
 _Avoid_: hit, pageview, read count
 
 **Play**:
-One run of a Game started: in Twenty Boats, a Draw (Draw a passenger, Draw again) or Live this night again. One View can lead to many Plays. A Play's source is that of the page's View. Only the live site records them, and Josh's are logged but flagged, like his Views.
+One run of a Game started: in Twenty Boats, a Draw (Draw a passenger, Draw again) or Live this night again; in Cactus Boats, setting sail from the title or Sunk! screen. One View can lead to many Plays. A Play's source is that of the page's View. Only the live site records them, and Josh's are logged but flagged, like his Views.
 _Avoid_: session, game start, run (in counts)
 
 **Finish**:
-A Play that reached its Ending. Each Finish records which Ending, and whether the passenger lived.
+A Play that reached its Ending. Each Finish records which Ending, and whether the passenger lived. In Cactus Boats every Play ends in a Finish: being sunk (Ending `sunk`, not lived), so its Score says more than its Finishes.
 _Avoid_: completion, win, game over
+
+**Score**:
+The points from one Play of Cactus Boats: points for each second survived plus more for each boat sunk, from `scoreOf` in the game's `score.js`.
+_Avoid_: high score, points total
 
 **Like**:
 A reader's thumbs-up on a Post, given with the button at the end of it. Each browser can Like a Post once; there is no unlike. Only the live site records them.

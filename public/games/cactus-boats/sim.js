@@ -26,7 +26,7 @@
 // Tuning lives in the named tables below (GUNS, PATROLS, TOKENS, SPAWN), so
 // difficulty is changed in one place. The Score is in score.js.
 
-import { scoreOf } from './score.js?v=2026-11-21-v3';
+import { scoreOf } from './score.js?v=2026-11-21-v4';
 
 /** The fixed tick, in seconds. */
 export const STEP = 1 / 60;

@@ -363,6 +363,11 @@ h2 {
   --c: var(--red);
 }
 
+/* Games are the yellow bricks. */
+.content > .games-block > h2 {
+  --c: var(--yellow);
+}
+
 /* ---- Cards (Projects, Recent writing): picture, title, description, then tags or date ---- */
 .rows {
   display: grid;
@@ -389,6 +394,10 @@ h2 {
 
 .posts a {
   --shadow: var(--red);
+}
+
+.games a {
+  --shadow: var(--yellow);
 }
 
 .rows a:hover {
@@ -479,6 +488,14 @@ time + .tags {
 .more {
   margin: 1.5rem 0 0;
   font-weight: 700;
+}
+
+/* The line under a page's h1, e.g. on the Games page. */
+.lede {
+  max-width: 40ch;
+  margin: 0 0 2rem;
+  font-size: 1.05rem;
+  color: var(--ink-soft);
 }
 
 /* ---- Writing list: the same card as the Homepage; the title link covers it ---- */

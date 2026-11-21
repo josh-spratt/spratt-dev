@@ -1,0 +1,14 @@
+[
+  {
+    "slug": "fixture-game",
+    "title": "Fixture Game",
+    "description": "First fixture game.",
+    "image": "/game-thumbs/fixture-game.webp",
+    "tags": ["Arcade"]
+  },
+  {
+    "slug": "other-game",
+    "title": "Other Game",
+    "description": "Second fixture game, no image or tags."
+  }
+]

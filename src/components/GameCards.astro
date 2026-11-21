@@ -1,0 +1,31 @@
+---
+import Tags from "./Tags.astro";
+import { gameHref, type Game } from "../lib/site";
+
+/** The Games as cards, each leading to the Game's own full-screen page. */
+interface Props {
+  games: Game[];
+}
+const { games } = Astro.props;
+---
+
+<ul class="rows games">
+  {
+    games.map((g) => (
+      <li>
+        <a href={gameHref(g)}>
+          {g.image ? (
+            <img class="logo" src={g.image} alt="" width="64" height="64" loading="lazy" />
+          ) : (
+            <span class="logo" aria-hidden="true" />
+          )}
+          <span class="body">
+            <strong>{g.title}</strong>
+            <span class="detail">{g.description}</span>
+            <Tags tags={g.tags} />
+          </span>
+        </a>
+      </li>
+    ))
+  }
+</ul>

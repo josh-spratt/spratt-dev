@@ -19,21 +19,23 @@ function htmlFiles(dir: string): string[] {
   );
 }
 
-// Game pages fill the screen with the game and have their own tests (games.test.ts).
-const pages = htmlFiles(site.outDir).filter((p) => !p.startsWith("games/"));
+// A Game's own page fills the screen with the game and has its own tests
+// (games.test.ts). The Games page listing them is an ordinary page.
+const pages = htmlFiles(site.outDir).filter((p) => !p.startsWith("games/") || p === "games/index.html");
 
 test("every kind of page is built", () => {
-  for (const p of ["index.html", "404.html", "writing/index.html", "writing/newer-post/index.html"]) {
+  for (const p of ["index.html", "404.html", "writing/index.html", "writing/newer-post/index.html", "games/index.html"]) {
     assert.ok(pages.includes(p), `${p} is built`);
   }
 });
 
-test("every page has the header with Writing and the three Links", () => {
+test("every page has the header with Writing, Games and the three Links", () => {
   for (const page of pages) {
     const doc = site.html(page);
     const header = doc.querySelector("header.site-header");
     assert.ok(header, `${page} has the header`);
-    assert.equal(header.querySelector('nav[aria-label="Site"] a')?.getAttribute("href"), "/writing/", `${page} links to Writing`);
+    const nav = header.querySelectorAll('nav[aria-label="Site"] a').map((a) => a.getAttribute("href"));
+    assert.deepEqual(nav, ["/writing/", "/games/"], `${page} links to Writing and Games`);
     const links = header.querySelectorAll('nav[aria-label="Links"] a').map((a) => a.getAttribute("href"));
     assert.deepEqual(
       links,
@@ -44,10 +46,19 @@ test("every page has the header with Writing and the three Links", () => {
 });
 
 test("Writing is marked as the current page on /writing and its Posts only", () => {
-  const current = (page: string) => site.html(page).querySelector('nav[aria-label="Site"] a')?.getAttribute("aria-current");
+  const current = (page: string) => site.html(page).querySelector('nav[aria-label="Site"] a[href="/writing/"]')?.getAttribute("aria-current");
   assert.equal(current("writing/index.html"), "page");
   assert.equal(current("writing/newer-post/index.html"), "page");
   assert.equal(current("index.html"), undefined);
+  assert.equal(current("games/index.html"), undefined);
+});
+
+test("Games is marked as the current page on the Games page only", () => {
+  const current = (page: string) => site.html(page).querySelector('nav[aria-label="Site"] a[href="/games/"]')?.getAttribute("aria-current");
+  assert.equal(current("games/index.html"), "page");
+  for (const page of ["index.html", "writing/index.html", "writing/newer-post/index.html"]) {
+    assert.equal(current(page), undefined, page);
+  }
 });
 
 test("the name is the first h1 on the Homepage and a header link to / everywhere else", () => {

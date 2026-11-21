@@ -1,10 +1,12 @@
 ---
-import { site, projects, getPosts, formatDate } from "../lib/site";
+import { site, projects, games, getPosts, formatDate } from "../lib/site";
 import Page from "../layouts/Page.astro";
 import Tags from "../components/Tags.astro";
+import GameCards from "../components/GameCards.astro";
 
 const posts = await getPosts();
 const recent = posts.slice(0, 3);
+// The Games page lists them all; the Homepage shows the first three, like Recent writing.
 ---
 
 <Page title={site.name} description={site.description} home>
@@ -46,6 +48,19 @@ const recent = posts.slice(0, 3);
         {posts.length > recent.length && (
           <p class="more">
             <a href="/writing/">All writing</a>
+          </p>
+        )}
+      </section>
+    )
+  }
+  {
+    games.length > 0 && (
+      <section class="games-block" aria-labelledby="games">
+        <h2 id="games">Games</h2>
+        <GameCards games={games.slice(0, 3)} />
+        {games.length > 3 && (
+          <p class="more">
+            <a href="/games/">All games</a>
           </p>
         )}
       </section>

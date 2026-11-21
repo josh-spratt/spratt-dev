@@ -32,6 +32,13 @@ const pages = [
     type: "article",
   },
   {
+    file: "games/index.html",
+    url: "https://jspratt.dev/games/",
+    title: "Games | Fixture Person",
+    description: "Games by Fixture Person, to play in the browser.",
+    type: "website",
+  },
+  {
     file: "404.html",
     url: undefined, // served at any URL, so there is nothing to canonicalise
     title: "Not found | Fixture Person",
@@ -104,5 +111,6 @@ test("robots.txt points at the sitemap, which lists pages but not Drafts", () =>
   assert.match(index, /sitemap-0\.xml/);
   const map = site.read("sitemap-0.xml");
   assert.match(map, /https:\/\/jspratt\.dev\/writing\/newer-post\//);
+  assert.match(map, /https:\/\/jspratt\.dev\/games\/</);
   assert.doesNotMatch(map, /secret-draft/);
 });

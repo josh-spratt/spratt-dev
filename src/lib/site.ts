@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /** Where content lives. Tests point this at fixtures via CONTENT_DIR. */
@@ -46,6 +46,22 @@ export interface Project {
   tags?: string[];
 }
 
+/**
+ * A Game listed on the Games page and the Homepage. Its page is always on this
+ * site at /games/<slug>/, so it has a slug rather than a url.
+ */
+export interface Game {
+  slug: string;
+  title: string;
+  description: string;
+  /** Optional square listing image, a path under public/ such as /game-thumbs/name.webp. */
+  image?: string;
+  tags?: string[];
+}
+
+/** Where a Game's own full-screen page is. */
+export const gameHref = (g: Game) => `/games/${g.slug}/`;
+
 function readJson(file: string): unknown {
   return JSON.parse(readFileSync(resolve(contentDir, file), "utf8"));
 }
@@ -81,33 +97,48 @@ function loadSite(): Site {
   };
 }
 
+/** The title, description, image and tags a Project or Game listing shares. */
+function loadListing(file: string, at: string, p: Record<string, any>) {
+  const tags = p.tags;
+  if (tags !== undefined && (!Array.isArray(tags) || tags.some((t) => typeof t !== "string"))) {
+    fail(file, `${at}: tags must be a list of strings`);
+  }
+  return {
+    title: requireString(file, `${at}: title`, p.title),
+    description: requireString(file, `${at}: description`, p.description),
+    ...(p.image !== undefined ? { image: requireString(file, `${at}: image`, p.image) } : {}),
+    ...(tags ? { tags: tags as string[] } : {}),
+  };
+}
+
 function loadProjects(): Project[] {
   const file = "projects.json";
   const raw = readJson(file);
   if (!Array.isArray(raw)) fail(file, "must be a list of projects");
   return raw.map((p: Record<string, any>, i) => {
     const at = `project ${i + 1}`;
-    const tags = p.tags;
-    if (
-      tags !== undefined &&
-      (!Array.isArray(tags) || tags.some((t) => typeof t !== "string"))
-    ) {
-      fail(file, `${at}: tags must be a list of strings`);
-    }
-    return {
-      title: requireString(file, `${at}: title`, p.title),
-      description: requireString(file, `${at}: description`, p.description),
-      url: requireString(file, `${at}: url`, p.url),
-      ...(p.image !== undefined
-        ? { image: requireString(file, `${at}: image`, p.image) }
-        : {}),
-      ...(tags ? { tags } : {}),
-    };
+    const { title, description, ...rest } = loadListing(file, at, p);
+    return { title, description, url: requireString(file, `${at}: url`, p.url), ...rest };
+  });
+}
+
+/** games.json is optional: a site without one has no Games page link or Homepage block. */
+function loadGames(): Game[] {
+  const file = "games.json";
+  if (!existsSync(resolve(contentDir, file))) return [];
+  const raw = readJson(file);
+  if (!Array.isArray(raw)) fail(file, "must be a list of games");
+  return raw.map((g: Record<string, any>, i) => {
+    const at = `game ${i + 1}`;
+    const slug = requireString(file, `${at}: slug`, g.slug);
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) fail(file, `${at}: slug must be lowercase letters, digits and dashes`);
+    return { slug, ...loadListing(file, at, g) };
   });
 }
 
 export const site: Site = loadSite();
 export const projects: Project[] = loadProjects();
+export const games: Game[] = loadGames();
 
 /** Posts that should appear in the current build mode, newest first. */
 export async function getPosts() {
