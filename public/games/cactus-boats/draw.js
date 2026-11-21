@@ -9,11 +9,13 @@
 //
 // Every sprite is drawn in code (the Sprite Lab prototype's variant A), then
 // snapped to one fixed palette with a 1 px ink outline. The hull rotates with
-// the boat; the cactus mast stays upright. Enemies are a palette swap: a plum
-// hull, a pale cactus and a red pennant. Animation runs on the Play's own
+// the boat; the cactus mast stays upright. Enemies are palette swaps with a
+// pale cactus and a pennant, one per hull on the ladder: a plum Prickly Pear
+// with two guns a side, a slate Sombrero in its hat, and a rust-red Saguaro
+// under a gold pennant. Animation runs on the Play's own
 // clock (state.elapsed), so a paused game is a still picture.
 
-import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, broadsides } from './sim.js?v=2026-11-21-v2';
+import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, HULLS, broadsides } from './sim.js?v=2026-11-21-v3';
 
 // Every drawn pixel is one of these.
 export const PAL = {
@@ -23,6 +25,7 @@ export const PAL = {
   cacDk: '#3d7a2a', cac: '#5fae3e', cacLt: '#a9dc6a',
   pink: '#ff6f91', pinkDk: '#b83a64', red: '#e8534a',
   plum: '#4a3550', plumLt: '#86648c', cream: '#f3ead2', gold: '#f2b134', iron: '#3a3a48',
+  slate: '#3a4a5a', slateLt: '#6d8296', rust: '#7a2f3a', rustLt: '#c25a66',
 };
 
 /** The sea's width and the whole-number scale that fits it on a screen. */
@@ -99,7 +102,9 @@ const MAST = { w: 16, h: 18, ax: 8, ay: 17 };
 // Colours for each kind of boat. `flash` is the all-cream frame shown when hit.
 const LOOKS = {
   player: { hull: 'wood', deck: 'woodLt', stern: 'woodDk', guns: 'iron', cac: 'cac', cacDk: 'cacDk', cacLt: 'cacLt', top: 'pink', topDk: 'pinkDk', flag: null },
-  enemy: { hull: 'plum', deck: 'plumLt', stern: 'ink', guns: 'ink', cac: 'cacLt', cacDk: 'cac', cacLt: 'cream', top: 'ink', topDk: 'ink', flag: 'red' },
+  prickly: { hull: 'plum', deck: 'plumLt', stern: 'ink', guns: 'ink', cac: 'cacLt', cacDk: 'cac', cacLt: 'cream', top: 'ink', topDk: 'ink', flag: 'red' },
+  sombrero: { hull: 'slate', deck: 'slateLt', stern: 'ink', guns: 'ink', cac: 'cacLt', cacDk: 'cac', cacLt: 'cream', top: 'ink', topDk: 'ink', flag: 'red', hat: 'gold' },
+  saguaro: { hull: 'rust', deck: 'rustLt', stern: 'ink', guns: 'ink', cac: 'cacLt', cacDk: 'cac', cacLt: 'cream', top: 'ink', topDk: 'ink', flag: 'gold' },
   flash: { hull: 'cream', deck: 'cream', stern: 'cream', guns: 'cream' },
 };
 
@@ -133,6 +138,10 @@ function mastSprite(look) {
   R('cacDk', 2, -6, 3, 2); R('cacDk', 3, -10, 2, 5); R('cac', 3, -10, 1, 5);
   R('top', -1, -15, 2, 2); R('topDk', 1, -14, 1, 1);
   if (look.flag) R('flag', 1, -16, 4, 2);
+  if (look.hat) {
+    R('hat', -4, -14, 8, 1);
+    R('hat', -2, -16, 4, 2);
+  }
   return crisp(c);
 }
 
@@ -185,8 +194,11 @@ export function createView(screen) {
   const g = off.getContext('2d');
   const sprites = {
     player: { hull: hullSprite(LOOKS.player), flash: hullSprite(LOOKS.flash), mast: mastSprite(LOOKS.player) },
-    enemy: { hull: hullSprite(LOOKS.enemy, 2), flash: hullSprite(LOOKS.flash, 2), mast: mastSprite(LOOKS.enemy) },
   };
+  for (const hull of ['prickly', 'sombrero', 'saguaro']) {
+    const guns = HULLS[hull].guns;
+    sprites[hull] = { hull: hullSprite(LOOKS[hull], guns), flash: hullSprite(LOOKS.flash, guns), mast: mastSprite(LOOKS[hull]) };
+  }
   let islands = { for: null, sprites: [] };
   let scale = 1;
   let wakes = [];
@@ -235,10 +247,14 @@ export function createView(screen) {
   }
 
   // A boat: the hull turns, the mast stands upright on it. Sunk boats settle and fade.
-  function drawBoat(b, look, W, H) {
-    const s = sprites[look];
+  function drawBoat(b, look, W, H, wreck = false) {
+    const s = sprites[look] ?? sprites.prickly;
     let sink = 0;
-    if (b.sunk) {
+    // The player's boat stops where it's sunk (the Play is over), so it's shown as a wreck.
+    if (wreck) {
+      g.globalAlpha = 0.5;
+      sink = 2;
+    } else if (b.sunk) {
       g.globalAlpha = Math.max(0, 1 - b.sinkT / 1.6);
       sink = Math.round(b.sinkT * 5);
     }
@@ -248,8 +264,8 @@ export function createView(screen) {
       g.rotate(b.h);
       g.drawImage(b.flash > 0 ? s.flash : s.hull, -HULL.ax, -HULL.ay);
       g.restore();
-      if (!b.sunk) g.drawImage(s.mast, x - MAST.ax, y + 1 - MAST.ay);
-      if (look === 'enemy' && !b.sunk) {
+      if (!b.sunk && !wreck) g.drawImage(s.mast, x - MAST.ax, y + 1 - MAST.ay);
+      if (look !== 'player' && !b.sunk) {
         // A small hull bar under each enemy.
         const w = 14;
         const f = b.hp / b.maxHp;
@@ -424,8 +440,8 @@ export function createView(screen) {
     drawFx(state, true);
     drawWarnings(state);
     if (!state.sunk) drawArcs(state);
-    for (const e of state.enemies) drawBoat(e, 'enemy', W, H);
-    drawBoat(state.boat, 'player', W, H);
+    for (const e of state.enemies) drawBoat(e, e.hull, W, H);
+    drawBoat(state.boat, 'player', W, H, state.sunk);
     drawBalls(state);
     drawFx(state, false);
     g.setTransform(1, 0, 0, 1, 0, 0);

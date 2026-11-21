@@ -3,10 +3,11 @@
 //
 //   newRun(seed, opts?) -> state      a fresh Play on a sea placed from the seed
 //   step(state, intent, dt)           advances the Play one fixed tick (STEP)
-//   summary(state) -> { survivedMs, sinks }
+//   summary(state) -> { survivedMs, sinks, score }
 //   isSunk(state) -> true once the player's hull reaches zero; step then does nothing
 //   broadsides(state) -> { port, stbd }  each side's { ready, reload, target }, for the firing arcs
-//   maxSpawnedBy(survivedMs) -> the most enemies that can have arrived by then
+//   maxSpawnedBy(survivedMs) -> the most enemies that can have been spawned by then
+//   difficultyAt(seconds) -> { every, afloat, mix }  the spawn curve at that time survived
 //
 // intent is the input layer's output: { turn: -1..1, sail: ANCHOR|HALF|FULL,
 // fire: null|'auto'|'port'|'stbd' }. Time passes only inside step, so a paused
@@ -23,7 +24,9 @@
 // state.shake. Everything else in it is the simulation's own.
 //
 // Tuning lives in the named tables below (GUNS, PATROLS, TOKENS, SPAWN), so
-// difficulty is changed in one place.
+// difficulty is changed in one place. The Score is in score.js.
+
+import { scoreOf } from './score.js?v=2026-11-21-v3';
 
 /** The fixed tick, in seconds. */
 export const STEP = 1 / 60;
@@ -38,10 +41,11 @@ export const SEA_HEIGHT = 216;
 export const SEA_WIDTHS = { min: 384, max: 468, default: 432 };
 
 // Hull stats, from the Enemy AI prototype. The player sails a Sombrero;
-// enemy patrols are Prickly Pears for now (#71 brings in the rest).
+// enemy patrols climb the ladder Prickly Pear, Sombrero, Saguaro (see SPAWN).
 export const HULLS = {
   prickly: { hp: 80, spd: 50, turn: 1.6, guns: 2, r: 8 },
   sombrero: { hp: 120, spd: 45, turn: 1.4, guns: 3, r: 9 },
+  saguaro: { hp: 160, spd: 47, turn: 1.4, guns: 3, r: 10 },
 };
 
 // The player's broadside guns, from the Combat Toy and Controls prototypes.
@@ -56,10 +60,14 @@ export const GUNS = {
 
 // How each patrol hull fights, from the Enemy AI prototype: it closes in,
 // orbits at orbitR, and fires a broadside when a side bears and you're inside
-// fireR. PATROL holds what all hulls share: how close to the beam counts as
-// bearing, and breaking off once below `breakOff` of the hull, for `breakFor` s.
+// fireR. The prototype had no patrol Saguaro, so it fights like a Sombrero
+// that hits harder and reaches further. PATROL holds what all hulls share: how
+// close to the beam counts as bearing, and breaking off once below `breakOff`
+// of the hull, for `breakFor` s.
 export const PATROLS = {
   prickly: { orbitR: 70, fireR: 95, throttle: 0.95, reload: 4.0, dmg: 5, spread: 0.16, assist: 0.15, range: 130, speed: 140 },
+  sombrero: { orbitR: 105, fireR: 125, throttle: 0.7, reload: 4.5, dmg: 5, spread: 0.16, assist: 0.15, range: 130, speed: 140 },
+  saguaro: { orbitR: 115, fireR: 135, throttle: 0.75, reload: 4.5, dmg: 6, spread: 0.14, assist: 0.15, range: 145, speed: 140 },
 };
 const PATROL = { closeIn: 70, bears: 0.35, breakOff: 0.3, breakFor: 4, flip: 9, avoid: 26 };
 // Enemy boats handle like the prototypes' AI boats, not the player's helm.
@@ -69,11 +77,36 @@ const ENEMY_HANDLING = { accel: 16, decel: 26, floor: 0.35 };
 // to the nearest again every `every` seconds. The rest circle wide and hold fire.
 export const TOKENS = { attackers: 2, every: 2, wideR: 175, wideThrottle: 0.55 };
 
-// Arrivals: a warning marker at an edge, then an enemy sails in from just
-// outside it `warn` seconds later. The first warning is at `first` seconds,
-// then one every `every` seconds while fewer than `afloat` are on the sea or
-// on their way. A steady rate for now; #71 turns this into a curve.
-export const SPAWN = { first: 2, every: 7, afloat: 4, warn: 1.5, hull: 'prickly', inset: 0.15 };
+// Arrivals, and how they get harder: a warning marker at an edge, then an
+// enemy sails in from just outside it `warn` seconds later. The first warning
+// is at `first` seconds. Each row of the curve takes over at `at` seconds
+// survived: after a warning the next waits `every` seconds (eased from row to
+// row), and only while fewer than `afloat` enemies are on the sea or on their
+// way; `mix` weighs which hull the next one is. A hull first appears in the
+// mix at its threshold, so the ladder goes Prickly Pear, Sombrero, Saguaro.
+export const SPAWN = {
+  first: 2, warn: 1.5, inset: 0.15,
+  curve: [
+    { at: 0, every: 9, afloat: 1, mix: { prickly: 1 } },
+    { at: 30, every: 8, afloat: 2, mix: { prickly: 1 } },
+    { at: 70, every: 7, afloat: 3, mix: { prickly: 3, sombrero: 1 } },
+    { at: 120, every: 6, afloat: 4, mix: { prickly: 2, sombrero: 2 } },
+    { at: 180, every: 5, afloat: 5, mix: { prickly: 2, sombrero: 2, saguaro: 1 } },
+    { at: 260, every: 4, afloat: 6, mix: { prickly: 1, sombrero: 2, saguaro: 2 } },
+    { at: 360, every: 3, afloat: 7, mix: { prickly: 1, sombrero: 2, saguaro: 3 } },
+  ],
+};
+
+/** The spawn curve at `seconds` survived: the gap between arrivals, the cap afloat and the hull mix. */
+export function difficultyAt(seconds) {
+  const rows = SPAWN.curve;
+  let i = 0;
+  while (i + 1 < rows.length && seconds >= rows[i + 1].at) i++;
+  const row = rows[i];
+  const next = rows[i + 1];
+  const k = next ? clamp((seconds - row.at) / (next.at - row.at), 0, 1) : 0;
+  return { every: next ? row.every + (next.every - row.every) * k : row.every, afloat: row.afloat, mix: row.mix };
+}
 
 // Hits: how long a boat flashes, how much being hit (and firing) shakes the
 // screen and how fast that settles, and how long a sunk boat takes to go under.
@@ -141,9 +174,10 @@ function placeIslands(state, count) {
  * A fresh Play. `width` is the sea's width (clamped to SEA_WIDTHS), picked by
  * the game from the screen. `islands` overrides how many islands there are
  * (the seed picks 2–3), for tests that want open water; `enemies: false`
- * keeps enemies away, for tests of sailing and gunnery alone.
+ * keeps enemies away, for tests of sailing and gunnery alone; `unsinkable`
+ * keeps the player's hull above zero, for tests that watch the whole curve.
  */
-export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = true } = {}) {
+export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = true, unsinkable = false } = {}) {
   const hull = HULLS.sombrero;
   const sea = { width: clamp(Math.round(width), SEA_WIDTHS.min, SEA_WIDTHS.max), height: SEA_HEIGHT };
   const state = {
@@ -163,7 +197,10 @@ export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = tr
     shake: 0,
     sinks: 0,
     sunk: false,
-    spawn: { on: enemies !== false, at: SPAWN.first, made: 0, next: 1 },
+    unsinkable: unsinkable === true,
+    // `at` is when the next warning may go up; `bound` is the earliest it
+    // could under the curve alone, as maxSpawnedBy counts it.
+    spawn: { on: enemies !== false, at: SPAWN.first, bound: SPAWN.first, made: 0, next: 1 },
     tokens: { at: 0, held: [] },
   };
   state.islands = placeIslands(state, islands);
@@ -211,7 +248,7 @@ function addFx(state, kind, x, y, dir = 0) {
 function hurt(state, boat, dmg) {
   const player = boat === state.boat;
   if (player ? state.sunk : boat.sunk) return;
-  boat.hp = Math.max(0, boat.hp - dmg);
+  boat.hp = Math.max(player && state.unsinkable ? 1 : 0, boat.hp - dmg);
   boat.flash = HIT.flash;
   if (player) {
     state.shake = Math.max(state.shake, HIT.shake);
@@ -353,10 +390,30 @@ function fire(state, want) {
   state.shake = Math.max(state.shake, HIT.recoil);
 }
 
-/** The most enemies that can have arrived by `survivedMs`, at the steady rate in SPAWN. */
+/**
+ * The most enemies that can have been spawned (warned of, so arrived or on
+ * their way) by `survivedMs`: the curve's arrivals with nothing ever holding
+ * them back. The spawner never runs ahead of this, so no Play can sink more.
+ * Counted to within a millisecond, since summary() rounds the time.
+ */
 export function maxSpawnedBy(survivedMs) {
-  const t = survivedMs / 1000;
-  return t < SPAWN.first ? 0 : 1 + Math.floor((t - SPAWN.first) / SPAWN.every);
+  const t = Number(survivedMs) / 1000 + 0.001;
+  if (!(t > 0)) return 0;
+  if (t === Infinity) return Infinity;
+  let n = 0;
+  for (let at = SPAWN.first; at <= t; at += difficultyAt(at).every) n++;
+  return n;
+}
+
+// Pick a hull from a mix of weights.
+function pickHull(state, mix) {
+  const hulls = Object.keys(mix);
+  let r = random(state) * hulls.reduce((sum, h) => sum + mix[h], 0);
+  for (const h of hulls) {
+    r -= mix[h];
+    if (r < 0) return h;
+  }
+  return hulls[hulls.length - 1];
 }
 
 // Edges: 0 top, 1 right, 2 bottom, 3 left. Each warning marks where an enemy will sail in.
@@ -382,14 +439,18 @@ function arrivals(state) {
   }
   state.warnings = state.warnings.filter((w) => state.elapsed < w.at);
 
+  const now = difficultyAt(state.elapsed);
   const coming = state.enemies.filter((e) => !e.sunk).length + state.warnings.length;
-  if (state.elapsed + 1e-9 < sp.at || coming >= SPAWN.afloat) return;
+  if (state.elapsed + 1e-9 < sp.at || coming >= now.afloat) return;
   const edge = Math.floor(random(state) * 4);
   const along = SPAWN.inset + random(state) * (1 - 2 * SPAWN.inset);
   const x = edge === 1 ? width - 1 : edge === 3 ? 0 : Math.round(along * width);
   const y = edge === 0 ? 0 : edge === 2 ? height - 1 : Math.round(along * height);
-  state.warnings.push({ x, y, edge, at: state.elapsed + SPAWN.warn, hull: SPAWN.hull });
-  sp.at = state.elapsed + SPAWN.every;
+  state.warnings.push({ x, y, edge, at: state.elapsed + SPAWN.warn, hull: pickHull(state, now.mix) });
+  // Never sooner than the curve's own schedule, so maxSpawnedBy stays a bound
+  // even when a full sea held this one back.
+  sp.bound += difficultyAt(sp.bound).every;
+  sp.at = Math.max(state.elapsed + now.every, sp.bound);
   sp.made += 1;
 }
 
@@ -590,7 +651,8 @@ export function isSunk(state) {
   return state.sunk;
 }
 
-/** How the Play is going: time survived (only ever stepped time) and boats sunk. */
+/** How the Play is going: time survived (only ever stepped time), boats sunk, and the Score for them. */
 export function summary(state) {
-  return { survivedMs: Math.round(state.elapsed * 1000), sinks: state.sinks };
+  const survivedMs = Math.round(state.elapsed * 1000);
+  return { survivedMs, sinks: state.sinks, score: scoreOf(survivedMs, state.sinks) };
 }
