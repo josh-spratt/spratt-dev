@@ -23,10 +23,14 @@
 // state.fx [{ kind, x, y, at, dir }] (kinds: smoke, hit, splash, thud, sink) and
 // state.shake. Everything else in it is the simulation's own.
 //
-// Tuning lives in the named tables below (GUNS, PATROLS, TOKENS, SPAWN), so
-// difficulty is changed in one place. The Score is in score.js.
+// Tuning lives in the named tables below (GUNS, PATROLS, TOKENS) and the spawn
+// curve in spawn.js (SPAWN), so difficulty is changed in one place. The Score
+// is in score.js.
 
-import { scoreOf } from './score.js?v=2026-11-21-v5';
+import { scoreOf } from './score.js?v=2026-11-21-v6';
+import { SPAWN, difficultyAt, maxSpawnedBy } from './spawn.js?v=2026-11-21-v6';
+
+export { SPAWN, difficultyAt, maxSpawnedBy };
 
 /** The fixed tick, in seconds. */
 export const STEP = 1 / 60;
@@ -76,37 +80,6 @@ const ENEMY_HANDLING = { accel: 16, decel: 26, floor: 0.35 };
 // Attack tokens: only `attackers` enemies attack at once, and the tokens go
 // to the nearest again every `every` seconds. The rest circle wide and hold fire.
 export const TOKENS = { attackers: 2, every: 2, wideR: 175, wideThrottle: 0.55 };
-
-// Arrivals, and how they get harder: a warning marker at an edge, then an
-// enemy sails in from just outside it `warn` seconds later. The first warning
-// is at `first` seconds. Each row of the curve takes over at `at` seconds
-// survived: after a warning the next waits `every` seconds (eased from row to
-// row), and only while fewer than `afloat` enemies are on the sea or on their
-// way; `mix` weighs which hull the next one is. A hull first appears in the
-// mix at its threshold, so the ladder goes Prickly Pear, Sombrero, Saguaro.
-export const SPAWN = {
-  first: 2, warn: 1.5, inset: 0.15,
-  curve: [
-    { at: 0, every: 9, afloat: 1, mix: { prickly: 1 } },
-    { at: 30, every: 8, afloat: 2, mix: { prickly: 1 } },
-    { at: 70, every: 7, afloat: 3, mix: { prickly: 3, sombrero: 1 } },
-    { at: 120, every: 6, afloat: 4, mix: { prickly: 2, sombrero: 2 } },
-    { at: 180, every: 5, afloat: 5, mix: { prickly: 2, sombrero: 2, saguaro: 1 } },
-    { at: 260, every: 4, afloat: 6, mix: { prickly: 1, sombrero: 2, saguaro: 2 } },
-    { at: 360, every: 3, afloat: 7, mix: { prickly: 1, sombrero: 2, saguaro: 3 } },
-  ],
-};
-
-/** The spawn curve at `seconds` survived: the gap between arrivals, the cap afloat and the hull mix. */
-export function difficultyAt(seconds) {
-  const rows = SPAWN.curve;
-  let i = 0;
-  while (i + 1 < rows.length && seconds >= rows[i + 1].at) i++;
-  const row = rows[i];
-  const next = rows[i + 1];
-  const k = next ? clamp((seconds - row.at) / (next.at - row.at), 0, 1) : 0;
-  return { every: next ? row.every + (next.every - row.every) * k : row.every, afloat: row.afloat, mix: row.mix };
-}
 
 // Hits: how long a boat flashes, how much being hit (and firing) shakes the
 // screen and how fast that settles, and how long a sunk boat takes to go under.
@@ -388,21 +361,6 @@ function fire(state, want) {
   b.reload[sideKey(side)] = GUNS.reload;
   volley(state, b, side, sideTarget(state, side)?.e ?? null, PLAYER_VOLLEY, 'player');
   state.shake = Math.max(state.shake, HIT.recoil);
-}
-
-/**
- * The most enemies that can have been spawned (warned of, so arrived or on
- * their way) by `survivedMs`: the curve's arrivals with nothing ever holding
- * them back. The spawner never runs ahead of this, so no Play can sink more.
- * Counted to within a millisecond, since summary() rounds the time.
- */
-export function maxSpawnedBy(survivedMs) {
-  const t = Number(survivedMs) / 1000 + 0.001;
-  if (!(t > 0)) return 0;
-  if (t === Infinity) return Infinity;
-  let n = 0;
-  for (let at = SPAWN.first; at <= t; at += difficultyAt(at).every) n++;
-  return n;
 }
 
 // Pick a hull from a mix of weights.
