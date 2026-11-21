@@ -1,0 +1,70 @@
+---
+// A Game page: the game takes the whole screen, so there's no yellow column,
+// header or site stylesheet. The game's own jspratt.dev link leads back to the
+// Homepage. The game itself is plain modules in public/games/cactus-boats/.
+// Not linked from the Homepage until it launches as a Project.
+import Head from "../../components/Head.astro";
+import { gamePreloads } from "../../lib/game-preloads";
+import { site } from "../../lib/site";
+
+// Preload every module the game loads, read from its own source.
+const { base, version, modules } = gamePreloads("cactus-boats", "cactus-boats.js");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <Head
+      title={`Cactus Boats | ${site.name}`}
+      description="Sail a little wooden boat with a cactus for a mast around a sea whose edges wrap."
+      themeColor="#0b2e36"
+      themeColorDark="#0b2e36"
+    />
+    <link rel="preload" as="style" href={`${base}cactus-boats.css?v=${version}`} />
+    {modules.map((href) => <link rel="modulepreload" href={href} />)}
+    <style is:global>
+      /* The game's sea and ink, the same in light and dark, so loading doesn't flash.
+         Nothing scrolls, zooms or selects while you steer on a phone. */
+      :root {
+        color-scheme: dark;
+        --game-sea: #0b2e36;
+        --game-ink: #f3ead2;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--game-sea);
+      }
+
+      .game {
+        position: fixed;
+        inset: 0;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .game-status {
+        margin: 0;
+        padding: 2rem clamp(1rem, 4vw, 2.5rem);
+        color: var(--game-ink);
+        font: 0.875rem/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game" class="game">
+      <p id="game-status" class="game-status" role="status">Loading Cactus Boats…</p>
+    </div>
+    <noscript><p class="game-status">Cactus Boats needs JavaScript to run.</p></noscript>
+    <script is:inline type="module" src={`${base}play.js?v=${version}`} data-game-script></script>
+  </body>
+</html>

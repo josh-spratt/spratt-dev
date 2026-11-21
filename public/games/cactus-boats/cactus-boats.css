@@ -1,0 +1,169 @@
+/* Cactus Boats: one canvas filling the screen, with a small HUD over it.
+   The page (src/pages/games/cactus-boats.astro) sets the sea colours first, so
+   loading doesn't flash. */
+
+.cb {
+  --cb-sea: #0b2e36;
+  --cb-ink: #f3ead2;
+  --cb-dim: #9fc3c4;
+  --cb-panel: rgba(7, 26, 32, 0.84);
+  --cb-accent: #f2b134;
+  --cb-hull: #7fd65a;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--cb-sea);
+  color: var(--cb-ink);
+  font: 12px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cb-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+
+.cb-screen {
+  display: block;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+.cb-hud {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: calc(8px + env(safe-area-inset-left, 0px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--cb-panel);
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cb-hull {
+  width: 48px;
+  height: 5px;
+  background: #0a1d22;
+  outline: 1px solid #24525c;
+}
+
+.cb-hull-fill {
+  display: block;
+  height: 100%;
+  background: var(--cb-hull);
+}
+
+.cb-sails {
+  display: flex;
+  gap: 6px;
+  color: var(--cb-dim);
+}
+
+.cb-sail.cb-on {
+  color: var(--cb-accent);
+}
+
+.cb-shelf {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  right: calc(8px + env(safe-area-inset-right, 0px));
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--cb-panel);
+  color: var(--cb-ink);
+  text-decoration: none;
+}
+
+.cb-shelf:hover,
+.cb-shelf:focus-visible {
+  color: var(--cb-accent);
+  text-decoration: underline;
+}
+
+.cb-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: var(--cb-panel);
+  color: var(--cb-dim);
+  white-space: nowrap;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: opacity 1s;
+}
+
+.cb-hint-gone {
+  opacity: 0;
+}
+
+.cb-msg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 6px;
+  padding: 14px 18px;
+  border-radius: 6px;
+  background: var(--cb-panel);
+  text-align: center;
+  pointer-events: none;
+}
+
+.cb-msg[hidden],
+.cb-stick[hidden],
+.cb-knob[hidden] {
+  display: none;
+}
+
+.cb-msg strong {
+  color: var(--cb-accent);
+  font-size: 16px;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.cb-stick,
+.cb-knob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.cb-stick {
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  border: 2px solid rgba(243, 234, 210, 0.3);
+}
+
+.cb-knob {
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  background: rgba(243, 234, 210, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-hint {
+    transition: none;
+  }
+}
