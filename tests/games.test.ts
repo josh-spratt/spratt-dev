@@ -49,8 +49,8 @@ const games: Record<string, Game> = {
   "cactus-boats": {
     title: "Cactus Boats",
     entry: "cactus-boats.js",
-    preloads: ["sim.js", "input.js", "draw.js"],
-    minModules: 5,
+    preloads: ["sim.js", "score.js", "input.js", "draw.js"],
+    minModules: 6,
     files: ["cactus-boats.css"],
     dataFiles: 0,
     cacheBustConstant: true,

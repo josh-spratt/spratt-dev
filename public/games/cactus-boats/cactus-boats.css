@@ -74,6 +74,18 @@
   color: var(--cb-accent);
 }
 
+.cb-time,
+.cb-sinks,
+.cb-score {
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-score {
+  min-width: 5ch;
+  color: var(--cb-accent);
+  text-align: right;
+}
+
 .cb-shelf {
   position: absolute;
   top: calc(8px + env(safe-area-inset-top, 0px));
@@ -127,6 +139,8 @@
 }
 
 .cb-msg[hidden],
+.cb-hud[hidden],
+.cb-hint[hidden],
 .cb-stick[hidden],
 .cb-knob[hidden] {
   display: none;
@@ -137,6 +151,63 @@
   font-size: 16px;
   font-weight: 400;
   text-transform: uppercase;
+}
+
+.cb-msg .cb-title {
+  font-size: 22px;
+  letter-spacing: 0.06em;
+}
+
+/* How to play, and the tally on the Sunk! screen: keys or labels on the left. */
+.cb-how,
+.cb-tally {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 3px 12px;
+  justify-content: center;
+  margin: 4px 0;
+  text-align: left;
+}
+
+.cb-how dt,
+.cb-tally dt {
+  color: var(--cb-dim);
+}
+
+.cb-how dt {
+  color: var(--cb-accent);
+}
+
+.cb-how dd,
+.cb-tally dd {
+  margin: 0;
+}
+
+.cb-tally {
+  font-size: 14px;
+}
+
+.cb-tally dd {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cb-best {
+  color: var(--cb-hull);
+}
+
+.cb-go {
+  margin-top: 4px;
+  color: var(--cb-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  animation: cb-blink 1.2s steps(2, jump-none) infinite;
+}
+
+@keyframes cb-blink {
+  50% {
+    opacity: 0.45;
+  }
 }
 
 .cb-stick,
@@ -165,5 +236,16 @@
 @media (prefers-reduced-motion: reduce) {
   .cb-hint {
     transition: none;
+  }
+
+  .cb-go {
+    animation: none;
+  }
+}
+
+/* On a narrow screen the sail setting gives way to time, sinks and Score. */
+@media (max-width: 560px) {
+  .cb-sails {
+    display: none;
   }
 }
