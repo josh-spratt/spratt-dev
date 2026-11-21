@@ -31,14 +31,14 @@
 // and pauses on P, blur and a hidden tab. Only stepped time is survival time,
 // so nothing paused (or on a screen) counts.
 
-import { newRun, step, summary, isSunk, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v6';
-import { createInput } from './input.js?v=2026-11-21-v6';
-import { createView, fitScreen } from './draw.js?v=2026-11-21-v6';
+import { newRun, step, summary, isSunk, broadsides, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v7';
+import { createInput } from './input.js?v=2026-11-21-v7';
+import { createView, fitScreen } from './draw.js?v=2026-11-21-v7';
 
 // Matches the ?v= on the imports above (and in the other modules and
 // play.js). Bump them together when a deploy must beat a stale browser cache:
 // there's no build step to hash the filenames.
-const CACHE_BUST = '2026-11-21-v6';
+const CACHE_BUST = '2026-11-21-v7';
 
 const SAIL_NAMES = { [ANCHOR]: 'Anchor', [HALF]: 'Half', [FULL]: 'Full' };
 const BEST_KEY = 'cactus-boats:best';
@@ -152,9 +152,16 @@ export async function mountCactusBoats(container, opts = {}) {
   const shelf = homeHref ? h('a', { class: 'cb-shelf', href: homeHref, text: 'jspratt.dev' }) : null;
   const hint = h('p', { class: 'cb-hint', hidden: true });
   const message = h('div', { class: 'cb-msg', role: 'status' });
-  const stickBase = h('span', { class: 'cb-stick', hidden: true });
-  const stickKnob = h('span', { class: 'cb-knob', hidden: true });
-  const root = h('div', { class: 'cb' }, stage, hud, shelf, hint, stickBase, stickKnob, message);
+  // The touch pad: a stick on the left thumb, a gun button for each side on the
+  // right. Always drawn on a touch screen, so there is nothing to discover.
+  const joyKnob = h('span', { class: 'cb-knob' });
+  const joy = h('div', { class: 'cb-joy' }, h('span', { class: 'cb-ring' }), joyKnob, h('span', { class: 'cb-padtag', text: 'Steer' }));
+  const sailTag = h('span', { class: 'cb-sailtag' });
+  const gun = (side, arrow, label) => h('button', { type: 'button', tabindex: '-1', class: `cb-fire cb-fire-${side}` }, h('b', { text: arrow }), h('span', { text: label }));
+  const portBtn = gun('port', '◀', 'Fire left');
+  const stbdBtn = gun('stbd', '▶', 'Fire right');
+  const padEl = h('div', { class: 'cb-pad', hidden: true }, joy, sailTag, h('div', { class: 'cb-guns' }, portBtn, stbdBtn));
+  const root = h('div', { class: 'cb' }, stage, hud, shelf, hint, padEl, message);
   container.append(root);
 
   const view = createView(screen);
@@ -194,7 +201,7 @@ export async function mountCactusBoats(container, opts = {}) {
   function showTitle() {
     const touch = touchy();
     const how = touch
-      ? [['Drag left', 'steer'], ['Pull further', 'more sail'], ['Tap right', 'fire a broadside']]
+      ? [['Left stick', 'steer: the boat turns where you drag'], ['Pull to the ring', 'more sail'], ['Tap the stick', 'drop anchor'], ['Right buttons', 'fire that side']]
       : [['A D', 'turn'], ['W S', 'sail: anchor, half, full'], ['Space', 'fire the side that bears'], ['J L', 'fire port, starboard'], ['P', 'pause']];
     show(
       h('strong', { class: 'cb-title', text: 'Cactus Boats' }),
@@ -420,6 +427,7 @@ export async function mountCactusBoats(container, opts = {}) {
   }
 
   const input = createInput(stage, {
+    pad: { root: padEl, joy, port: portBtn, stbd: stbdBtn },
     onPause: (away) => setPaused(away ? true : !paused),
     onWake: () => {
       // The key or tap that changes screens does nothing else.
@@ -442,9 +450,9 @@ export async function mountCactusBoats(container, opts = {}) {
   if (document.hidden) setPaused(true);
 
   function showHint() {
-    const tall = window.innerHeight > window.innerWidth;
+    hint.classList.toggle('cb-hint-top', touchy());
     hint.textContent = touchy()
-      ? tall ? 'Turn your phone sideways for a bigger sea' : 'Drag left to steer · tap right to fire'
+      ? 'Left thumb steers · right thumb fires'
       : 'A D turn · W S sail · Space fire · J L port stbd · P pause';
   }
   showHint();
@@ -498,14 +506,17 @@ export async function mountCactusBoats(container, opts = {}) {
       showHint();
       if (mode === 'title') showTitle();
     }
-    const s = input.stick;
-    stickBase.hidden = stickKnob.hidden = !s;
-    if (s) {
-      const dx = s.x - s.ox;
-      const dy = s.y - s.oy;
-      const k = Math.min(1, 48 / (Math.hypot(dx, dy) || 1));
-      stickBase.style.transform = `translate(${s.ox}px, ${s.oy}px)`;
-      stickKnob.style.transform = `translate(${s.ox + dx * k}px, ${s.oy + dy * k}px)`;
+    // The pad: only while sailing, and only on a touch screen.
+    const showPad = touchy() && mode === 'playing';
+    if (padEl.hidden === showPad) padEl.hidden = !showPad;
+    if (showPad) {
+      const s = input.stick;
+      const k = s ? Math.min(1, 60 / (Math.hypot(s.dx, s.dy) || 1)) : 0;
+      joyKnob.style.transform = s ? `translate(${s.dx * k}px, ${s.dy * k}px)` : '';
+      sailTag.textContent = `Sail: ${SAIL_NAMES[input.sail]}`;
+      const guns = broadsides(state);
+      portBtn.classList.toggle('cb-wait', !guns.port.ready);
+      stbdBtn.classList.toggle('cb-wait', !guns.stbd.ready);
     }
   }
   frame = requestAnimationFrame(tick);

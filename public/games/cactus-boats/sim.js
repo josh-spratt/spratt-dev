@@ -27,8 +27,8 @@
 // curve in spawn.js (SPAWN), so difficulty is changed in one place. The Score
 // is in score.js.
 
-import { scoreOf } from './score.js?v=2026-11-21-v6';
-import { SPAWN, difficultyAt, maxSpawnedBy } from './spawn.js?v=2026-11-21-v6';
+import { scoreOf } from './score.js?v=2026-11-21-v7';
+import { SPAWN, difficultyAt, maxSpawnedBy } from './spawn.js?v=2026-11-21-v7';
 
 export { SPAWN, difficultyAt, maxSpawnedBy };
 

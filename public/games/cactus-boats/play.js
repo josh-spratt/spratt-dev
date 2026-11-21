@@ -78,7 +78,7 @@ const leaderboard = {
 try {
   // Imported here rather than at the top, so a module that fails to download
   // shows the message below instead of leaving the page on "Loading".
-  const { mountCactusBoats } = await import('./cactus-boats.js?v=2026-11-21-v6');
+  const { mountCactusBoats } = await import('./cactus-boats.js?v=2026-11-21-v7');
   await mountCactusBoats(game, { homeHref: '/', onEvent: report, leaderboard, seed: Number.isFinite(seed) ? seed : undefined });
   status.remove();
 } catch (error) {
