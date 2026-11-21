@@ -1,0 +1,20 @@
+[
+  {
+    "slug": "cactus-boats",
+    "title": "Cactus Boats",
+    "description": "An endless broadside shooter: sail a little boat with a cactus for a mast and sink the patrols that keep coming, until they sink you.",
+    "image": "/game-thumbs/cactus-boats.webp",
+    "tags": [
+      "Arcade"
+    ]
+  },
+  {
+    "slug": "twenty-boats",
+    "title": "Twenty Boats",
+    "description": "The night the Titanic sank, played as a randomly drawn passenger. Twenty lifeboats, 2,200 people aboard, and every boat timed from the historical record.",
+    "image": "/game-thumbs/twenty-boats.webp",
+    "tags": [
+      "History"
+    ]
+  }
+]

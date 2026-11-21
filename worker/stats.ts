@@ -132,7 +132,7 @@ export function refTag(url: URL): string | null {
 }
 
 /** The Games whose Views, Plays and Finishes are logged, by their name in /games/<name>/. */
-export const GAMES = ["twenty-boats"] as const;
+export const GAMES = ["twenty-boats", "cactus-boats"] as const;
 export type Game = (typeof GAMES)[number];
 
 function isGame(name: string | undefined): name is Game {

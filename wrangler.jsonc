@@ -34,6 +34,8 @@
 			"/writing/*",
 			"/games/twenty-boats/",
 			"/games/twenty-boats/event",
+			"/games/cactus-boats/",
+			"/games/cactus-boats/event",
 			"/stats",
 			"/stats/*"
 		]

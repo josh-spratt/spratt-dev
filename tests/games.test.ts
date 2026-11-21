@@ -45,7 +45,6 @@ const games: Record<string, Game> = {
     eventPath: "/games/twenty-boats/event",
     card: true,
   },
-  // The share card and Game logging arrive when it launches as a Project (#72).
   "cactus-boats": {
     title: "Cactus Boats",
     entry: "cactus-boats.js",
@@ -55,8 +54,8 @@ const games: Record<string, Game> = {
     dataFiles: 0,
     cacheBustConstant: true,
     themeColours: { dark: "#0b2e36", light: "#0b2e36" },
-    eventPath: null,
-    card: false,
+    eventPath: "/games/cactus-boats/event",
+    card: true,
   },
 };
 
@@ -72,6 +71,17 @@ function files(d: string): string[] {
 test("every Game in public/games/ says what's particular to it", () => {
   const folders = readdirSync("public/games", { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
   assert.deepEqual(folders.sort(), Object.keys(games).sort(), "add the Game to `games` in tests/games.test.ts");
+});
+
+test("every Game is listed on the Games page, with a listing image that's built", () => {
+  const doc = site.html("games/index.html");
+  const rows = doc.querySelectorAll("main ul.games > li");
+  const hrefs = rows.map((r) => r.querySelector("a")?.getAttribute("href"));
+  assert.deepEqual(hrefs.sort(), Object.keys(games).map((name) => `/games/${name}/`).sort(), "add the Game to content/games.json");
+  for (const row of rows) {
+    const src = row.querySelector("img")?.getAttribute("src");
+    assert.ok(src && existsSync(join(site.outDir, src)), `${src} is built`);
+  }
 });
 
 for (const [name, game] of Object.entries(games)) {

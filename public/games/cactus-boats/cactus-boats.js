@@ -6,7 +6,8 @@
 //
 // mountCactusBoats(container, { homeHref, onEvent, leaderboard, seed }) -> destroy
 //   homeHref    where the jspratt.dev link in the corner goes; without it the link is left out
-//   onEvent     gets { event: 'play' } when a Play starts
+//   onEvent     gets { event: 'play' } when a Play starts, and
+//               { event: 'finish', ending: 'sunk', survived: false } when it's sunk
 //   leaderboard { start, submit, top }, backed by the page; unused until the Leaderboard lands
 //   seed        a fixed seed for the first Play's sea, else a random one
 //
@@ -21,14 +22,14 @@
 // and pauses on P, blur and a hidden tab. Only stepped time is survival time,
 // so nothing paused (or on a screen) counts.
 
-import { newRun, step, summary, isSunk, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v3';
-import { createInput } from './input.js?v=2026-11-21-v3';
-import { createView, fitScreen } from './draw.js?v=2026-11-21-v3';
+import { newRun, step, summary, isSunk, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v4';
+import { createInput } from './input.js?v=2026-11-21-v4';
+import { createView, fitScreen } from './draw.js?v=2026-11-21-v4';
 
 // Matches the ?v= on the imports above (and in the other modules and
 // play.js). Bump them together when a deploy must beat a stale browser cache:
 // there's no build step to hash the filenames.
-const CACHE_BUST = '2026-11-21-v3';
+const CACHE_BUST = '2026-11-21-v4';
 
 const SAIL_NAMES = { [ANCHOR]: 'Anchor', [HALF]: 'Half', [FULL]: 'Full' };
 const BEST_KEY = 'cactus-boats:best';
@@ -250,6 +251,8 @@ export async function mountCactusBoats(container, opts = {}) {
         sunkAt = now;
         hint.hidden = true;
         showSunk();
+        // Every Play ends sunk; the Score is the interesting part.
+        onEvent?.({ event: 'finish', ending: 'sunk', survived: false });
       }
     }
     view.draw(state);

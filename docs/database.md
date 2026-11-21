@@ -31,7 +31,7 @@ Branch previews read the live counts but never write them. If D1 fails, the stat
 
 ## Games
 
-Twenty Boats (`/games/twenty-boats/`) is logged in `game_log`, one row per event, with the same source and owner rules as Posts:
+Twenty Boats (`/games/twenty-boats/`) and Cactus Boats (`/games/cactus-boats/`) are logged in `game_log`, one row per event, with the same source and owner rules as Posts. Cactus Boats reports a `play` each time you set sail and a `finish` with ending `sunk` and `survived: false` each time you're sunk:
 
 - `view`: the Worker logs a browser navigation to the game's page on `jspratt.dev`, like a Post's View. The page is served as built.
 - `play`: the game's `play.js` POSTs `{ "event": "play" }` to `/games/twenty-boats/event` when a run starts (a Draw, or Live this night again).
@@ -39,7 +39,7 @@ Twenty Boats (`/games/twenty-boats/`) is logged in `game_log`, one row per event
 
 Each report carries the page's `?ref=` tag and `document.referrer`, which the Worker cleans the same way as a View's (tag rules above, hostname only), so a Play has the same source as the View it came from. The Worker refuses a report from another site, answers 204 and writes nothing off the live hostname, and stores no IP, address or id: a row is the Game, the event, the Ending, the time, the source and `is_me`. Someone could POST fake reports from the page's own origin; for a personal site that's fine.
 
-To log another Game, add its name to `GAMES` in `worker/stats.ts`, its page and `event` address to `run_worker_first`, and an `onEvent` hook like Twenty Boats'.
+To log another Game, add its name to `GAMES` in `worker/stats.ts` and its title to `GAME_TITLES` in `worker/dashboard.ts`, its page and `event` address to `run_worker_first`, and an `onEvent` hook like Twenty Boats'.
 
 ## One-time setup
 

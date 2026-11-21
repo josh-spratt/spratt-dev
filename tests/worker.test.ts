@@ -363,8 +363,11 @@ test("the owner's Views are logged as theirs but leave the public count alone", 
 test("gamePage and gameEventPath match a known Game only", () => {
   assert.equal(gamePage("/games/twenty-boats/"), "twenty-boats");
   assert.equal(gamePage("/games/twenty-boats/play.js"), null);
+  assert.equal(gamePage("/games/cactus-boats/"), "cactus-boats");
+  assert.equal(gamePage("/games/"), null, "the Games page isn't a Game");
   assert.equal(gamePage("/games/not-a-game/"), null);
   assert.equal(gameEventPath("/games/twenty-boats/event"), "twenty-boats");
+  assert.equal(gameEventPath("/games/cactus-boats/event"), "cactus-boats");
   assert.equal(gameEventPath("/games/not-a-game/event"), null);
   assert.equal(gameEventPath("/games/twenty-boats/event/"), null);
 });
@@ -444,6 +447,44 @@ test("a game report from another site, by GET, malformed, or on a preview writes
   assert.equal(gameLog().length, before);
 });
 
+test("Cactus Boats' page View is logged with its source, and the page is served as built", async () => {
+  const before = gameLog().length;
+  const res = await get(`${LIVE}/games/cactus-boats/?ref=cb`, { ...navigate, referer: "https://www.reddit.com/r/webgames/" });
+  assert.equal(res.status, 200);
+  assert.equal(res.body, site.read("games/cactus-boats/index.html"));
+  await get(`${LIVE}/games/cactus-boats/`, {}); // a crawler: not logged
+  await get("https://views.spratt-dev.example.workers.dev/games/cactus-boats/"); // a preview: not logged
+  await get(`${LIVE}/games/cactus-boats/`, { ...navigate, cookie: "me=1" });
+  assert.deepEqual(gameLog().slice(before), [
+    { game: "cactus-boats", event: "view", ending: null, survived: null, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
+    { game: "cactus-boats", event: "view", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
+  ]);
+});
+
+test("Cactus Boats reports Plays and sunk Finishes on the live site, the owner's flagged", async () => {
+  const before = gameLog().length;
+  const url = `${LIVE}/games/cactus-boats/event`;
+  const from = { ref: "cb", referrer: "https://www.reddit.com/r/webgames/" };
+  assert.equal((await report(url, { event: "play", ...from })).status, 204);
+  assert.equal((await report(url, { event: "finish", ending: "sunk", survived: false, ...from })).status, 204);
+  assert.equal((await report(url, { event: "play" }, { cookie: "me=1" })).status, 204);
+  assert.equal((await report(url, { event: "finish", ending: "sunk", survived: false }, { cookie: "me=1" })).status, 204);
+  assert.deepEqual(gameLog().slice(before), [
+    { game: "cactus-boats", event: "play", ending: null, survived: null, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
+    { game: "cactus-boats", event: "finish", ending: "sunk", survived: 0, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
+    { game: "cactus-boats", event: "play", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
+    { game: "cactus-boats", event: "finish", ending: "sunk", survived: 0, referrer: null, ref: null, is_me: 1 },
+  ]);
+});
+
+test("a Cactus Boats report from another site or on a preview writes nothing", async () => {
+  const before = gameLog().length;
+  const url = `${LIVE}/games/cactus-boats/event`;
+  assert.equal((await report(url, { event: "play" }, { origin: "https://evil.example" })).status, 403);
+  assert.equal((await report("https://views.spratt-dev.example.workers.dev/games/cactus-boats/event", { event: "play" })).status, 204);
+  assert.equal(gameLog().length, before);
+});
+
 /** Opens the dashboard with the key and returns the cookie it sets. */
 async function statsLogin(): Promise<string> {
   const res = await get(`${LIVE}/stats/?key=${STATS_KEY}`, {});
@@ -502,6 +543,11 @@ test("the dashboard shows Views, Likes, sources and tags from D1, uncached and u
   const hn = row("hn").querySelectorAll("td").map((td) => td.text.trim());
   assert.deepEqual(hn, ["hn", "1", "1", "1"]);
   assert.deepEqual(row("water-lost").querySelectorAll("td").map((td) => td.text.trim()), ["water-lost", "no", "1"]);
+  // Cactus Boats sits beside it: one counted View, Play and Finish (sunk), from cb; the owner's left out.
+  const cactus = row("Cactus Boats").querySelectorAll("td").map((td) => td.text.trim());
+  assert.deepEqual(cactus, ["Cactus Boats", "1", "1", "1", "0"]);
+  assert.deepEqual(row("cb").querySelectorAll("td").map((td) => td.text.trim()), ["cb", "1", "1", "1"]);
+  assert.deepEqual(row("sunk").querySelectorAll("td").map((td) => td.text.trim()), ["sunk", "no", "1"]);
 });
 
 test("the dashboard can include the owner's Views", async () => {

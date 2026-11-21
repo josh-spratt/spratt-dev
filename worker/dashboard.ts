@@ -84,7 +84,7 @@ export interface DashboardData {
 }
 
 /** Display names for the Games in game_log. */
-const GAME_TITLES: Record<string, string> = { "twenty-boats": "Twenty Boats" };
+const GAME_TITLES: Record<string, string> = { "twenty-boats": "Twenty Boats", "cactus-boats": "Cactus Boats" };
 
 /** Every UTC day in the window, oldest first, ending today. */
 export function windowDays(days: number, now = new Date()): string[] {

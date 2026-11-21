@@ -2,7 +2,6 @@
 // A Game page: the game takes the whole screen, so there's no yellow column,
 // header or site stylesheet. The game's own jspratt.dev link leads back to the
 // Homepage. The game itself is plain modules in public/games/cactus-boats/.
-// Not linked from the Homepage until it launches as a Project.
 import Head from "../../components/Head.astro";
 import { gamePreloads } from "../../lib/game-preloads";
 import { site } from "../../lib/site";
@@ -16,7 +15,9 @@ const { base, version, modules } = gamePreloads("cactus-boats", "cactus-boats.js
   <head>
     <Head
       title={`Cactus Boats | ${site.name}`}
-      description="Sail a little wooden boat with a cactus for a mast around a sea whose edges wrap."
+      description="An endless broadside shooter. Sail a little wooden boat with a cactus for a mast, sink the patrols that keep coming, and see how long you last."
+      image="/games/cactus-boats/card.png"
+      imageAlt="Cactus Boats: a cactus boat under sail between two enemy patrols and sandy islands, the Score in the corner"
       themeColor="#0b2e36"
       themeColorDark="#0b2e36"
     />

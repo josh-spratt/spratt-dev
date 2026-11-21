@@ -1,0 +1,22 @@
+[
+  {
+    "slug": "game-1",
+    "title": "Game 1",
+    "description": "Fixture game 1."
+  },
+  {
+    "slug": "game-2",
+    "title": "Game 2",
+    "description": "Fixture game 2."
+  },
+  {
+    "slug": "game-3",
+    "title": "Game 3",
+    "description": "Fixture game 3."
+  },
+  {
+    "slug": "game-4",
+    "title": "Game 4",
+    "description": "Fixture game 4."
+  }
+]

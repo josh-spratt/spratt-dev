@@ -1,0 +1,13 @@
+---
+// The Games page: every Game, each leading to its own full-screen page.
+// Unlike a Game's page, it's an ordinary page of the site, header and all.
+import Page from "../../layouts/Page.astro";
+import GameCards from "../../components/GameCards.astro";
+import { site, games } from "../../lib/site";
+---
+
+<Page title={`Games | ${site.name}`} description={`Games by ${site.name}, to play in the browser.`}>
+  <h1>Games</h1>
+  <p class="lede">Made by me, played in your browser. Each one opens full screen.</p>
+  <GameCards games={games} />
+</Page>
