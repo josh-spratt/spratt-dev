@@ -32,7 +32,9 @@ function report(event) {
 const BOARD = '/games/cactus-boats/';
 // The board is cached for a few seconds; just after sending a Score, a reload asks again.
 const SENT_KEY = 'cactus-boats:sent';
-async function ask(path, body) {
+// `refusable`: a 4xx answers { refused: true } (the Worker turned the Score
+// down) rather than null (the board couldn't be reached).
+async function ask(path, body, refusable = false) {
   try {
     let cache = 'default';
     try {
@@ -47,6 +49,7 @@ async function ask(path, body) {
       cache,
       signal: AbortSignal.timeout(6000),
     });
+    if (refusable && res.status >= 400 && res.status < 500) return { refused: true };
     return res.ok ? await res.json() : null;
   } catch {
     return null;
@@ -55,11 +58,11 @@ async function ask(path, body) {
 const leaderboard = {
   /** → { run } (run is null off the live site), or null. */
   start: () => ask('start', { ref: params.get('ref') ?? undefined, referrer: document.referrer || undefined }),
-  /** { run, initials, survivedMs, sinks, score } → { rank, top }, or null. */
+  /** { run, initials, survivedMs, sinks, score } → { rank, top }, { refused: true } if not accepted, or null. */
   async submit(entry) {
-    const sent = await ask('score', entry);
+    const sent = await ask('score', entry, true);
     try {
-      if (sent) sessionStorage.setItem(SENT_KEY, String(Date.now()));
+      if (sent && !sent.refused) sessionStorage.setItem(SENT_KEY, String(Date.now()));
     } catch {
       // As above.
     }
@@ -75,7 +78,7 @@ const leaderboard = {
 try {
   // Imported here rather than at the top, so a module that fails to download
   // shows the message below instead of leaving the page on "Loading".
-  const { mountCactusBoats } = await import('./cactus-boats.js?v=2026-11-21-v5');
+  const { mountCactusBoats } = await import('./cactus-boats.js?v=2026-11-21-v6');
   await mountCactusBoats(game, { homeHref: '/', onEvent: report, leaderboard, seed: Number.isFinite(seed) ? seed : undefined });
   status.remove();
 } catch (error) {

@@ -51,7 +51,22 @@ Cactus Boats keeps a global Leaderboard in `scores`, one row per Play that asked
 
 The board is the highest Scores first, the earlier run winning a tie. Only submitted rows are on it; a Play that didn't make the board, or was skipped, leaves a row with only `started_at` and its source.
 
-The two POSTs refuse another Origin (403), anything but POST (405) and a body over 512 bytes (413). Like the Game log, a row stores no IP, address or browser id, and the owner's `me` cookie sets `is_me = 1`, but the owner's Scores still show on the board. Someone could still script a plausible Score from the page's own origin; checks on how long the run has been going and how many boats could have been sunk are to come.
+The two POSTs refuse another Origin (403), anything but POST (405) and a body over 512 bytes (413). Like the Game log, a row stores no IP, address or browser id, and the owner's `me` cookie sets `is_me = 1`, but the owner's Scores still show on the board.
+
+### Plausibility checks
+
+To stop the casual cheats, `score` also refuses a Score with a 400 and writes nothing when:
+
+- the Initials are on a small blocklist of rude three-letter words (`RUDE_INITIALS` in `worker/stats.ts`);
+- the Score isn't `scoreOf(survivedMs, sinks)`;
+- the run has already been scored: one Score per Play;
+- the run started more than 3 hours ago (`RUN_MAX_AGE_HOURS`);
+- `survivedMs` is more than the wall-clock time since the run's `started_at`, plus 5 seconds (`CLOCK_ALLOWANCE_MS`) to cover the `start` request's round trip and the second-precision stamp. The clock is D1's, the same one that stamped `started_at`;
+- `sinks` is more than the game's spawner could have sent in `survivedMs` (`maxSpawnedBy` in `public/games/cactus-boats/spawn.js`). The Worker imports that same function, so the cap and the game can't drift, and a test checks that they agree.
+
+The run checks are part of the `UPDATE` itself, so two Scores sent at the same moment for one run can't both land. The game shows a refused Score as "not accepted" and carries on.
+
+These checks stop hand-edited requests and replayed runs. They don't stop someone scripting a plausible Score from the page's own origin: start a run, wait, then send a time and sink count that fit. For a personal site that's accepted, as it is for the Game log. If it happens, remove the Score by hand (below).
 
 Read the board, the owner's included:
 

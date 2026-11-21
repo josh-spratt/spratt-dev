@@ -30,7 +30,10 @@ import {
   interestSlug,
   interestedCookie,
   BOARD_SIZE,
+  CLOCK_ALLOWANCE_MS,
   LEADERBOARD_MAX_BYTES,
+  RUN_MAX_AGE_HOURS,
+  isPlausible,
   leaderboardPath,
   parseScore,
   parseStart,
@@ -214,8 +217,15 @@ async function gameEvent(request: Request, env: Env, game: Game): Promise<Respon
 // The Leaderboard: the board is the top Scores, highest first, the earlier
 // run winning a tie. Only submitted rows are on it.
 const START_RUN = "INSERT INTO scores (game, referrer, ref, is_me) VALUES (?1, ?2, ?3, ?4) RETURNING id";
-const SUBMIT_SCORE =
-  "UPDATE scores SET submitted_at = datetime('now'), initials = ?3, survived_ms = ?4, sinks = ?5, score = ?6, is_me = MAX(is_me, ?7) WHERE id = ?1 AND game = ?2 RETURNING id";
+// One statement, so a Score lands only on a run that is this Game's, not yet
+// scored, under RUN_MAX_AGE_HOURS old, and has been going at least as long as
+// it says it survived (less CLOCK_ALLOWANCE_MS). Two Scores sent at once for
+// one run can't both land. The clock is D1's, the same one that stamped started_at.
+const SUBMIT_SCORE = `UPDATE scores SET submitted_at = datetime('now'), initials = ?3, survived_ms = ?4, sinks = ?5, score = ?6, is_me = MAX(is_me, ?7)
+  WHERE id = ?1 AND game = ?2 AND submitted_at IS NULL
+    AND started_at > datetime('now', '-${RUN_MAX_AGE_HOURS} hours')
+    AND ?4 <= (julianday('now') - julianday(started_at)) * 86400000 + ${CLOCK_ALLOWANCE_MS}
+  RETURNING id`;
 const BOARD = `SELECT initials, score, survived_ms AS survivedMs, sinks, strftime('%Y-%m-%dT%H:%M:%SZ', submitted_at) AS at FROM scores WHERE game = ?1 AND submitted_at IS NOT NULL ORDER BY score DESC, id LIMIT ${BOARD_SIZE}`;
 const RANK =
   "SELECT COUNT(*) + 1 AS rank FROM scores WHERE game = ?1 AND submitted_at IS NOT NULL AND (score > ?2 OR (score = ?2 AND id < ?3))";
@@ -268,16 +278,18 @@ async function startRun(request: Request, env: Env, game: LeaderboardGame): Prom
 
 /**
  * POST /games/<name>/score { run, initials, survivedMs, sinks, score } →
- * { rank, top }. The Worker stores its own scoreOf, and refuses a Score that
- * doesn't match it or a run it never handed out. Live site only.
+ * { rank, top }. The Worker stores its own scoreOf. It refuses (400, writing
+ * nothing) rude Initials, a Score that doesn't match scoreOf or sinks more
+ * boats than could have come, and a run it never handed out, already scored,
+ * too old, or younger than the time survived. Live site only.
  */
 async function submitScore(request: Request, env: Env, game: LeaderboardGame): Promise<Response> {
   const refused = refuse(request);
   if (refused) return refused;
   const sub = parseScore(await request.text());
   if (!sub) return new Response("Bad Request", { status: 400 });
+  if (!isPlausible(sub)) return new Response("Bad Request", { status: 400 });
   const score = scoreOf(sub.survivedMs, sub.sinks);
-  if (score !== sub.score) return new Response("Bad Request", { status: 400 });
   if (!isLive(request)) return new Response("Forbidden", { status: 403 });
   try {
     const row = await env.DB.prepare(SUBMIT_SCORE)

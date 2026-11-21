@@ -193,7 +193,10 @@ export function parseGameEvent(body: string): GameEvent | null {
 // The Leaderboard. Kept apart from GAMES: a Game can be logged without having
 // a Leaderboard. The Score is the game's own scoreOf, so the two can't disagree.
 
-export { scoreOf } from "../public/games/cactus-boats/score.js";
+import { scoreOf } from "../public/games/cactus-boats/score.js";
+import { maxSpawnedBy } from "../public/games/cactus-boats/spawn.js";
+
+export { scoreOf };
 
 /** The Games with a Leaderboard, by their name in /games/<name>/. */
 export const LEADERBOARD_GAMES = ["cactus-boats"] as const;
@@ -210,6 +213,16 @@ export function leaderboardPath(pathname: string): { game: LeaderboardGame; acti
   if (!m || !(LEADERBOARD_GAMES as readonly string[]).includes(m[1])) return null;
   return { game: m[1] as LeaderboardGame, action: m[2] as LeaderboardAction };
 }
+
+/**
+ * Rude three-letter words that can't be Initials on the board. Small on
+ * purpose: the obvious ones, not every spelling; Josh removes anything else by
+ * hand (docs/database.md).
+ */
+export const RUDE_INITIALS: ReadonlySet<string> = new Set([
+  "ASS", "CNT", "COK", "CUM", "DIK", "DIC", "FAG", "FCK", "FKU", "FUC", "FUK", "FUQ",
+  "FGT", "JIZ", "KKK", "KUM", "NGR", "NIG", "PIS", "SHT", "TIT", "TWT", "WTF",
+]);
 
 /** Three letters A–Z, uppercased; anything else (spaces, digits, accents, two or four letters) → null. */
 export function cleanInitials(initials: unknown): string | null {
@@ -252,16 +265,42 @@ const count = (n: unknown): n is number => Number.isSafeInteger(n) && (n as numb
 
 /**
  * Reads { run, initials, survivedMs, sinks, score }: whole, non-negative
- * numbers, a positive run id and clean Initials, or null. Whether the Score
- * is plausible (and matches scoreOf) is checked against the run separately.
+ * numbers, a positive run id and clean Initials that aren't rude, or null.
+ * Whether the Score is plausible (and matches scoreOf) is checked against the
+ * run separately (see isPlausible and the Worker's SUBMIT_SCORE).
  */
 export function parseScore(body: string): ScoreSubmission | null {
   const d = parseObject(body);
   if (!d) return null;
   const initials = cleanInitials(d.initials);
   const { run, survivedMs, sinks, score } = d;
-  if (!initials || !count(run) || run === 0 || !count(survivedMs) || !count(sinks) || !count(score)) return null;
+  if (!initials || RUDE_INITIALS.has(initials) || !count(run) || run === 0 || !count(survivedMs) || !count(sinks) || !count(score)) return null;
   return { run, initials, survivedMs, sinks, score };
+}
+
+// Plausibility: the casual cheats the Worker refuses (docs/database.md).
+
+/** How long after its start a run can still be scored. */
+export const RUN_MAX_AGE_HOURS = 3;
+
+/**
+ * How much longer than the wall clock since the run's start a Play may say it
+ * survived. `start` is stamped when its request lands, a round trip after the
+ * Play began, and to the second.
+ */
+export const CLOCK_ALLOWANCE_MS = 5000;
+
+/**
+ * The most boats a Play can have sunk by `survivedMs`: every boat the game's
+ * own spawner could have sent by then (spawn.js), so the two can't drift.
+ */
+export function maxSinks(survivedMs: number): number {
+  return maxSpawnedBy(survivedMs);
+}
+
+/** A Score that adds up: it is scoreOf its time and sinks, and sinks no more boats than could have come. */
+export function isPlausible(sub: ScoreSubmission): boolean {
+  return sub.score === scoreOf(sub.survivedMs, sub.sinks) && sub.sinks <= maxSinks(sub.survivedMs);
 }
 
 export function statsText(views: number): string {

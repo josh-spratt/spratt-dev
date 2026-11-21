@@ -16,6 +16,7 @@ import {
   interestSlug,
   leaderboardPath,
   likeLabel,
+  maxSinks,
   likeSlug,
   parseGameEvent,
   parseScore,
@@ -26,6 +27,7 @@ import {
   shouldCount,
   statsText,
 } from "../worker/stats.ts";
+import { maxSpawnedBy } from "../public/games/cactus-boats/sim.js";
 
 type Worker = Awaited<ReturnType<typeof unstable_startWorker>>;
 
@@ -524,9 +526,20 @@ test("parseScore keeps whole, non-negative numbers, a run id and clean Initials"
     JSON.stringify({ ...good, sinks: null }),
     JSON.stringify({ ...good, score: 1e300 }),
     JSON.stringify({ ...good, pad: "x".repeat(600) }),
+    JSON.stringify({ ...good, initials: "ass" }),
+    JSON.stringify({ ...good, initials: "KKK" }),
   ]) {
     assert.equal(parseScore(bad), null, bad.slice(0, 80));
   }
+});
+
+test("the Worker's sink cap is the game's own spawner: no more sinks than boats spawned by then", () => {
+  for (let ms = 0; ms <= 4 * 60 * 60 * 1000; ms += 997) {
+    assert.equal(maxSinks(ms), maxSpawnedBy(ms), `${ms} ms`);
+  }
+  assert.equal(maxSinks(0), 0);
+  assert.equal(maxSinks(1990), 0, "the first boat is warned of at 2 s");
+  assert.equal(maxSinks(2000), 1);
 });
 
 test("parseStart cleans where the player came from", () => {
@@ -552,6 +565,14 @@ async function startRun(headers: Record<string, string> = {}, url = BOARD_URL, f
   return JSON.parse(res.body).run;
 }
 
+/** Moves a run's start `seconds` into the past, as if the Play had been sailing that long. */
+function backdate(run: number | null, seconds: number) {
+  sql(`UPDATE scores SET started_at = datetime('now', '-${seconds} seconds') WHERE id = ${Number(run)}`);
+}
+
+/** The board as everyone reads it. */
+const board = async () => JSON.parse((await get(`${BOARD_URL}/scores`, {})).body).top;
+
 /** A Score for `run` with the right scoreOf, unless `score` says otherwise. */
 const submitScore = (run: number | null, initials: string, survivedMs: number, sinks: number, more: object = {}, headers: Record<string, string> = {}, url = BOARD_URL) =>
   report(`${url}/score`, { run, initials, survivedMs, sinks, score: Math.floor(survivedMs / 1000) * 10 + sinks * 250, ...more }, headers);
@@ -563,6 +584,7 @@ test("a Play's run gets a Score on the live site: one row, the Worker's own Scor
     { id: run, game: "cactus-boats", initials: null, survived_ms: null, sinks: null, score: null, submitted: 0, started: 1, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
   ]);
 
+  backdate(run, 65);
   const res = await submitScore(run, "jos", 61_500, 3);
   assert.equal(res.status, 200);
   assert.equal(res.headers["cache-control"], "no-store");
@@ -581,13 +603,15 @@ test("the board is the top 10, highest first with the earlier run winning a tie,
   const ranks: number[] = [];
   for (let i = 0; i <= 10; i++) {
     const run = await startRun();
-    const res = await submitScore(run, String.fromCharCode(65 + i).repeat(3), i * 20_000 + 10_000, 0);
+    backdate(run, 300);
+    const res = await submitScore(run, "ABCDEFGHIJL"[i].repeat(3), i * 20_000 + 10_000, 0);
     assert.equal(res.status, 200);
     ranks.push(JSON.parse(res.body).rank);
   }
   // 100, 300 … 2100: each new best goes to the top, except below JOS's 1360 at first.
   assert.deepEqual(ranks, [2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1]);
   const tie = await startRun();
+  backdate(tie, 300);
   const tied = JSON.parse((await submitScore(tie, "TIE", 136_000, 0)).body);
   assert.equal(tied.rank, 6, "behind the earlier 1360");
 
@@ -599,7 +623,7 @@ test("the board is the top 10, highest first with the earlier run winning a tie,
   assert.deepEqual(top, tied.top, "the board after a Score is the board everyone reads");
   assert.deepEqual(
     top.map((e: { initials: string; score: number }) => `${e.initials} ${e.score}`),
-    ["KKK 2100", "JJJ 1900", "III 1700", "HHH 1500", "JOS 1360", "TIE 1360", "GGG 1300", "FFF 1100", "EEE 900", "DDD 700"],
+    ["LLL 2100", "JJJ 1900", "III 1700", "HHH 1500", "JOS 1360", "TIE 1360", "GGG 1300", "FFF 1100", "EEE 900", "DDD 700"],
   );
   const low = await startRun();
   assert.equal(JSON.parse((await submitScore(low, "LOW", 0, 0)).body).rank, 14, "off the board, after everyone");
@@ -657,6 +681,7 @@ test("a preview reads the live board, but start hands out no run and score write
 
 test("the owner's runs are stored as theirs and their Score still shows on the board", async () => {
   const run = await startRun({ cookie: "me=1" });
+  backdate(run, 610);
   const res = await submitScore(run, "JSP", 600_000, 20, {}, { cookie: "me=1" });
   assert.equal(res.status, 200);
   const { rank, top } = JSON.parse(res.body);
@@ -664,6 +689,78 @@ test("the owner's runs are stored as theirs and their Score still shows on the b
   assert.equal(top[0].initials, "JSP");
   assert.equal("is_me" in top[0], false, "the board doesn't say whose is whose");
   assert.equal(scoreRows().find((r) => r.id === run)?.is_me, 1);
+});
+
+/**
+ * Plausibility: each refusal is a 400 that writes nothing, so the run's row
+ * and the board are just as they were.
+ */
+async function assertRefused(run: number | null, initials: string, survivedMs: number, sinks: number) {
+  const rows = scoreRows();
+  const top = await board();
+  const res = await submitScore(run, initials, survivedMs, sinks);
+  assert.equal(res.status, 400, res.body);
+  assert.deepEqual(scoreRows(), rows, "nothing written");
+  assert.deepEqual(await board(), top, "the board is unchanged");
+}
+
+test("a Score with rude Initials is refused, and the run can still be scored with others", async () => {
+  const run = await startRun();
+  backdate(run, 60);
+  await assertRefused(run, "ass", 30_000, 1);
+  await assertRefused(run, "FUK", 30_000, 1);
+  assert.equal((await submitScore(run, "NIC", 30_000, 1)).status, 200);
+});
+
+test("a Play is scored once: a second Score for the same run is refused", async () => {
+  const run = await startRun();
+  backdate(run, 60);
+  assert.equal((await submitScore(run, "ONE", 40_000, 2)).status, 200);
+  await assertRefused(run, "TWO", 50_000, 3);
+  await assertRefused(run, "ONE", 40_000, 2);
+});
+
+test("a run older than a few hours can't be scored", async () => {
+  const run = await startRun();
+  backdate(run, 4 * 60 * 60);
+  await assertRefused(run, "OLD", 60_000, 1);
+});
+
+test("a Score can't have survived longer than the Play has been going", async () => {
+  const run = await startRun();
+  backdate(run, 60);
+  await assertRefused(run, "FIB", 120_000, 0);
+  const fresh = await startRun();
+  await assertRefused(fresh, "FIB", 30_000, 0);
+});
+
+test("a Score can't sink more boats than the spawner could have sent in the time survived", async () => {
+  const run = await startRun();
+  backdate(run, 600);
+  // 300 s of the curve is 56 arrivals at most.
+  await assertRefused(run, "GUN", 300_000, 57);
+  await assertRefused(run, "GUN", 1_990, 1);
+});
+
+test("a long Play sent the moment it's sunk is accepted, within the small allowance", async () => {
+  const run = await startRun();
+  backdate(run, 600);
+  // The run's start is stamped a little after the Play began (the request's
+  // round trip), so a Score a few seconds over the wall clock still counts.
+  const res = await submitScore(run, "FST", 603_000, 10);
+  assert.equal(res.status, 200, res.body);
+  assert.equal(scoreRows().find((r) => r.id === run)?.score, 603 * 10 + 10 * 250);
+});
+
+test("a high sink count that fits the spawn curve is accepted", async () => {
+  const run = await startRun();
+  backdate(run, 610);
+  // 600 s of the curve is 154 arrivals at most: sinking every one is allowed.
+  const res = await submitScore(run, "ACE", 600_000, 154);
+  assert.equal(res.status, 200, res.body);
+  const { rank, top } = JSON.parse(res.body);
+  assert.equal(rank, 1);
+  assert.deepEqual([top[0].initials, top[0].sinks], ["ACE", 154]);
 });
 
 /** Opens the dashboard with the key and returns the cookie it sets. */

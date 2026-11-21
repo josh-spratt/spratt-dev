@@ -15,7 +15,7 @@
 // under a gold pennant. Animation runs on the Play's own
 // clock (state.elapsed), so a paused game is a still picture.
 
-import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, HULLS, broadsides } from './sim.js?v=2026-11-21-v5';
+import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, HULLS, broadsides } from './sim.js?v=2026-11-21-v6';
 
 // Every drawn pixel is one of these.
 export const PAL = {

@@ -21,8 +21,9 @@
 // (A–Z, remembered for next time, Esc or Skip to skip), and sends them with
 // leaderboard.submit(); then the board shows with your entry highlighted, or
 // how far off it you were. The title screen shows the board too. When the
-// board can't be reached, or there's no run (a preview), the game says so and
-// carries on.
+// board can't be reached, there's no run (a preview), or the Worker refuses
+// the Score (rude Initials, an implausible Score), the game says so ("not
+// accepted" for a refusal) and carries on.
 //
 // The rules live in sim.js (headless, seeded, tested in tests/cactus-boats/),
 // the Score in score.js, keys and touch in input.js, and the picture in
@@ -30,14 +31,14 @@
 // and pauses on P, blur and a hidden tab. Only stepped time is survival time,
 // so nothing paused (or on a screen) counts.
 
-import { newRun, step, summary, isSunk, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v5';
-import { createInput } from './input.js?v=2026-11-21-v5';
-import { createView, fitScreen } from './draw.js?v=2026-11-21-v5';
+import { newRun, step, summary, isSunk, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v6';
+import { createInput } from './input.js?v=2026-11-21-v6';
+import { createView, fitScreen } from './draw.js?v=2026-11-21-v6';
 
 // Matches the ?v= on the imports above (and in the other modules and
 // play.js). Bump them together when a deploy must beat a stale browser cache:
 // there's no build step to hash the filenames.
-const CACHE_BUST = '2026-11-21-v5';
+const CACHE_BUST = '2026-11-21-v6';
 
 const SAIL_NAMES = { [ANCHOR]: 'Anchor', [HALF]: 'Half', [FULL]: 'Full' };
 const BEST_KEY = 'cactus-boats:best';
@@ -379,6 +380,10 @@ export async function mountCactusBoats(container, opts = {}) {
         // Unreachable: said so below.
       }
       if (sunk !== play) return;
+      if (sent?.refused) {
+        finish(boardPanel('Your Score was not accepted.'));
+        return;
+      }
       if (!sent || !Array.isArray(sent.top)) {
         finish(boardPanel('Your Score couldn’t be sent: the Leaderboard can’t be reached right now.'));
         return;
