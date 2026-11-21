@@ -11,7 +11,7 @@ const seed = Number.parseInt(new URLSearchParams(location.search).get('seed') ??
 try {
   // Imported here rather than at the top, so a module that fails to download
   // shows the message below instead of leaving the page on "Loading".
-  const { mountCactusBoats } = await import('./cactus-boats.js?v=2026-11-21-v1');
+  const { mountCactusBoats } = await import('./cactus-boats.js?v=2026-11-21-v2');
   await mountCactusBoats(game, { homeHref: '/', seed: Number.isFinite(seed) ? seed : undefined });
   status.remove();
 } catch (error) {

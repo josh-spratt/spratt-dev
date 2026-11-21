@@ -1,4 +1,4 @@
-// Cactus Boats' drawing: the sea, islands and boats, from the simulation's
+// Cactus Boats' drawing: the sea, islands, boats and the fight, from the simulation's
 // state, on an offscreen canvas 216 px tall that's scaled up by a whole number
 // of device pixels so the pixel art stays sharp.
 //
@@ -9,10 +9,11 @@
 //
 // Every sprite is drawn in code (the Sprite Lab prototype's variant A), then
 // snapped to one fixed palette with a 1 px ink outline. The hull rotates with
-// the boat; the cactus mast stays upright. Animation runs on the Play's own
+// the boat; the cactus mast stays upright. Enemies are a palette swap: a plum
+// hull, a pale cactus and a red pennant. Animation runs on the Play's own
 // clock (state.elapsed), so a paused game is a still picture.
 
-import { SEA_HEIGHT, SEA_WIDTHS } from './sim.js?v=2026-11-21-v1';
+import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, broadsides } from './sim.js?v=2026-11-21-v2';
 
 // Every drawn pixel is one of these.
 export const PAL = {
@@ -95,35 +96,43 @@ function poly(g, pts) {
 const HULL = { w: 32, h: 32, ax: 16, ay: 16 };
 const MAST = { w: 16, h: 18, ax: 8, ay: 17 };
 
-function hullSprite() {
+// Colours for each kind of boat. `flash` is the all-cream frame shown when hit.
+const LOOKS = {
+  player: { hull: 'wood', deck: 'woodLt', stern: 'woodDk', guns: 'iron', cac: 'cac', cacDk: 'cacDk', cacLt: 'cacLt', top: 'pink', topDk: 'pinkDk', flag: null },
+  enemy: { hull: 'plum', deck: 'plumLt', stern: 'ink', guns: 'ink', cac: 'cacLt', cacDk: 'cac', cacLt: 'cream', top: 'ink', topDk: 'ink', flag: 'red' },
+  flash: { hull: 'cream', deck: 'cream', stern: 'cream', guns: 'cream' },
+};
+
+function hullSprite(look, guns = 3) {
   const c = canvas(HULL.w, HULL.h);
   const g = c.getContext('2d');
   g.translate(HULL.ax, HULL.ay);
-  g.fillStyle = PAL.wood;
+  g.fillStyle = PAL[look.hull];
   poly(g, [11, 0, 4, -5, -8, -5, -10, -3, -10, 3, -8, 5, 4, 5]);
-  g.fillStyle = PAL.woodLt;
+  g.fillStyle = PAL[look.deck];
   poly(g, [8, 0, 3, -3, -7, -3, -8, -2, -8, 2, -7, 3, 3, 3]);
-  g.fillStyle = PAL.woodDk;
+  g.fillStyle = PAL[look.stern];
   g.fillRect(-8, -2, 3, 4);
-  g.fillStyle = PAL.iron;
-  for (const x of [-5, -1, 3]) {
+  g.fillStyle = PAL[look.guns];
+  for (const x of guns === 2 ? [-3, 2] : [-5, -1, 3]) {
     g.fillRect(x, -5, 2, 1);
     g.fillRect(x, 4, 2, 1);
   }
   return crisp(c);
 }
 
-function mastSprite() {
+function mastSprite(look) {
   const c = canvas(MAST.w, MAST.h);
   const g = c.getContext('2d');
   const R = (col, x, y, w, h) => {
-    g.fillStyle = PAL[col];
+    g.fillStyle = PAL[look[col]];
     g.fillRect(MAST.ax + x, MAST.ay + y, w, h);
   };
   R('cacDk', -1, -13, 3, 13); R('cac', -1, -13, 2, 13); R('cacLt', -1, -12, 1, 10);
   R('cacDk', -4, -8, 3, 2); R('cacDk', -4, -11, 2, 4); R('cac', -4, -11, 1, 4);
   R('cacDk', 2, -6, 3, 2); R('cacDk', 3, -10, 2, 5); R('cac', 3, -10, 1, 5);
-  R('pink', -1, -15, 2, 2); R('pinkDk', 1, -14, 1, 1);
+  R('top', -1, -15, 2, 2); R('topDk', 1, -14, 1, 1);
+  if (look.flag) R('flag', 1, -16, 4, 2);
   return crisp(c);
 }
 
@@ -174,12 +183,14 @@ export function createView(screen) {
   const ctx = screen.getContext('2d');
   const off = canvas(SEA_WIDTHS.default, SEA_HEIGHT);
   const g = off.getContext('2d');
-  const hull = hullSprite();
-  const mast = mastSprite();
+  const sprites = {
+    player: { hull: hullSprite(LOOKS.player), flash: hullSprite(LOOKS.flash), mast: mastSprite(LOOKS.player) },
+    enemy: { hull: hullSprite(LOOKS.enemy, 2), flash: hullSprite(LOOKS.flash, 2), mast: mastSprite(LOOKS.enemy) },
+  };
   let islands = { for: null, sprites: [] };
   let scale = 1;
-  const wakes = [];
-  let lastWake = null;
+  let wakes = [];
+  const lastWake = new Map();
 
   function fit(cssWidth, cssHeight, dpr, seaWidth) {
     const f = fitScreen(cssWidth, cssHeight, dpr, seaWidth);
@@ -208,17 +219,158 @@ export function createView(screen) {
   }
 
   function trackWake(state) {
-    const b = state.boat;
     const t = state.elapsed;
-    if (b.spd > 6 && (!lastWake || t - lastWake >= 0.07)) {
-      lastWake = t;
+    const boats = [['player', state.boat], ...state.enemies.filter((e) => !e.sunk && !e.entering).map((e) => [e.id, e])];
+    for (const [key, b] of boats) {
+      const last = lastWake.get(key);
+      if (b.spd <= 6 || (last !== undefined && t - last < 0.07 && last <= t)) continue;
+      lastWake.set(key, t);
       const sx = b.x - Math.cos(b.h) * b.r;
       const sy = b.y - Math.sin(b.h) * b.r;
       // Foam peels off to both sides of the stern.
       const side = Math.sin(t * 40) > 0 ? 1 : -1;
       wakes.push({ x: sx + Math.cos(b.h + Math.PI / 2) * side * 2, y: sy + Math.sin(b.h + Math.PI / 2) * side * 2, born: t });
     }
-    while (wakes.length && (t - wakes[0].born > 1.1 || wakes[0].born > t)) wakes.shift();
+    wakes = wakes.filter((w) => t - w.born <= 1.1 && w.born <= t);
+  }
+
+  // A boat: the hull turns, the mast stands upright on it. Sunk boats settle and fade.
+  function drawBoat(b, look, W, H) {
+    const s = sprites[look];
+    let sink = 0;
+    if (b.sunk) {
+      g.globalAlpha = Math.max(0, 1 - b.sinkT / 1.6);
+      sink = Math.round(b.sinkT * 5);
+    }
+    const one = (x, y) => {
+      g.save();
+      g.translate(x, y + sink);
+      g.rotate(b.h);
+      g.drawImage(b.flash > 0 ? s.flash : s.hull, -HULL.ax, -HULL.ay);
+      g.restore();
+      if (!b.sunk) g.drawImage(s.mast, x - MAST.ax, y + 1 - MAST.ay);
+      if (look === 'enemy' && !b.sunk) {
+        // A small hull bar under each enemy.
+        const w = 14;
+        const f = b.hp / b.maxHp;
+        g.fillStyle = PAL.ink;
+        g.fillRect(x - w / 2, y + b.r + 1, w, 2);
+        g.fillStyle = f > 0.35 ? PAL.cacLt : PAL.red;
+        g.fillRect(x - w / 2, y + b.r + 1, Math.ceil(w * f), 2);
+      }
+    };
+    if (b.entering) one(Math.round(b.x), Math.round(b.y));
+    else wrapped(Math.round(b.x), Math.round(b.y), 16, W, H, one);
+    g.globalAlpha = 1;
+  }
+
+  // Faint arcs on each side, bright when that side is loaded and has a target.
+  function drawArcs(state) {
+    const b = state.boat;
+    const guns = broadsides(state);
+    for (const [side, gun] of [[-1, guns.port], [1, guns.stbd]]) {
+      const dir = b.h + (side * Math.PI) / 2;
+      const lit = gun.ready && gun.target;
+      g.strokeStyle = lit ? PAL.gold : gun.ready ? PAL.cream : PAL.ink;
+      g.globalAlpha = lit ? 0.55 : 0.14;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(b.x, b.y);
+      g.arc(b.x, b.y, GUNS.range, dir - GUNS.assist, dir + GUNS.assist);
+      g.closePath();
+      g.stroke();
+      g.globalAlpha = 1;
+      if (lit) bracket(gun.target.x, gun.target.y, gun.target.r + 3);
+    }
+  }
+
+  function bracket(x, y, r) {
+    g.fillStyle = PAL.gold;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const px = Math.round(x + sx * r);
+      const py = Math.round(y + sy * r);
+      g.fillRect(px - (sx > 0 ? 2 : 0), py, 3, 1);
+      g.fillRect(px, py - (sy > 0 ? 2 : 0), 1, 3);
+    }
+  }
+
+  // A blinking arrow at the edge where an enemy is about to sail in.
+  function drawWarnings(state) {
+    const t = state.elapsed;
+    for (const w of state.warnings) {
+      if (Math.floor(t * 6) % 2) continue;
+      const inward = [Math.PI / 2, Math.PI, -Math.PI / 2, 0][w.edge];
+      g.save();
+      g.translate(Math.round(w.x + Math.cos(inward) * 4), Math.round(w.y + Math.sin(inward) * 4));
+      g.rotate(inward);
+      g.fillStyle = PAL.ink;
+      poly(g, [5, 0, -2, -5, -2, 5]);
+      g.fillStyle = PAL.red;
+      poly(g, [4, 0, -1, -3, -1, 3]);
+      g.restore();
+    }
+  }
+
+  // Cannonballs with a little lob, and a shadow on the water under them.
+  function drawBalls(state) {
+    for (const ball of state.balls) {
+      const k = 1 - ball.life / ball.max;
+      const lift = Math.round(Math.sin(k * Math.PI) * 5);
+      const x = Math.round(ball.x);
+      const y = Math.round(ball.y);
+      g.globalAlpha = 0.35;
+      g.fillStyle = PAL.deep;
+      g.fillRect(x, y, 2, 1);
+      g.globalAlpha = 1;
+      g.fillStyle = PAL.ink;
+      g.fillRect(x, y - lift - 1, 2, 2);
+    }
+  }
+
+  // Splashes, sparks, puffs and smoke, each fading over its life in the simulation.
+  function drawFx(state, under) {
+    const t = state.elapsed;
+    for (const [i, f] of state.fx.entries()) {
+      if ((f.kind === 'splash' || f.kind === 'sink') !== under) continue;
+      const age = Math.min(1, Math.max(0, (t - f.at) / FX[f.kind]));
+      const x = Math.round(f.x);
+      const y = Math.round(f.y);
+      g.globalAlpha = 1 - age * 0.7;
+      if (f.kind === 'splash') {
+        const r = Math.round(age * 4);
+        g.fillStyle = PAL.foam;
+        g.fillRect(x - r, y, 1, 1);
+        g.fillRect(x + r, y, 1, 1);
+        g.fillRect(x, y - r - 1, 1, 2);
+      } else if (f.kind === 'sink') {
+        // A ring of foam and drops thrown up around the wreck.
+        g.fillStyle = PAL.foam;
+        g.beginPath();
+        g.arc(x, y, 3 + age * 9, 0, Math.PI * 2);
+        g.lineWidth = 1;
+        g.strokeStyle = PAL.foam;
+        g.stroke();
+        for (let k = 0; k < 14; k++) {
+          const h = hash(Math.round(f.at * 1000) + k, i);
+          const a = (h % 628) / 100;
+          const reach = 4 + ((h >>> 9) % 10) * age;
+          const up = Math.round(Math.sin(age * Math.PI) * ((h >>> 14) % 6));
+          g.fillRect(Math.round(x + Math.cos(a) * reach), Math.round(y + Math.sin(a) * reach * 0.6) - up, 1, 1);
+        }
+      } else if (f.kind === 'hit') {
+        g.fillStyle = age < 0.4 ? PAL.cream : PAL.gold;
+        const r = Math.round(age * 5) + 1;
+        g.fillRect(x - r, y, r * 2, 1);
+        g.fillRect(x, y - r, 1, r * 2);
+      } else {
+        // Smoke drifts out from the gun; a thud throws up sand.
+        g.fillStyle = f.kind === 'thud' ? PAL.sand : PAL.cream;
+        const drift = f.kind === 'smoke' ? age * 6 : 0;
+        const r = Math.round(age * 3) + 1;
+        g.fillRect(Math.round(x + Math.cos(f.dir) * drift) - r, Math.round(y + Math.sin(f.dir) * drift) - r, r * 2, r * 2);
+      }
+    }
+    g.globalAlpha = 1;
   }
 
   function draw(state) {
@@ -228,8 +380,15 @@ export function createView(screen) {
     if (islands.for !== state.islands) islands = { for: state.islands, sprites: state.islands.map(islandSprite) };
     trackWake(state);
 
+    // Being hit shakes the picture a pixel or two, on the Play's own clock.
+    const shake = state.shake > 0.5 ? state.shake : 0;
+    const jig = hash(Math.round(t * 60), 7);
+    const sx = shake ? Math.round(((jig % 100) / 100 - 0.5) * shake) : 0;
+    const sy = shake ? Math.round((((jig >>> 8) % 100) / 100 - 0.5) * shake) : 0;
+    g.setTransform(1, 0, 0, 1, sx, sy);
+
     g.fillStyle = PAL.sea;
-    g.fillRect(0, 0, W, H);
+    g.fillRect(-4, -4, W + 8, H + 8);
     // Sea texture: wave dashes on a grid that shimmer on the Play's clock.
     const tick = Math.floor(t * 1.5);
     g.fillStyle = PAL.wave;
@@ -262,21 +421,14 @@ export function createView(screen) {
     }
     g.globalAlpha = 1;
 
-    // The boat: the hull turns, the mast stands upright on it.
-    const b = state.boat;
-    const flash = b.bump > 0.6;
-    wrapped(Math.round(b.x), Math.round(b.y), 16, W, H, (x, y) => {
-      g.save();
-      g.translate(x, y);
-      g.rotate(b.h);
-      g.drawImage(hull, -HULL.ax, -HULL.ay);
-      g.restore();
-      if (flash) {
-        g.fillStyle = PAL.cream;
-        g.fillRect(x - 1, y - 1, 3, 3);
-      }
-      g.drawImage(mast, x - MAST.ax, y + 1 - MAST.ay);
-    });
+    drawFx(state, true);
+    drawWarnings(state);
+    if (!state.sunk) drawArcs(state);
+    for (const e of state.enemies) drawBoat(e, 'enemy', W, H);
+    drawBoat(state.boat, 'player', W, H);
+    drawBalls(state);
+    drawFx(state, false);
+    g.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.drawImage(off, 0, 0, screen.width, screen.height);
   }
