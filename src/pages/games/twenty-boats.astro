@@ -2,25 +2,13 @@
 // A Game page: the game takes the whole screen, so there's no yellow column,
 // header or site stylesheet. The game's own jspratt.dev button leads back to the
 // Homepage. The game itself is plain modules in public/games/twenty-boats/.
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import Head from "../../components/Head.astro";
+import { gamePreloads } from "../../lib/game-preloads";
 import { site } from "../../lib/site";
 
-// Preload every module and data file the game loads, so they arrive in
-// parallel rather than one import at a time. Read from the game's own source,
-// so the list can't drift from what it actually requests.
-const base = "/games/twenty-boats/";
-const dir = join("public", base);
-const sources = readdirSync(dir)
-  .filter((f) => f.endsWith(".js"))
-  .map((f) => readFileSync(join(dir, f), "utf8"));
-const modules = [...new Set(sources.flatMap((s) => [...s.matchAll(/(?:from\s+|import\()'\.\/([^']+)'/g)].map((m) => base + m[1])))];
-const main = readFileSync(join(dir, "twenty-boats.js"), "utf8");
-const version = main.match(/const CACHE_BUST = '([^']+)'/)?.[1];
-const dataNames = [...(main.match(/const DATA = \[([^\]]+)\]/)?.[1].matchAll(/'([^']+)'/g) ?? [])].map((m) => m[1]);
-if (!version || dataNames.length === 0) throw new Error("twenty-boats.js: couldn't find CACHE_BUST or DATA to preload");
-const data = dataNames.map((name) => `${base}data/${name}.json?v=${version}`);
+// Preload every module and data file the game loads, read from its own source.
+const { base, version, modules, data } = gamePreloads("twenty-boats", "twenty-boats.js");
+if (data.length === 0) throw new Error("twenty-boats.js: couldn't find DATA to preload");
 ---
 
 <!doctype html>
