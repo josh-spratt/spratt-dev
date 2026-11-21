@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { newRun, step, summary, STEP, ANCHOR, HALF, FULL } from '../../public/games/cactus-boats/sim.js';
+import { newRun, step, summary, isSunk, maxSpawnedBy, STEP, ANCHOR, HALF, FULL, GUNS, TOKENS } from '../../public/games/cactus-boats/sim.js';
 
 // The simulation is driven only through newRun, step and summary. It exposes
-// state.sea, state.boat and state.islands for drawing, and these tests read
-// them the same way the drawing does.
+// state.sea, state.boat, state.islands, state.enemies and state.balls for
+// drawing, and these tests read them the same way the drawing does.
 
 const hold = { turn: 0, sail: ANCHOR, fire: null };
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
@@ -33,17 +33,19 @@ function pointAt(state, heading) {
 function wander(seed, n) {
   let s = seed;
   const next = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
-  return Array.from({ length: n }, () => ({ turn: Math.round(next() * 2 - 1), sail: Math.floor(next() * 3), fire: null }));
+  const fires = [null, null, null, null, null, null, 'auto', 'port', 'stbd'];
+  return Array.from({ length: n }, () => ({ turn: Math.round(next() * 2 - 1), sail: Math.floor(next() * 3), fire: fires[Math.floor(next() * fires.length)] }));
 }
 
 test('the same seed and the same intents give the same Play', () => {
-  const intents = wander(7, 60 * 30);
+  const intents = wander(7, 60 * 60);
   const a = newRun(1234);
   const b = newRun(1234);
   for (const intent of intents) {
     step(a, intent, STEP);
     step(b, intent, STEP);
   }
+  assert.ok(a.enemies.length > 0 || summary(a).sinks > 0, 'enemies were in play');
   assert.deepEqual(a, b);
   assert.deepEqual(summary(a), summary(b));
   assert.notDeepEqual(newRun(1234).islands, newRun(1235).islands, 'another seed gives another sea');
@@ -65,19 +67,19 @@ test('no time passes without a step', async () => {
 
 test('the sail steps Anchor, Half, Full and sets how fast the boat goes', () => {
   const speeds = [ANCHOR, HALF, FULL].map((sail) => {
-    const state = run(newRun(3, { islands: 0 }), { turn: 0, sail, fire: null }, 4);
+    const state = run(newRun(3, { islands: 0, enemies: false }), { turn: 0, sail, fire: null }, 4);
     return state.boat.spd;
   });
   assert.equal(speeds[0], 0, 'at Anchor the boat stays put');
   assert.ok(speeds[1] > 0 && speeds[2] > speeds[1], speeds.join(', '));
   // Dropping anchor brings the boat to a stop.
-  const state = run(newRun(3, { islands: 0 }), { turn: 0, sail: FULL, fire: null }, 4);
+  const state = run(newRun(3, { islands: 0, enemies: false }), { turn: 0, sail: FULL, fire: null }, 4);
   run(state, hold, 3);
   assert.equal(state.boat.spd, 0);
 });
 
 test('the boat can come about from a standstill', () => {
-  const state = newRun(5, { islands: 0 });
+  const state = newRun(5, { islands: 0, enemies: false });
   const start = state.boat.h;
   let turned = 0;
   let last = start;
@@ -90,8 +92,8 @@ test('the boat can come about from a standstill', () => {
 });
 
 test('turn is clamped to the helm and an unknown sail is held as Anchor', () => {
-  const wild = run(newRun(5, { islands: 0 }), { turn: 50, sail: 9, fire: null }, 1);
-  const hard = run(newRun(5, { islands: 0 }), { turn: 1, sail: ANCHOR, fire: null }, 1);
+  const wild = run(newRun(5, { islands: 0, enemies: false }), { turn: 50, sail: 9, fire: null }, 1);
+  const hard = run(newRun(5, { islands: 0, enemies: false }), { turn: 1, sail: ANCHOR, fire: null }, 1);
   assert.deepEqual(wild.boat, hard.boat);
 });
 
@@ -102,7 +104,7 @@ for (const [edge, heading] of [
   ['right', 0],
 ]) {
   test(`sailing off the ${edge} edge brings the boat in on the opposite edge`, () => {
-    const state = newRun(11, { islands: 0 });
+    const state = newRun(11, { islands: 0, enemies: false });
     const { width, height } = state.sea;
     pointAt(state, heading);
     let wrapped = false;
@@ -143,7 +145,7 @@ test('islands are placed from the seed, inside the sea, apart, and away from the
 
 test('islands stop the boat and scrape the hull when rammed at speed', () => {
   for (const seed of [2, 17, 40]) {
-    const state = newRun(seed);
+    const state = newRun(seed, { enemies: false });
     const isle = state.islands[0];
     const hull = state.boat.hp;
     let closest = Infinity;
@@ -171,4 +173,241 @@ test('all randomness comes from the seed', () => {
   } finally {
     Math.random = real;
   }
+});
+
+// ---- Combat ----
+
+const wdist = (a, b, sea) => {
+  const dx = Math.abs(a.x - b.x) % sea.width;
+  const dy = Math.abs(a.y - b.y) % sea.height;
+  return Math.hypot(Math.min(dx, sea.width - dx), Math.min(dy, sea.height - dy));
+};
+
+/**
+ * A captain who turns to keep the nearest enemy on the beam, sails at Half,
+ * and fires a smart broadside whenever asked. The kind of Play a person has.
+ */
+function captain(state) {
+  const b = state.boat;
+  let near = null;
+  for (const e of state.enemies) {
+    if (e.sunk || e.entering) continue;
+    if (!near || wdist(b, e, state.sea) < wdist(b, near, state.sea)) near = e;
+  }
+  let turn = 0;
+  if (near) {
+    let dx = near.x - b.x;
+    let dy = near.y - b.y;
+    dx -= Math.round(dx / state.sea.width) * state.sea.width;
+    dy -= Math.round(dy / state.sea.height) * state.sea.height;
+    const bearing = Math.atan2(dy, dx);
+    const side = angDiff(bearing, b.h) > 0 ? 1 : -1;
+    turn = Math.max(-1, Math.min(1, angDiff(bearing - side * Math.PI / 2, b.h) * 4));
+  }
+  return { turn, sail: HALF, fire: 'auto' };
+}
+
+/** Play until `until(state)` or `seconds` run out, watching every enemy that goes down. */
+function fight(state, brain, seconds, until = () => false) {
+  const sunk = new Set();
+  const seen = new Set();
+  let last = 0;
+  for (let i = 0; i < Math.round(seconds / STEP) && !until(state); i++) {
+    step(state, brain(state), STEP);
+    for (const e of state.enemies) {
+      seen.add(e.id);
+      if (e.sunk) sunk.add(e.id);
+    }
+    const { sinks } = summary(state);
+    assert.ok(sinks >= last, 'the sink count never goes down');
+    assert.equal(sinks, sunk.size, `at ${state.elapsed.toFixed(2)} s every sunk boat is counted once`);
+    last = sinks;
+  }
+  return { sunk, seen };
+}
+
+test('enemies keep arriving, from the edges, after a warning', () => {
+  const state = newRun(31, { islands: 0 });
+  const arrived = new Map();
+  let warned = 0;
+  run(state, { turn: 1, sail: HALF, fire: null }, 60, (s) => {
+    warned = Math.max(warned, s.warnings.length);
+    for (const e of s.enemies) {
+      if (arrived.has(e.id)) continue;
+      arrived.set(e.id, { x: e.x, y: e.y });
+      const { width, height } = s.sea;
+      const outside = e.x < 0 || e.x >= width || e.y < 0 || e.y >= height;
+      assert.ok(outside, `enemy ${e.id} arrives just outside an edge (${e.x.toFixed(0)}, ${e.y.toFixed(0)})`);
+    }
+    assert.ok(arrived.size <= maxSpawnedBy(s.elapsed * 1000), `no more than ${maxSpawnedBy(s.elapsed * 1000)} by ${s.elapsed.toFixed(1)} s`);
+  });
+  assert.ok(warned > 0, 'a warning marker went up');
+  assert.ok(arrived.size >= 3, `${arrived.size} enemies arrived in a minute`);
+});
+
+test('no more than two enemies attack at once', () => {
+  for (const seed of [4, 8, 15]) {
+    const state = newRun(seed);
+    const counted = new WeakSet();
+    const shooters = new Map(); // token period -> enemies that fired in it
+    run(state, { turn: 0.3, sail: HALF, fire: null }, 90, (s) => {
+      for (const ball of s.balls) {
+        if (counted.has(ball)) continue;
+        counted.add(ball);
+        if (ball.from === 'player') continue;
+        const period = Math.floor((s.elapsed - STEP / 2) / TOKENS.every);
+        if (!shooters.has(period)) shooters.set(period, new Set());
+        shooters.get(period).add(ball.from);
+      }
+    });
+    assert.ok(shooters.size > 0, `seed ${seed}: the enemies fought back`);
+    for (const [period, who] of shooters) {
+      assert.ok(who.size <= TOKENS.attackers, `seed ${seed}: ${who.size} enemies fired between ${period * TOKENS.every} s and ${(period + 1) * TOKENS.every} s`);
+    }
+  }
+});
+
+test('you can sink enemies, and each sink counts exactly once', () => {
+  let total = 0;
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const state = newRun(seed);
+    // fight() checks after every tick that the count matches the boats seen going down.
+    const { sunk } = fight(state, captain, 120, isSunk);
+    total += sunk.size;
+  }
+  assert.ok(total >= 5, `the captain sank ${total} boats over five Plays`);
+});
+
+test('enemy fire and islands wear the hull down, and a Play stops when it reaches zero', () => {
+  const state = newRun(12);
+  run(state, hold, 600, () => {});
+  assert.ok(isSunk(state), 'an anchored boat that never fires is sunk');
+  assert.equal(state.boat.hp, 0);
+  const after = structuredClone(state);
+  run(state, { turn: 1, sail: FULL, fire: 'auto' }, 5);
+  assert.deepEqual(state, after, 'nothing happens once you are sunk');
+  assert.ok(summary(state).survivedMs < 600 * 1000, `sunk after ${summary(state).survivedMs} ms`);
+});
+
+test('each side reloads on its own', () => {
+  const state = newRun(6, { islands: 0, enemies: false });
+  const balls = () => state.balls.length;
+  step(state, { turn: 0, sail: ANCHOR, fire: 'port' }, STEP);
+  assert.equal(balls(), GUNS.balls, 'port fires a volley');
+  step(state, { turn: 0, sail: ANCHOR, fire: 'port' }, STEP);
+  assert.equal(balls(), GUNS.balls, 'port is reloading');
+  step(state, { turn: 0, sail: ANCHOR, fire: 'stbd' }, STEP);
+  assert.equal(balls(), GUNS.balls * 2, 'starboard is still loaded');
+  step(state, { turn: 0, sail: ANCHOR, fire: 'auto' }, STEP);
+  assert.equal(balls(), GUNS.balls * 2, 'with both sides reloading, smart fire does nothing');
+  run(state, hold, GUNS.reload);
+  step(state, { turn: 0, sail: ANCHOR, fire: 'auto' }, STEP);
+  assert.equal(balls(), GUNS.balls, 'after the reload a side fires again');
+});
+
+test('port fires to the left of the bow and starboard to the right', () => {
+  for (const [fire, side] of [['port', -1], ['stbd', 1]]) {
+    const state = newRun(6, { islands: 0, enemies: false });
+    const b = { ...state.boat };
+    step(state, { turn: 0, sail: ANCHOR, fire }, STEP);
+    const beam = b.h + side * Math.PI / 2;
+    for (const ball of state.balls) {
+      const off = Math.abs(angDiff(Math.atan2(ball.vy, ball.vx), beam));
+      assert.ok(off < 0.05, `${fire} fires out of its own side (${off.toFixed(3)} rad off the beam)`);
+    }
+  }
+});
+
+test('smart fire picks the side with an enemy on it', () => {
+  for (const seed of [2, 9, 23, 41]) {
+    const state = newRun(seed, { islands: 0 });
+    // Wait for an enemy to be on the sea, and near.
+    run(state, { turn: 0, sail: ANCHOR, fire: null }, 30, () => {});
+    const b = state.boat;
+    const near = state.enemies.filter((e) => !e.sunk && !e.entering).sort((p, q) => wdist(b, p, state.sea) - wdist(b, q, state.sea))[0];
+    if (!near || wdist(b, near, state.sea) > GUNS.range) continue;
+    const before = new Set(state.balls);
+    step(state, { turn: 0, sail: ANCHOR, fire: 'auto' }, STEP);
+    const mine = state.balls.filter((x) => !before.has(x) && x.from === 'player');
+    if (!mine.length) continue; // both sides happened to be reloading
+    let dx = near.x - b.x;
+    let dy = near.y - b.y;
+    dx -= Math.round(dx / state.sea.width) * state.sea.width;
+    dy -= Math.round(dy / state.sea.height) * state.sea.height;
+    const want = angDiff(Math.atan2(dy, dx), b.h) > 0 ? 1 : -1;
+    const went = angDiff(Math.atan2(mine[0].vy, mine[0].vx), b.h) > 0 ? 1 : -1;
+    assert.equal(went, want, `seed ${seed}: the broadside went out of the side facing the enemy`);
+    return;
+  }
+  assert.fail('no seed put an enemy in range to test against');
+});
+
+test('cannonballs wrap at the edges like boats', () => {
+  const state = newRun(11, { islands: 0, enemies: false });
+  const { width, height } = state.sea;
+  pointAt(state, 0); // bow east, so port faces north, off the top edge
+  step(state, { turn: 0, sail: ANCHOR, fire: 'port' }, STEP);
+  const ball = state.balls[0];
+  let prev = { x: ball.x, y: ball.y };
+  let wrapped = false;
+  run(state, hold, 2, (s) => {
+    if (!s.balls.includes(ball)) return;
+    assert.ok(ball.x >= 0 && ball.x < width && ball.y >= 0 && ball.y < height, `on the sea at ${ball.x}, ${ball.y}`);
+    if (prev.y < 10 && ball.y > height - 10) wrapped = true;
+    prev = { x: ball.x, y: ball.y };
+  });
+  assert.ok(wrapped, 'the ball went off the top and came in at the bottom');
+});
+
+test('islands block cannonballs', () => {
+  let tried = 0;
+  for (let seed = 1; seed <= 200 && tried < 5; seed++) {
+    const state = newRun(seed, { enemies: false });
+    const b = state.boat;
+    // An island the guns can reach.
+    const isle = state.islands.find((i) => dist(i, b) - i.r < GUNS.range * 0.6);
+    if (!isle) continue;
+    tried++;
+    // Turn so the starboard beam points at it, then fire.
+    pointAt(state, Math.atan2(isle.y - b.y, isle.x - b.x) - Math.PI / 2);
+    step(state, { turn: 0, sail: ANCHOR, fire: 'stbd' }, STEP);
+    const fired = [...state.balls];
+    assert.equal(fired.length, GUNS.balls);
+    let thuds = 0;
+    run(state, hold, 2, (s) => {
+      for (const ball of fired) {
+        if (!s.balls.includes(ball)) continue;
+        assert.ok(dist(ball, isle) >= isle.r, `seed ${seed}: a ball sailed into the island`);
+      }
+      thuds = Math.max(thuds, s.fx.filter((f) => f.kind === 'thud').length);
+    });
+    assert.ok(fired.every((x) => !state.balls.includes(x)), 'every ball has landed');
+    assert.ok(thuds > 0, `seed ${seed}: the island took the shot`);
+  }
+  assert.ok(tried >= 3, `found ${tried} seeds with an island in range`);
+});
+
+test('boats shove apart rather than overlap', () => {
+  const state = newRun(19);
+  let worst = Infinity;
+  run(state, { turn: 0, sail: HALF, fire: null }, 60, (s) => {
+    const boats = [s.boat, ...s.enemies.filter((e) => !e.sunk && !e.entering)];
+    for (let i = 0; i < boats.length; i++) {
+      for (let j = i + 1; j < boats.length; j++) {
+        worst = Math.min(worst, wdist(boats[i], boats[j], s.sea) / (boats[i].r + boats[j].r));
+      }
+    }
+  });
+  assert.ok(worst > 0.8, `boats overlapped to ${(worst * 100).toFixed(0)}% of their radii`);
+});
+
+test('maxSpawnedBy bounds the steady arrivals', () => {
+  assert.equal(maxSpawnedBy(0), 0);
+  let prev = 0;
+  for (let ms = 0; ms <= 600_000; ms += 500) {
+    const n = maxSpawnedBy(ms);
+    assert.ok(n >= prev, 'it never goes down');
+    prev = n;
+  }
+  assert.ok(maxSpawnedBy(600_000) > 10);
 });

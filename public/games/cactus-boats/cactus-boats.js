@@ -1,6 +1,7 @@
 // Cactus Boats: an endless broadside shooter on a single-screen sea whose
-// edges wrap. This slice is the sailing skeleton: you sail a little wooden
-// boat with a cactus for a mast around a few islands, with no enemies yet.
+// edges wrap. You sail a little wooden boat with a cactus for a mast, enemy
+// patrols sail in from the edges, and you fight them with broadsides. When
+// your hull reaches zero the Play stops; the Sunk! screen and Score come next.
 //
 // mountCactusBoats(container, { homeHref, onEvent, leaderboard, seed }) -> destroy
 //   homeHref    where the jspratt.dev link in the corner goes; without it the link is left out
@@ -12,14 +13,14 @@
 // keys and touch in input.js, and the picture in draw.js. This module runs
 // the fixed 1/60 s loop and the HUD, and pauses on P, blur and a hidden tab.
 
-import { newRun, step, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v1';
-import { createInput } from './input.js?v=2026-11-21-v1';
-import { createView, fitScreen } from './draw.js?v=2026-11-21-v1';
+import { newRun, step, summary, isSunk, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v2';
+import { createInput } from './input.js?v=2026-11-21-v2';
+import { createView, fitScreen } from './draw.js?v=2026-11-21-v2';
 
 // Matches the ?v= on the imports above (and in the other modules and
 // play.js). Bump them together when a deploy must beat a stale browser cache:
 // there's no build step to hash the filenames.
-const CACHE_BUST = '2026-11-21-v1';
+const CACHE_BUST = '2026-11-21-v2';
 
 const SAIL_NAMES = { [ANCHOR]: 'Anchor', [HALF]: 'Half', [FULL]: 'Full' };
 
@@ -59,9 +60,11 @@ export async function mountCactusBoats(container, opts = {}) {
   const stage = h('div', { class: 'cb-stage' }, screen);
   const hullFill = h('span', { class: 'cb-hull-fill' });
   const sails = [ANCHOR, HALF, FULL].map((s) => h('span', { class: 'cb-sail', text: SAIL_NAMES[s] }));
+  const sinksShown = h('span', { class: 'cb-sinks' });
   const hud = h('div', { class: 'cb-hud', 'aria-hidden': 'true' },
     h('span', { class: 'cb-hull' }, hullFill),
     h('span', { class: 'cb-sails' }, ...sails),
+    sinksShown,
   );
   const shelf = homeHref ? h('a', { class: 'cb-shelf', href: homeHref, text: 'jspratt.dev' }) : null;
   const hint = h('p', { class: 'cb-hint' });
@@ -75,7 +78,7 @@ export async function mountCactusBoats(container, opts = {}) {
   const dpr = () => window.devicePixelRatio || 1;
   const box = stage.getBoundingClientRect();
   const { width } = fitScreen(box.width, box.height, dpr());
-  const state = newRun(opts.seed ?? randomSeed(), { width });
+  let state = newRun(opts.seed ?? randomSeed(), { width });
   view.fit(box.width, box.height, dpr(), state.sea.width);
   const resize = new ResizeObserver(() => {
     const r = stage.getBoundingClientRect();
@@ -100,6 +103,13 @@ export async function mountCactusBoats(container, opts = {}) {
   const input = createInput(stage, {
     onPause: (away) => setPaused(away ? true : !paused),
     onWake: () => {
+      if (isSunk(state)) {
+        // For now a key or tap after being sunk just sets sail again.
+        state = newRun(randomSeed(), { width: state.sea.width });
+        message.hidden = true;
+        onEvent?.({ event: 'play' });
+        return true;
+      }
       if (!paused) return false;
       setPaused(false);
       return true;
@@ -110,8 +120,8 @@ export async function mountCactusBoats(container, opts = {}) {
   function showHint() {
     const tall = window.innerHeight > window.innerWidth;
     hint.textContent = touchy()
-      ? tall ? 'Turn your phone sideways for a bigger sea' : 'Drag on the left half to steer'
-      : 'A D turn · W S sail · P pause';
+      ? tall ? 'Turn your phone sideways for a bigger sea' : 'Drag left to steer · tap right to fire'
+      : 'A D turn · W S sail · Space fire · J L port stbd · P pause';
   }
   showHint();
 
@@ -122,12 +132,14 @@ export async function mountCactusBoats(container, opts = {}) {
   let frame = 0;
   let shownHull = null;
   let shownSail = null;
+  let shownSinks = null;
+  let wasSunk = false;
   let wasTouched = false;
   function tick(now) {
     frame = requestAnimationFrame(tick);
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    if (paused) acc = 0;
+    if (paused || isSunk(state)) acc = 0;
     else {
       // Read the controls once a frame that steps, so a shot fires on its first tick only.
       acc += dt;
@@ -148,6 +160,21 @@ export async function mountCactusBoats(container, opts = {}) {
     if (hull !== shownHull) {
       shownHull = hull;
       hullFill.style.width = `${(100 * state.boat.hp) / state.boat.maxHp}%`;
+    }
+    const { sinks } = summary(state);
+    if (sinks !== shownSinks) {
+      shownSinks = sinks;
+      sinksShown.textContent = `Sunk ${sinks}`;
+    }
+    if (isSunk(state) !== wasSunk) {
+      wasSunk = isSunk(state);
+      if (wasSunk) {
+        message.hidden = false;
+        message.replaceChildren(
+          h('strong', { text: 'Sunk!' }),
+          h('span', { text: `You sank ${sinks} ${sinks === 1 ? 'boat' : 'boats'}. ${touchy() ? 'Tap' : 'Press any key'} to sail again.` }),
+        );
+      }
     }
     if (input.sail !== shownSail) {
       shownSail = input.sail;
