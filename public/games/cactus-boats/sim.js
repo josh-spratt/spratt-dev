@@ -5,12 +5,16 @@
 //   step(state, intent, dt)           advances the Play one fixed tick (STEP)
 //   summary(state) -> { survivedMs, sinks, score }
 //   isSunk(state) -> true once the player's hull reaches zero; step then does nothing
+//   setFireMode(state, 'broadside'|'bow')   what the fire button shoots
+//   bowGun(state) -> { ready, reload }  the bow cannon, for the aim line
 //   broadsides(state) -> { port, stbd }  each side's { ready, reload, target }, for the firing arcs
 //   maxSpawnedBy(survivedMs) -> the most enemies that can have been spawned by then
 //   difficultyAt(seconds) -> { every, afloat, mix }  the spawn curve at that time survived
 //
 // intent is the input layer's output: { turn: -1..1, sail: ANCHOR|HALF|FULL,
-// fire: null|'auto'|'port'|'stbd' }. Time passes only inside step, so a paused
+// fire: null|'volley'|'auto'|'port'|'stbd' }; 'volley' is the fire button, which
+// shoots what state.fireMode says (both broadsides, or the bow cannon).
+// Time passes only inside step, so a paused
 // game (no step calls) never adds to survivedMs. All randomness comes from a
 // seeded generator kept in the state, so a seed plus a list of intents replays
 // a Play exactly, and the state is plain data (it survives structuredClone).
@@ -27,8 +31,8 @@
 // curve in spawn.js (SPAWN), so difficulty is changed in one place. The Score
 // is in score.js.
 
-import { scoreOf } from './score.js?v=2026-11-21-v7';
-import { SPAWN, difficultyAt, maxSpawnedBy } from './spawn.js?v=2026-11-21-v7';
+import { scoreOf } from './score.js?v=2026-11-21-v8';
+import { SPAWN, difficultyAt, maxSpawnedBy } from './spawn.js?v=2026-11-21-v8';
 
 export { SPAWN, difficultyAt, maxSpawnedBy };
 
@@ -61,6 +65,13 @@ export const GUNS = {
   balls: 3, reload: 3, dmg: 8, speed: 140, range: 130, assist: (20 * Math.PI) / 180,
   seek: { range: 156, off: Math.PI / 2 }, spacing: 6, carry: 0.5,
 };
+
+// The bow cannon: the other way to fire. One heavy ball straight ahead along
+// the heading, further and faster than a broadside, on a short reload. The
+// fire button shoots it when state.fireMode is 'bow'; otherwise it shoots both
+// broadsides.
+export const BOW = { dmg: 14, speed: 210, range: 190, reload: 1.1 };
+export const FIRE_MODES = ['broadside', 'bow'];
 
 // How each patrol hull fights, from the Enemy AI prototype: it closes in,
 // orbits at orbitR, and fires a broadside when a side bears and you're inside
@@ -160,7 +171,7 @@ export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = tr
     sea,
     boat: {
       x: sea.width / 2, y: sea.height / 2, h: -Math.PI / 2, spd: 0, hp: hull.hp, maxHp: hull.hp, r: hull.r,
-      bump: 0, scraped: 0, flash: 0, reload: { port: 0, stbd: 0 },
+      bump: 0, scraped: 0, flash: 0, reload: { port: 0, stbd: 0, bow: 0 },
     },
     islands: [],
     enemies: [],
@@ -170,6 +181,7 @@ export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = tr
     shake: 0,
     sinks: 0,
     sunk: false,
+    fireMode: 'broadside',
     unsinkable: unsinkable === true,
     // `at` is when the next warning may go up; `bound` is the earliest it
     // could under the curve alone, as maxSpawnedBy counts it.
@@ -340,9 +352,41 @@ function volley(state, boat, side, target, o, from) {
 
 const PLAYER_VOLLEY = { balls: GUNS.balls, dmg: GUNS.dmg, speed: GUNS.speed, range: GUNS.range, assist: GUNS.assist, leads: true };
 
+export function setFireMode(state, mode) {
+  state.fireMode = FIRE_MODES.includes(mode) ? mode : 'broadside';
+}
+
+/** The bow cannon: loaded or not, and how much reload is left (0..1). */
+export function bowGun(state) {
+  const r = state.boat.reload.bow;
+  return { ready: r <= 0, reload: Math.max(0, r) / BOW.reload };
+}
+
+// The fire button: both broadsides at once (each side that is loaded, bent
+// toward what it can reach), or one ball from the bow straight ahead.
+function fireVolley(state) {
+  const b = state.boat;
+  if (state.fireMode === 'bow') {
+    if (b.reload.bow > 0) return;
+    b.reload.bow = BOW.reload;
+    volley(state, b, 0, null, { balls: 1, dmg: BOW.dmg, speed: BOW.speed, range: BOW.range, assist: 0 }, 'player');
+    state.shake = Math.max(state.shake, HIT.recoil);
+    return;
+  }
+  let fired = false;
+  for (const side of [-1, 1]) {
+    if (b.reload[sideKey(side)] > 0) continue;
+    b.reload[sideKey(side)] = GUNS.reload;
+    volley(state, b, side, sideTarget(state, side)?.e ?? null, PLAYER_VOLLEY, 'player');
+    fired = true;
+  }
+  if (fired) state.shake = Math.max(state.shake, HIT.recoil);
+}
+
 // Smart fire: of the loaded sides, the one with the best-lined-up target; with
 // no target either side, the side facing the nearest enemy (or any loaded side).
 function fire(state, want) {
+  if (want === 'volley') return fireVolley(state);
   if (!['auto', 'port', 'stbd'].includes(want)) return;
   const b = state.boat;
   const ready = (s) => b.reload[sideKey(s)] <= 0;
@@ -570,6 +614,7 @@ function timers(state, dt) {
     b.flash = Math.max(0, b.flash - dt);
     b.reload.port = Math.max(0, b.reload.port - dt);
     b.reload.stbd = Math.max(0, b.reload.stbd - dt);
+    b.reload.bow = Math.max(0, b.reload.bow - dt);
   };
   tick(state.boat);
   for (const e of state.enemies) {

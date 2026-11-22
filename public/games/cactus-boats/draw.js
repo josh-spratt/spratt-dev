@@ -15,7 +15,7 @@
 // under a gold pennant. Animation runs on the Play's own
 // clock (state.elapsed), so a paused game is a still picture.
 
-import { SEA_HEIGHT, SEA_WIDTHS, GUNS, FX, HULLS, broadsides } from './sim.js?v=2026-11-21-v7';
+import { SEA_HEIGHT, SEA_WIDTHS, GUNS, BOW, FX, HULLS, broadsides, bowGun } from './sim.js?v=2026-11-21-v8';
 
 // Every drawn pixel is one of these.
 export const PAL = {
@@ -287,6 +287,7 @@ export function createView(screen) {
   // Faint arcs on each side, bright when that side is loaded and has a target.
   function drawArcs(state) {
     const b = state.boat;
+    if (state.fireMode === 'bow') return drawAim(state);
     const guns = broadsides(state);
     for (const [side, gun] of [[-1, guns.port], [1, guns.stbd]]) {
       const dir = b.h + (side * Math.PI) / 2;
@@ -302,6 +303,18 @@ export function createView(screen) {
       g.globalAlpha = 1;
       if (lit) bracket(gun.target.x, gun.target.y, gun.target.r + 3);
     }
+  }
+
+  // The bow cannon's line: a dotted sight straight ahead, bright once it's loaded.
+  function drawAim(state) {
+    const b = state.boat;
+    const ready = bowGun(state).ready;
+    g.fillStyle = ready ? PAL.gold : PAL.cream;
+    g.globalAlpha = ready ? 0.7 : 0.18;
+    for (let d = b.r + 6; d < BOW.range; d += 8) {
+      g.fillRect(Math.round(b.x + Math.cos(b.h) * d), Math.round(b.y + Math.sin(b.h) * d), 1, 1);
+    }
+    g.globalAlpha = 1;
   }
 
   function bracket(x, y, r) {
