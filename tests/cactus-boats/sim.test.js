@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { newRun, step, summary, isSunk, maxSpawnedBy, STEP, ANCHOR, HALF, FULL, GUNS, TOKENS } from '../../public/games/cactus-boats/sim.js';
+import { newRun, step, summary, isSunk, maxSpawnedBy, STEP, ANCHOR, HALF, FULL, GUNS, BOW, TOKENS, setFireMode } from '../../public/games/cactus-boats/sim.js';
 
 // The simulation is driven only through newRun, step and summary. It exposes
 // state.sea, state.boat, state.islands, state.enemies and state.balls for
@@ -401,3 +401,43 @@ test('boats shove apart rather than overlap', () => {
   assert.ok(worst > 0.8, `boats overlapped to ${(worst * 100).toFixed(0)}% of their radii`);
 });
 
+
+test('the fire button shoots both broadsides at once, and only the loaded sides', () => {
+  const state = newRun(6, { islands: 0, enemies: false });
+  const volley = { turn: 0, sail: ANCHOR, fire: 'volley' };
+  step(state, volley, STEP);
+  assert.equal(state.balls.length, GUNS.balls * 2, 'both sides fire together');
+  const sides = new Set(state.balls.map((b) => Math.sign(angDiff(Math.atan2(b.vy, b.vx), state.boat.h))));
+  assert.deepEqual([...sides].sort(), [-1, 1], 'one volley to each side of the bow');
+  step(state, volley, STEP);
+  assert.equal(state.balls.length, GUNS.balls * 2, 'both sides are reloading');
+  step(state, { turn: 0, sail: ANCHOR, fire: 'stbd' }, STEP);
+  run(state, hold, GUNS.reload);
+  step(state, volley, STEP);
+  assert.equal(state.balls.length, GUNS.balls * 2, 'after the reload both fire again');
+});
+
+test('the bow cannon shoots one ball straight along the heading, on its own reload', () => {
+  const state = newRun(6, { islands: 0, enemies: false });
+  setFireMode(state, 'bow');
+  const volley = { turn: 0, sail: ANCHOR, fire: 'volley' };
+  step(state, volley, STEP);
+  assert.equal(state.balls.length, 1);
+  const [ball] = state.balls;
+  assert.ok(Math.abs(angDiff(Math.atan2(ball.vy, ball.vx), state.boat.h)) < 1e-9, 'straight ahead');
+  assert.equal(ball.dmg, BOW.dmg);
+  step(state, volley, STEP);
+  assert.equal(state.balls.length, 1, 'the bow cannon is reloading');
+  step(state, { turn: 0, sail: ANCHOR, fire: 'port' }, STEP);
+  assert.equal(state.balls.length, 1 + GUNS.balls, 'the broadsides are still loaded');
+  run(state, hold, BOW.reload);
+  step(state, volley, STEP);
+  assert.equal(state.balls.filter((b) => b.dmg === BOW.dmg).length >= 1, true, 'after the reload it fires again');
+});
+
+test('an unknown fire mode falls back to broadsides', () => {
+  const state = newRun(6, { islands: 0, enemies: false });
+  setFireMode(state, 'bow');
+  setFireMode(state, 'banana');
+  assert.equal(state.fireMode, 'broadside');
+});

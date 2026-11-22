@@ -8,17 +8,17 @@
 //
 // The Helm scheme from the Controls prototype: A/D or ←/→ turn relative to
 // the bow, W/S or ↑/↓ step the sail Anchor/Half/Full and it stays there.
-// Space or a click fires the smart broadside, J and L fire port and starboard.
-// On touch there's a pad drawn on screen (the `pad` option: { joy, port, stbd }
+// Space or a click fires (both broadsides, or the bow cannon: B switches), J and L fire port and starboard alone.
+// On touch there's a pad drawn on screen (the `pad` option: { joy, fire, mode }
 // elements). The joystick is a compass: the boat turns toward the drag and the
 // sail follows how far it is pulled (Half, then Full past the ring); letting go
-// keeps sailing on that heading, and tapping the stick drops anchor. The Port
-// and Starboard buttons fire that side; a tap anywhere else on the sea fires
-// whichever side bears.
+// keeps sailing on that heading, and tapping the stick drops anchor. The Fire
+// button, or a tap anywhere else on the sea, shoots what the fire mode says (both
+// broadsides, or the bow cannon); the mode button switches it, as B does.
 // P calls onPause; losing focus or hiding the tab calls onPause(true). Any key
 // or tap calls onWake first, so a paused game can carry on.
 
-import { ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v7';
+import { ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v8';
 
 // How far (in CSS px) a drag must go to steer, and to reach Full sail.
 const STICK = { dead: 14, full: 52 };
@@ -30,7 +30,7 @@ const KEYS = {
 };
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
-export function createInput(stage, { onPause = () => {}, onWake = () => {}, pad = null } = {}) {
+export function createInput(stage, { onPause = () => {}, onWake = () => {}, onMode = () => {}, pad = null } = {}) {
   const held = new Set();
   const ctl = new AbortController();
   const on = (target, type, fn, opts) => target.addEventListener(type, fn, { signal: ctl.signal, ...opts });
@@ -40,6 +40,7 @@ export function createInput(stage, { onPause = () => {}, onWake = () => {}, pad 
   let stick = null;
   let stickId = null;
   let touched = false;
+  let holding = null; // the pointer holding the fire button down
 
   on(window, 'keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -56,7 +57,8 @@ export function createInput(stage, { onPause = () => {}, onWake = () => {}, pad 
     if (KEYS.up.includes(c)) sail = Math.min(FULL, sail + 1);
     if (KEYS.down.includes(c)) sail = Math.max(ANCHOR, sail - 1);
     if (KEYS.left.includes(c) || KEYS.right.includes(c)) want = null;
-    if (c === 'Space') fire = 'auto';
+    if (c === 'Space') fire = 'volley';
+    if (c === 'KeyB') onMode();
     if (c === 'KeyJ') fire = 'port';
     if (c === 'KeyL') fire = 'stbd';
   });
@@ -66,23 +68,31 @@ export function createInput(stage, { onPause = () => {}, onWake = () => {}, pad 
     e.preventDefault();
     if (onWake()) return;
     if (e.pointerType === 'mouse') {
-      if (e.button === 0) fire = 'auto';
+      if (e.button === 0) fire = 'volley';
       return;
     }
     touched = true;
-    fire = 'auto';
+    fire = 'volley';
   });
 
   if (pad) {
-    const buttons = [[pad.port, 'port'], [pad.stbd, 'stbd']];
-    for (const [el, side] of buttons) {
-      on(el, 'pointerdown', (e) => {
-        e.preventDefault();
-        touched = true;
-        if (onWake()) return;
-        fire = side;
-      });
-    }
+    on(pad.fire, 'pointerdown', (e) => {
+      e.preventDefault();
+      touched = true;
+      if (onWake()) return;
+      fire = 'volley';
+      holding = e.pointerId; // held down, it keeps firing as each gun reloads
+    });
+    const letGo = (e) => {
+      if (e.pointerId === holding) holding = null;
+    };
+    on(pad.fire, 'pointerup', letGo);
+    on(pad.fire, 'pointercancel', letGo);
+    on(pad.mode, 'pointerdown', (e) => {
+      e.preventDefault();
+      touched = true;
+      if (!onWake()) onMode();
+    });
     on(pad.joy, 'pointerdown', (e) => {
       e.preventDefault();
       touched = true;
@@ -123,6 +133,7 @@ export function createInput(stage, { onPause = () => {}, onWake = () => {}, pad 
 
   const away = () => {
     held.clear();
+    holding = null;
     stickId = null;
     stick = null;
     onPause(true);
@@ -160,7 +171,7 @@ export function createInput(stage, { onPause = () => {}, onWake = () => {}, pad 
         if (Math.abs(d) < 0.02 && !stick) want = null;
         else turn = Math.max(-1, Math.min(1, d * 4));
       }
-      const out = { turn, sail, fire };
+      const out = { turn, sail, fire: fire ?? (holding !== null ? 'volley' : null) };
       fire = null;
       return out;
     },
