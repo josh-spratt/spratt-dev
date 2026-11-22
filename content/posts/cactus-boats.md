@@ -3,6 +3,7 @@ title: Cactus Boats
 description: My six-year-old had an idea for a game. A few sessions later, we were playing it.
 date: 2026-11-21
 draft: false
+image: /game-thumbs/cactus-boats.webp
 tags: [AI, Games]
 ---
 
