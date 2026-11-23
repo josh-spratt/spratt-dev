@@ -33,14 +33,14 @@
 // and pauses on P, blur and a hidden tab. Only stepped time is survival time,
 // so nothing paused (or on a screen) counts.
 
-import { newRun, step, summary, isSunk, canFire, greekFire, broadsides, BOATS, BOAT_KINDS, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-22-v1';
-import { createInput } from './input.js?v=2026-11-22-v1';
-import { createView, fitScreen } from './draw.js?v=2026-11-22-v1';
+import { newRun, step, summary, isSunk, canFire, greekFire, broadsides, BOATS, BOAT_KINDS, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-22-v2';
+import { createInput } from './input.js?v=2026-11-22-v2';
+import { createView, fitScreen } from './draw.js?v=2026-11-22-v2';
 
 // Matches the ?v= on the imports above (and in the other modules and
 // play.js). Bump them together when a deploy must beat a stale browser cache:
 // there's no build step to hash the filenames.
-const CACHE_BUST = '2026-11-22-v1';
+const CACHE_BUST = '2026-11-22-v2';
 
 const SAIL_NAMES = { [ANCHOR]: 'Anchor', [HALF]: 'Half', [FULL]: 'Full' };
 const BEST_KEY = 'cactus-boats:best';
@@ -558,6 +558,7 @@ export async function mountCactusBoats(container, opts = {}) {
       acc += dt;
       let intent = acc >= STEP ? input.intent(state.boat.h) : { turn: 0, sail: input.sail, fire: null };
       while (acc >= STEP && !isSunk(state)) {
+        view.remember(state);
         step(state, intent, STEP);
         intent = { ...intent, fire: null };
         acc -= STEP;
@@ -575,7 +576,8 @@ export async function mountCactusBoats(container, opts = {}) {
         onEvent?.({ event: 'finish', ending: 'sunk', survived: false });
       }
     }
-    view.draw(state);
+    // Part-way to the next tick, so a 90 or 120 Hz screen moves on every frame.
+    view.draw(state, mode === 'playing' && !paused ? Math.min(1, acc / STEP) : 1);
 
     // The HUD, touched only when something on it changes.
     const { survivedMs, sinks, score } = summary(state);
@@ -602,8 +604,11 @@ export async function mountCactusBoats(container, opts = {}) {
     if (showPad) {
       const s = input.stick;
       const k = s ? Math.min(1, 60 / (Math.hypot(s.dx, s.dy) || 1)) : 0;
-      joyKnob.style.transform = s ? `translate(${s.dx * k}px, ${s.dy * k}px)` : '';
-      sailTag.textContent = `Sail: ${SAIL_NAMES[input.sail]}`;
+      // Written only when they change: a style or text write every frame costs a phone a layout.
+      const knob = s ? `translate(${Math.round(s.dx * k)}px, ${Math.round(s.dy * k)}px)` : '';
+      if (joyKnob.style.transform !== knob) joyKnob.style.transform = knob;
+      const tag = `Sail: ${SAIL_NAMES[input.sail]}`;
+      if (sailTag.textContent !== tag) sailTag.textContent = tag;
       fireBtn.classList.toggle('cb-wait', !canFire(state));
       if (boatKind === 'galleon') {
         const guns = broadsides(state);

@@ -5,7 +5,13 @@
 //   fitScreen(cssWidth, cssHeight, dpr, seaWidth?) -> { width, scale }
 //   const view = createView(canvas)
 //   view.fit(cssWidth, cssHeight, dpr, seaWidth)   when the screen changes
-//   view.draw(state)                                every frame
+//   view.remember(state)                            just before each step
+//   view.draw(state, between = 1)                   every frame
+//
+// The sea steps 60 times a second, but a phone's screen may draw 90 or 120.
+// So `between` (0–1, how far the clock is toward the next tick) draws what moves
+// that far from where it was at the last remember(), and frames that fall
+// between ticks still move instead of repeating the last picture.
 //
 // Every sprite is drawn in code (the Sprite Lab prototype's variant A), then
 // snapped to one fixed palette with a 1 px ink outline. The hull rotates with
@@ -17,7 +23,7 @@
 // and the Ram's Prickly pear (and an iron beak). Animation runs on the Play's own
 // clock (state.elapsed), so a paused game is a still picture.
 
-import { SEA_HEIGHT, SEA_WIDTHS, GUNS, BOW, FX, HULLS, GREEK, WHIRL, broadsides, bowGun, whirlStrength } from './sim.js?v=2026-11-22-v1';
+import { SEA_HEIGHT, SEA_WIDTHS, GUNS, BOW, FX, HULLS, GREEK, WHIRL, broadsides, bowGun, whirlStrength } from './sim.js?v=2026-11-22-v2';
 
 // Every drawn pixel is one of these.
 export const PAL = {
@@ -542,7 +548,34 @@ export function createView(screen) {
     }
   }
 
-  function draw(state) {
+  // Where each moving thing was one tick ago.
+  const before = new WeakMap();
+  function remember(state) {
+    for (const o of [state.boat, ...state.enemies, ...state.balls, ...state.flames]) before.set(o, { x: o.x, y: o.y, h: o.h });
+  }
+
+  // The state as it stands `k` of the way from the last tick to this one. Only
+  // positions and headings move; everything else is this tick's.
+  function blend(state, k) {
+    const { width: W, height: H } = state.sea;
+    const at = (o) => {
+      const p = before.get(o);
+      if (!p) return o;
+      // The short way round, for things that just wrapped across the sea.
+      const dx = o.x - p.x - Math.round((o.x - p.x) / W) * W;
+      const dy = o.y - p.y - Math.round((o.y - p.y) / H) * H;
+      const out = { ...o, x: o.x - dx * (1 - k), y: o.y - dy * (1 - k) };
+      if (o.h !== undefined) out.h = o.h - Math.atan2(Math.sin(o.h - p.h), Math.cos(o.h - p.h)) * (1 - k);
+      return out;
+    };
+    return { ...state, boat: at(state.boat), enemies: state.enemies.map(at), balls: state.balls.map(at), flames: state.flames.map(at) };
+  }
+
+  function draw(state, between = 1) {
+    paint(between < 1 ? blend(state, Math.max(0, between)) : state);
+  }
+
+  function paint(state) {
     const { width: W, height: H } = state.sea;
     if (off.width !== W) off.width = W;
     const t = state.elapsed;
@@ -606,5 +639,5 @@ export function createView(screen) {
     ctx.drawImage(off, 0, 0, screen.width, screen.height);
   }
 
-  return { fit, draw };
+  return { fit, remember, draw };
 }
