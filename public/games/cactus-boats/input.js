@@ -20,7 +20,7 @@
 // P calls onPause; losing focus or hiding the tab calls onPause(true). Any key
 // or tap calls onWake first, so a paused game can carry on.
 
-import { ANCHOR, HALF, FULL } from './sim.js?v=2026-11-22-v1';
+import { ANCHOR, HALF, FULL } from './sim.js?v=2026-11-22-v2';
 
 // How far (in CSS px) a drag must go to steer, and to reach Full sail.
 const STICK = { dead: 14, full: 52 };
