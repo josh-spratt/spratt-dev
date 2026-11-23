@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { newRun, step, summary, isSunk, maxSpawnedBy, STEP, ANCHOR, HALF, FULL, GUNS, BOW, TOKENS, setFireMode } from '../../public/games/cactus-boats/sim.js';
+import { newRun, step, summary, isSunk, maxSpawnedBy, STEP, ANCHOR, HALF, FULL, GUNS, BOW, RAM, GREEK, WHIRL, BOATS, TOKENS, canFire } from '../../public/games/cactus-boats/sim.js';
 
 // The simulation is driven only through newRun, step and summary. It exposes
 // state.sea, state.boat, state.islands, state.enemies and state.balls for
@@ -417,9 +417,23 @@ test('the fire button shoots both broadsides at once, and only the loaded sides'
   assert.equal(state.balls.length, GUNS.balls * 2, 'after the reload both fire again');
 });
 
-test('the bow cannon shoots one ball straight along the heading, on its own reload', () => {
+test('a side fired alone reloads faster, and the other side is still loaded', () => {
   const state = newRun(6, { islands: 0, enemies: false });
-  setFireMode(state, 'bow');
+  step(state, { turn: 0, sail: ANCHOR, fire: 'stbd' }, STEP);
+  assert.equal(state.balls.length, GUNS.balls);
+  step(state, { turn: 0, sail: ANCHOR, fire: 'port' }, STEP);
+  assert.equal(state.balls.length, GUNS.balls * 2, 'the other side fires straight after');
+  assert.ok(GUNS.single < GUNS.reload);
+  run(state, hold, GUNS.single);
+  assert.ok(canFire(state) && state.boat.reload.stbd === 0 && state.boat.reload.port === 0, 'both reloaded in the single time');
+  // A both-sides volley takes the full reload.
+  step(state, { turn: 0, sail: ANCHOR, fire: 'volley' }, STEP);
+  run(state, hold, GUNS.single);
+  assert.equal(canFire(state), false, 'a volley is still reloading');
+});
+
+test('the Bow Chaser shoots one ball straight along the heading, on its own reload', () => {
+  const state = newRun(6, { islands: 0, enemies: false, boat: 'chaser' });
   const volley = { turn: 0, sail: ANCHOR, fire: 'volley' };
   step(state, volley, STEP);
   assert.equal(state.balls.length, 1);
@@ -429,15 +443,101 @@ test('the bow cannon shoots one ball straight along the heading, on its own relo
   step(state, volley, STEP);
   assert.equal(state.balls.length, 1, 'the bow cannon is reloading');
   step(state, { turn: 0, sail: ANCHOR, fire: 'port' }, STEP);
-  assert.equal(state.balls.length, 1 + GUNS.balls, 'the broadsides are still loaded');
+  assert.equal(state.balls.length, 1, 'it has no broadsides');
   run(state, hold, BOW.reload);
+  assert.ok(canFire(state), 'reloaded');
   step(state, volley, STEP);
-  assert.equal(state.balls.filter((b) => b.dmg === BOW.dmg).length >= 1, true, 'after the reload it fires again');
+  assert.equal(canFire(state), false, 'and fired again');
+  assert.equal(state.boat.hp, BOATS.chaser.hp);
 });
 
-test('an unknown fire mode falls back to broadsides', () => {
-  const state = newRun(6, { islands: 0, enemies: false });
-  setFireMode(state, 'bow');
-  setFireMode(state, 'banana');
-  assert.equal(state.fireMode, 'broadside');
+test('an unknown boat sails as the Galleon', () => {
+  assert.equal(newRun(6, { boat: 'banana' }).boat.kind, 'galleon');
+  assert.equal(newRun(6).boat.maxHp, BOATS.galleon.hp);
+});
+
+/** A Play with one patrol boat of `hull` placed `d` px dead ahead of the player, who points east. */
+function faceOff(boat, d, hull = 'sombrero') {
+  const state = newRun(21, { islands: 0, enemies: false, hazards: false, boat });
+  state.boat.h = 0;
+  const b = state.boat;
+  state.enemies.push({
+    id: 99, hull, x: b.x + d, y: b.y, h: Math.PI / 2, spd: 0, hp: 120, maxHp: 120, r: 9, reload: { port: 9, stbd: 9 },
+    flash: 0, bump: 0, entering: false, sunk: false, sinkT: 0, ai: { state: 'circle wide', stateT: 0, orbit: 1, t: 0, brokeOff: false },
+  });
+  state.tokens.at = Infinity; // no tokens: it holds fire
+  return state;
+}
+
+test('the Ram has no guns, Charges, and sinks boats by sailing into them bow first', () => {
+  const state = faceOff('ram', 60);
+  step(state, { turn: 0, sail: FULL, fire: 'volley' }, STEP);
+  assert.equal(state.balls.length, 0, 'no guns');
+  assert.ok(state.boat.charging > 0 && !canFire(state), 'charging, and the Charge reloads');
+  let top = 0;
+  run(state, { turn: 0, sail: FULL, fire: null }, 1.2, (s) => (top = Math.max(top, s.boat.spd)));
+  assert.ok(top > BOATS.ram.spd * 1.4, `a Charge goes faster than Full sail: ${top.toFixed(0)} px/s`);
+  const hp = state.enemies[0].hp;
+  assert.ok(hp <= 120 - RAM.per * BOATS.ram.spd, `a charging ram hits hard: ${hp.toFixed(0)} hp left`);
+  assert.ok(state.boat.spd < top, 'and the Ram loses way');
+  assert.ok(state.boat.hp >= BOATS.ram.hp - 2 * RAM.recoil, 'and takes a knock itself');
+  // Side on, or too slow, it only shoves.
+  const slow = faceOff('ram', 30);
+  run(slow, { turn: 0, sail: HALF, fire: null }, 0.6);
+  assert.equal(slow.enemies[0].hp, 120, 'slow bumps do nothing');
+});
+
+test('Greek fire: a jar floats up, grabbing it sprays fire from the bow that burns boats and the water', () => {
+  const state = newRun(8, { islands: 0, enemies: false });
+  run(state, hold, GREEK.first + STEP * 2);
+  assert.equal(state.jars.length, 1, 'a jar is on the sea');
+  const jar = state.jars[0];
+  assert.ok(dist(jar, state.boat) >= 60, 'not on top of you');
+  state.boat.x = jar.x;
+  state.boat.y = jar.y;
+  step(state, hold, STEP);
+  assert.equal(state.jars.length, 0, 'grabbed');
+  assert.ok(Math.abs(state.boat.fire - GREEK.burns) < 0.1);
+  run(state, hold, 1);
+  assert.ok(state.flames.length > 4, 'flames stream out');
+  for (const f of state.flames) assert.ok(Math.abs(angDiff(Math.atan2(f.vy, f.vx), state.boat.h)) <= GREEK.spread + 1e-9, 'ahead of the bow');
+  assert.ok(state.patches.length > 0, 'and the water burns');
+  run(state, hold, GREEK.burns);
+  assert.equal(state.boat.fire, 0, 'it runs out');
+  run(state, hold, GREEK.patch + GREEK.life + 0.1);
+  assert.equal(state.flames.length + state.patches.length, 0, 'and the fire goes out');
+
+  // The stream burns a boat in front; the fire on the water burns you too.
+  const duel = faceOff('galleon', 30);
+  duel.boat.fire = 3;
+  run(duel, hold, 2);
+  assert.ok(duel.enemies[0].hp < 120 - 30, `burned to ${duel.enemies[0].hp.toFixed(0)}`);
+  const own = newRun(8, { islands: 0, enemies: false, hazards: false });
+  own.patches.push({ x: own.boat.x, y: own.boat.y, at: 0, until: 3 });
+  run(own, hold, 2);
+  assert.ok(own.boat.hp < BOATS.galleon.hp, 'sailing over burning water hurts');
+});
+
+test('a whirlpool opens away from you, pulls boats in, and Full sail gets out', () => {
+  const state = newRun(4, { islands: 0, enemies: false });
+  run(state, hold, WHIRL.first + STEP * 2);
+  assert.equal(state.whirls.length, 1, 'a whirlpool opened');
+  const w = state.whirls[0];
+  assert.ok(dist(w, state.boat) >= WHIRL.clear);
+  run(state, hold, WHIRL.grow);
+  // A boat at Anchor near the rim is drawn in to the eye, and hurt there.
+  state.boat.x = w.x + WHIRL.r * 0.8;
+  state.boat.y = w.y;
+  run(state, hold, 4);
+  assert.ok(dist(state.boat, w) < WHIRL.eye, `pulled to ${dist(state.boat, w).toFixed(1)} px from the eye`);
+  assert.ok(state.boat.hp < BOATS.galleon.hp, 'the eye hurts');
+  // From halfway in, Full sail straight out escapes.
+  state.boat.x = w.x + WHIRL.r * 0.5;
+  state.boat.y = w.y;
+  state.boat.h = 0;
+  state.boat.spd = BOATS.galleon.spd;
+  run(state, { turn: 0, sail: FULL, fire: null }, 3);
+  assert.ok(dist(state.boat, w) > WHIRL.r, 'sailed clear');
+  run(state, hold, WHIRL.lasts + WHIRL.shrink);
+  assert.equal(state.whirls.length, 0, 'and it closes');
 });

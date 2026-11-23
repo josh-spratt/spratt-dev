@@ -11,8 +11,10 @@
 //   leaderboard { start, submit, top }, backed by the page (play.js); without it there's no board
 //   seed        a fixed seed for the first Play's sea, else a random one
 //
-// A visit goes title screen → Play → Sunk! → Play → … The first key or tap
-// starts; after being sunk, one key or tap goes again. The best Score on this
+// A visit goes title screen → Play → Sunk! → Play → … The title and Sunk!
+// screens let you pick your boat (tap one, or 1 2 3); the boat you pick is
+// remembered. The first other key or tap starts; after being sunk, one key or
+// tap goes again. The best Score on this
 // browser is kept in localStorage, as a convenience: without it the game
 // still plays, it just forgets.
 //
@@ -31,14 +33,14 @@
 // and pauses on P, blur and a hidden tab. Only stepped time is survival time,
 // so nothing paused (or on a screen) counts.
 
-import { newRun, step, summary, isSunk, setFireMode, bowGun, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-21-v8';
-import { createInput } from './input.js?v=2026-11-21-v8';
-import { createView, fitScreen } from './draw.js?v=2026-11-21-v8';
+import { newRun, step, summary, isSunk, canFire, greekFire, broadsides, BOATS, BOAT_KINDS, STEP, ANCHOR, HALF, FULL } from './sim.js?v=2026-11-22-v1';
+import { createInput } from './input.js?v=2026-11-22-v1';
+import { createView, fitScreen } from './draw.js?v=2026-11-22-v1';
 
 // Matches the ?v= on the imports above (and in the other modules and
 // play.js). Bump them together when a deploy must beat a stale browser cache:
 // there's no build step to hash the filenames.
-const CACHE_BUST = '2026-11-21-v8';
+const CACHE_BUST = '2026-11-22-v1';
 
 const SAIL_NAMES = { [ANCHOR]: 'Anchor', [HALF]: 'Half', [FULL]: 'Full' };
 const BEST_KEY = 'cactus-boats:best';
@@ -77,20 +79,25 @@ function readBest() {
   }
 }
 
-const FIRE_KEY = 'cactus-boats:fire';
+const BOAT_KEY = 'cactus-boats:boat';
+// Before there were boats to pick, a player could switch the guns to a bow
+// cannon; they start on the Bow Chaser.
+const OLD_FIRE_KEY = 'cactus-boats:fire';
 
-// Which way the fire button shoots is a player preference, kept as a convenience.
-function readFire() {
+// The boat you sail is a player preference, kept as a convenience.
+function readBoat() {
   try {
-    return localStorage.getItem(FIRE_KEY) === 'bow' ? 'bow' : 'broadside';
+    const saved = localStorage.getItem(BOAT_KEY);
+    if (BOAT_KINDS.includes(saved)) return saved;
+    return localStorage.getItem(OLD_FIRE_KEY) === 'bow' ? 'chaser' : 'galleon';
   } catch {
-    return 'broadside';
+    return 'galleon';
   }
 }
 
-function saveFire(kind) {
+function saveBoat(kind) {
   try {
-    localStorage.setItem(FIRE_KEY, kind);
+    localStorage.setItem(BOAT_KEY, kind);
   } catch {
     // Not remembered; it still applies for this visit.
   }
@@ -160,25 +167,30 @@ export async function mountCactusBoats(container, opts = {}) {
   const sails = [ANCHOR, HALF, FULL].map((s) => h('span', { class: 'cb-sail', text: SAIL_NAMES[s] }));
   const timeShown = h('span', { class: 'cb-time' });
   const sinksShown = h('span', { class: 'cb-sinks' });
+  const greekShown = h('span', { class: 'cb-greek', hidden: true });
   const scoreShown = h('span', { class: 'cb-score' });
   const hud = h('div', { class: 'cb-hud', 'aria-hidden': 'true', hidden: true },
     h('span', { class: 'cb-hull' }, hullFill),
     h('span', { class: 'cb-sails' }, ...sails),
     timeShown,
     sinksShown,
+    greekShown,
     scoreShown,
   );
   const shelf = homeHref ? h('a', { class: 'cb-shelf', href: homeHref, text: 'jspratt.dev' }) : null;
   const hint = h('p', { class: 'cb-hint', hidden: true });
   const message = h('div', { class: 'cb-msg', role: 'status' });
-  // The touch pad: a stick on the left thumb, a gun button for each side on the
-  // right. Always drawn on a touch screen, so there is nothing to discover.
+  // The touch pad: a stick on the left thumb, the guns on the right: FIRE, and
+  // on the Galleon a button for each side alone. Always drawn on a touch
+  // screen, so there is nothing to discover.
   const joyKnob = h('span', { class: 'cb-knob' });
   const joy = h('div', { class: 'cb-joy' }, h('span', { class: 'cb-ring' }), joyKnob, h('span', { class: 'cb-padtag', text: 'Steer' }));
   const sailTag = h('span', { class: 'cb-sailtag' });
-  const fireBtn = h('button', { type: 'button', tabindex: '-1', class: 'cb-fire' }, h('b', { text: 'FIRE' }));
-  const modeBtn = h('button', { type: 'button', tabindex: '-1', class: 'cb-mode' });
-  const padEl = h('div', { class: 'cb-pad', hidden: true }, joy, sailTag, h('div', { class: 'cb-guns' }, modeBtn, fireBtn));
+  const fireBtn = h('button', { type: 'button', tabindex: '-1', class: 'cb-fire' }, h('b', { text: 'FIRE' }), h('span'));
+  const portBtn = h('button', { type: 'button', tabindex: '-1', class: 'cb-side' }, h('b', { text: '◀ Port' }), h('span', { text: 'left' }));
+  const stbdBtn = h('button', { type: 'button', tabindex: '-1', class: 'cb-side' }, h('b', { text: 'Stbd ▶' }), h('span', { text: 'right' }));
+  const sideBtns = h('div', { class: 'cb-sides' }, portBtn, stbdBtn);
+  const padEl = h('div', { class: 'cb-pad', hidden: true }, joy, sailTag, h('div', { class: 'cb-guns' }, sideBtns, fireBtn));
   const root = h('div', { class: 'cb' }, stage, hud, shelf, hint, padEl, message);
   container.append(root);
 
@@ -186,22 +198,15 @@ export async function mountCactusBoats(container, opts = {}) {
   const dpr = () => window.devicePixelRatio || 1;
   const box = stage.getBoundingClientRect();
   const { width } = fitScreen(box.width, box.height, dpr());
-  let state = newRun(opts.seed ?? randomSeed(), { width });
-  let fireKind = readFire();
-  setFireMode(state, fireKind);
-  const gunReady = () => (fireKind === 'bow' ? bowGun(state).ready : state.boat.reload.port <= 0 || state.boat.reload.stbd <= 0);
-  function showFireKind() {
-    modeBtn.replaceChildren(h('span', { text: 'Guns' }), h('b', { text: fireKind === 'bow' ? 'Bow cannon' : 'Broadsides' }));
-    fireBtn.dataset.kind = fireKind;
+  let boatKind = readBoat();
+  let state = newRun(opts.seed ?? randomSeed(), { width, boat: boatKind });
+  // The pad's guns, for the boat you sail.
+  function showGuns() {
+    fireBtn.firstChild.textContent = boatKind === 'ram' ? 'CHARGE' : 'FIRE';
+    fireBtn.lastChild.textContent = boatKind === 'galleon' ? 'both sides' : '';
+    sideBtns.hidden = boatKind !== 'galleon';
   }
-  function toggleMode() {
-    fireKind = fireKind === 'bow' ? 'broadside' : 'bow';
-    setFireMode(state, fireKind);
-    saveFire(fireKind);
-    showFireKind();
-    showHint();
-  }
-  showFireKind();
+  showGuns();
   view.fit(box.width, box.height, dpr(), state.sea.width);
   const resize = new ResizeObserver(() => {
     const r = stage.getBoundingClientRect();
@@ -231,17 +236,49 @@ export async function mountCactusBoats(container, opts = {}) {
     message.replaceChildren(...shown);
   }
 
+  /** The three boats, the one you'll sail picked out. A tap (or 1 2 3) picks another. */
+  function boatPicker() {
+    return h('div', { class: 'cb-boats' }, ...BOAT_KINDS.map((kind, i) => {
+      const boat = BOATS[kind];
+      const b = h('button', { type: 'button', class: kind === boatKind ? 'cb-boat cb-picked' : 'cb-boat', 'aria-pressed': String(kind === boatKind) },
+        h('b', { text: touchy() ? boat.name : `${i + 1} ${boat.name}` }),
+        h('span', { text: boat.cactus }),
+        h('span', { class: 'cb-fights', text: boat.fights }),
+      );
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        pickBoat(kind);
+      });
+      return b;
+    }));
+  }
+
+  function pickBoat(kind) {
+    if (!BOAT_KINDS.includes(kind) || (mode !== 'title' && mode !== 'sunk')) return;
+    boatKind = kind;
+    saveBoat(kind);
+    // On the title screen the sea behind shows the boat you'll sail; after
+    // being sunk, the next Play takes it.
+    if (mode === 'title') state = newRun(state.seed, { width: state.sea.width, boat: kind });
+    showGuns();
+    showHint();
+    if (mode === 'title') showTitle();
+    else if (sunk) showSunk(lastBoard);
+  }
+
   function showTitle() {
     const touch = touchy();
+    const fire = { galleon: 'both broadsides', chaser: 'the bow cannon', ram: 'Charge!' }[boatKind];
     const how = touch
-      ? [['Left stick', 'steer: the boat turns where you drag'], ['Pull to the ring', 'more sail'], ['Tap the stick', 'drop anchor'], ['FIRE', 'both broadsides (hold to keep firing)'], ['Gun button', 'switch to the bow cannon']]
-      : [['A D', 'turn'], ['W S', 'sail: anchor, half, full'], ['Space', 'fire both broadsides'], ['B', 'switch to the bow cannon'], ['J L', 'fire port, starboard alone'], ['P', 'pause']];
+      ? [['Left stick', 'steer: the boat turns where you drag'], ['Pull to the ring', 'more sail'], ['Tap the stick', 'drop anchor'], [boatKind === 'ram' ? 'CHARGE' : 'FIRE', `${fire} (hold to keep going)`], boatKind === 'galleon' ? ['Port, Stbd', 'one side alone: reloads faster'] : null]
+      : [['A D', 'turn'], ['W S', 'sail: anchor, half, full'], ['Space', fire], boatKind === 'galleon' ? ['J L', 'port, starboard alone: reloads faster'] : null, ['P', 'pause']];
     show(
       h('strong', { class: 'cb-title', text: 'Cactus Boats' }),
-      h('span', { text: 'Survive the patrols. Sink what you can.' }),
+      h('span', { text: 'Survive the patrols. Sink what you can. Grab the Greek fire; mind the whirlpools.' }),
+      boatPicker(),
       h('div', { class: 'cb-split' },
         h('div', { class: 'cb-panel' },
-          h('dl', { class: 'cb-how' }, ...how.flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { text: v })])),
+          h('dl', { class: 'cb-how' }, ...how.filter(Boolean).flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { text: v })])),
           best ? h('span', { class: 'cb-best', text: `Your best ${points(best)}` }) : null,
         ),
         boardPanel(top === undefined ? 'Reading the board…' : top === null ? 'The Leaderboard can’t be reached right now.' : null),
@@ -284,10 +321,13 @@ export async function mountCactusBoats(container, opts = {}) {
 
   // The Play just sunk, its tally, and whether it was a new best.
   let sunk = null;
+  // The Leaderboard part last shown on the Sunk! screen, to show again on picking a boat.
+  let lastBoard = null;
 
   /** The Sunk! screen: the tally, then the Leaderboard part (`board`), then how to go again. */
-  function showSunk(board, go = touchy() ? 'Tap to sail again' : 'Press any key to sail again') {
+  function showSunk(board, go = touchy() ? 'Tap the sea to sail again' : 'Press any key to sail again') {
     const { survivedMs, sinks, score, record } = sunk;
+    lastBoard = board;
     show(
       h('strong', { text: 'Sunk!' }),
       h('div', { class: 'cb-split' },
@@ -301,6 +341,7 @@ export async function mountCactusBoats(container, opts = {}) {
         ),
         board,
       ),
+      mode === 'sunk' ? boatPicker() : null,
       go ? h('span', { class: 'cb-go', text: go }) : null,
     );
   }
@@ -444,10 +485,7 @@ export async function mountCactusBoats(container, opts = {}) {
   }
 
   function setSail() {
-    if (mode === 'sunk') {
-      state = newRun(randomSeed(), { width: state.sea.width });
-      setFireMode(state, fireKind);
-    }
+    if (mode === 'sunk') state = newRun(randomSeed(), { width: state.sea.width, boat: boatKind });
     if (leaderboard) {
       run = Promise.resolve()
         .then(() => leaderboard.start())
@@ -462,9 +500,9 @@ export async function mountCactusBoats(container, opts = {}) {
     onEvent?.({ event: 'play' });
   }
 
+  const picking = new AbortController();
   const input = createInput(stage, {
-    pad: { root: padEl, joy, fire: fireBtn, mode: modeBtn },
-    onMode: () => toggleMode(),
+    pad: { root: padEl, joy, fire: fireBtn, port: portBtn, stbd: stbdBtn },
     onPause: (away) => setPaused(away ? true : !paused),
     onWake: () => {
       // The key or tap that changes screens does nothing else.
@@ -482,6 +520,14 @@ export async function mountCactusBoats(container, opts = {}) {
       return true;
     },
   });
+  // 1 2 3 pick a boat on the title and Sunk! screens, before the key can start a Play.
+  window.addEventListener('keydown', (e) => {
+    const n = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code);
+    if (n < 0 || e.metaKey || e.ctrlKey || e.altKey || (mode !== 'title' && mode !== 'sunk')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    pickBoat(BOAT_KINDS[n]);
+  }, { capture: true, signal: picking.signal });
   showTitle();
   readBoard();
   if (document.hidden) setPaused(true);
@@ -490,7 +536,9 @@ export async function mountCactusBoats(container, opts = {}) {
     hint.classList.toggle('cb-hint-top', touchy());
     hint.textContent = touchy()
       ? 'Left thumb steers · right thumb fires'
-      : 'A D turn · W S sail · Space fire · B guns · P pause';
+      : boatKind === 'galleon' ? 'A D turn · W S sail · Space fire · J L one side · P pause'
+        : boatKind === 'ram' ? 'A D turn · W S sail · Space charge · P pause'
+          : 'A D turn · W S sail · Space fire · P pause';
   }
   showHint();
 
@@ -531,7 +579,12 @@ export async function mountCactusBoats(container, opts = {}) {
 
     // The HUD, touched only when something on it changes.
     const { survivedMs, sinks, score } = summary(state);
-    const next = { hull: Math.ceil(state.boat.hp), time: clock(survivedMs), sinks, score, sail: input.sail };
+    const greek = Math.ceil(greekFire(state));
+    const next = { hull: Math.ceil(state.boat.hp), time: clock(survivedMs), sinks, score, sail: input.sail, greek };
+    if (next.greek !== shown.greek) {
+      greekShown.hidden = !greek;
+      greekShown.textContent = `Greek fire ${greek}`;
+    }
     if (next.hull !== shown.hull) hullFill.style.width = `${(100 * state.boat.hp) / state.boat.maxHp}%`;
     if (next.time !== shown.time) timeShown.textContent = next.time;
     if (next.sinks !== shown.sinks) sinksShown.textContent = `Sunk ${sinks}`;
@@ -551,7 +604,12 @@ export async function mountCactusBoats(container, opts = {}) {
       const k = s ? Math.min(1, 60 / (Math.hypot(s.dx, s.dy) || 1)) : 0;
       joyKnob.style.transform = s ? `translate(${s.dx * k}px, ${s.dy * k}px)` : '';
       sailTag.textContent = `Sail: ${SAIL_NAMES[input.sail]}`;
-      fireBtn.classList.toggle('cb-wait', !gunReady());
+      fireBtn.classList.toggle('cb-wait', !canFire(state));
+      if (boatKind === 'galleon') {
+        const guns = broadsides(state);
+        portBtn.classList.toggle('cb-wait', !guns.port.ready);
+        stbdBtn.classList.toggle('cb-wait', !guns.stbd.ready);
+      }
     }
   }
   frame = requestAnimationFrame(tick);
@@ -559,6 +617,7 @@ export async function mountCactusBoats(container, opts = {}) {
   return function destroy() {
     cancelAnimationFrame(frame);
     resize.disconnect();
+    picking.abort();
     input.destroy();
     root.remove();
     link.remove();
