@@ -12,10 +12,12 @@
 // the boat; the cactus mast stays upright. Enemies are palette swaps with a
 // pale cactus and a pennant, one per hull on the ladder: a plum Prickly Pear
 // with two guns a side, a slate Sombrero in its hat, and a rust-red Saguaro
-// under a gold pennant. Animation runs on the Play's own
+// under a gold pennant. Your boat is one of three, each with its own cactus:
+// the Galleon's Saguaro, the Bow Chaser's Barrel cactus (and a gun in the bow),
+// and the Ram's Prickly pear (and an iron beak). Animation runs on the Play's own
 // clock (state.elapsed), so a paused game is a still picture.
 
-import { SEA_HEIGHT, SEA_WIDTHS, GUNS, BOW, FX, HULLS, broadsides, bowGun } from './sim.js?v=2026-11-21-v8';
+import { SEA_HEIGHT, SEA_WIDTHS, GUNS, BOW, FX, HULLS, GREEK, WHIRL, broadsides, bowGun, whirlStrength } from './sim.js?v=2026-11-22-v1';
 
 // Every drawn pixel is one of these.
 export const PAL = {
@@ -26,6 +28,7 @@ export const PAL = {
   pink: '#ff6f91', pinkDk: '#b83a64', red: '#e8534a',
   plum: '#4a3550', plumLt: '#86648c', cream: '#f3ead2', gold: '#f2b134', iron: '#3a3a48',
   slate: '#3a4a5a', slateLt: '#6d8296', rust: '#7a2f3a', rustLt: '#c25a66',
+  orange: '#ff8a2a', clay: '#b0603a',
 };
 
 /** A whole-number scale keeps the pixels square, but on a small screen it can
@@ -112,20 +115,30 @@ const LOOKS = {
   flash: { hull: 'cream', deck: 'cream', stern: 'cream', guns: 'cream' },
 };
 
-function hullSprite(look, guns = 3) {
+// `guns` is how many a side (0 for none); `bow` adds a gun in the bow, `ram` an iron beak.
+function hullSprite(look, guns = 3, { bow = false, ram = false } = {}) {
   const c = canvas(HULL.w, HULL.h);
   const g = c.getContext('2d');
   g.translate(HULL.ax, HULL.ay);
+  if (ram) {
+    g.fillStyle = PAL[look.guns];
+    poly(g, [15, 0, 8, -4, 8, 4]);
+  }
   g.fillStyle = PAL[look.hull];
-  poly(g, [11, 0, 4, -5, -8, -5, -10, -3, -10, 3, -8, 5, 4, 5]);
+  poly(g, bow ? [12, 0, 5, -4, -8, -4, -10, -3, -10, 3, -8, 4, 5, 4] : [11, 0, 4, -5, -8, -5, -10, -3, -10, 3, -8, 5, 4, 5]);
   g.fillStyle = PAL[look.deck];
   poly(g, [8, 0, 3, -3, -7, -3, -8, -2, -8, 2, -7, 3, 3, 3]);
   g.fillStyle = PAL[look.stern];
   g.fillRect(-8, -2, 3, 4);
   g.fillStyle = PAL[look.guns];
-  for (const x of guns === 2 ? [-3, 2] : [-5, -1, 3]) {
+  for (const x of guns === 0 ? [] : guns === 2 ? [-3, 2] : [-5, -1, 3]) {
     g.fillRect(x, -5, 2, 1);
     g.fillRect(x, 4, 2, 1);
+  }
+  if (bow) g.fillRect(8, -1, 6, 2);
+  if (ram) {
+    g.fillRect(-6, -5, 10, 1);
+    g.fillRect(-6, 4, 10, 1);
   }
   return crisp(c);
 }
@@ -137,6 +150,39 @@ function mastSprite(look) {
     g.fillStyle = PAL[look[col]];
     g.fillRect(MAST.ax + x, MAST.ay + y, w, h);
   };
+  if (look.cactus === 'barrel') {
+    // A squat, ribbed barrel with pink flowers on top.
+    g.fillStyle = PAL[look.cacDk];
+    g.beginPath();
+    g.ellipse(MAST.ax, MAST.ay - 5, 5, 6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = PAL[look.cac];
+    g.beginPath();
+    g.ellipse(MAST.ax - 1, MAST.ay - 6, 3, 5, 0, 0, Math.PI * 2);
+    g.fill();
+    R('cacLt', -2, -9, 1, 6); R('cacDk', 1, -10, 1, 8);
+    R('top', -3, -12, 2, 2); R('top', 1, -12, 2, 2); R('topDk', -1, -13, 2, 2);
+    return crisp(c);
+  }
+  if (look.cactus === 'prickly') {
+    // Prickly pear: flat pads stacked on pads, with a fruit on top.
+    const pad = (x, y, rx, ry) => {
+      g.fillStyle = PAL[look.cacDk];
+      g.beginPath();
+      g.ellipse(MAST.ax + x, MAST.ay + y, rx, ry, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = PAL[look.cac];
+      g.beginPath();
+      g.ellipse(MAST.ax + x - 0.5, MAST.ay + y - 0.5, rx - 1, ry - 1, 0, 0, Math.PI * 2);
+      g.fill();
+    };
+    pad(0, -4, 3, 4);
+    pad(-3, -9, 3, 3);
+    pad(3, -10, 2.5, 3);
+    R('cacLt', -1, -5, 1, 1); R('cacLt', -4, -10, 1, 1); R('cacLt', 2, -11, 1, 1);
+    R('top', 3, -14, 2, 2); R('topDk', -4, -13, 2, 1);
+    return crisp(c);
+  }
   R('cacDk', -1, -13, 3, 13); R('cac', -1, -13, 2, 13); R('cacLt', -1, -12, 1, 10);
   R('cacDk', -4, -8, 3, 2); R('cacDk', -4, -11, 2, 4); R('cac', -4, -11, 1, 4);
   R('cacDk', 2, -6, 3, 2); R('cacDk', 3, -10, 2, 5); R('cac', 3, -10, 1, 5);
@@ -197,7 +243,9 @@ export function createView(screen) {
   const off = canvas(SEA_WIDTHS.default, SEA_HEIGHT);
   const g = off.getContext('2d');
   const sprites = {
-    player: { hull: hullSprite(LOOKS.player), flash: hullSprite(LOOKS.flash), mast: mastSprite(LOOKS.player) },
+    galleon: { hull: hullSprite(LOOKS.player), flash: hullSprite(LOOKS.flash), mast: mastSprite(LOOKS.player) },
+    chaser: { hull: hullSprite(LOOKS.player, 0, { bow: true }), flash: hullSprite(LOOKS.flash, 0, { bow: true }), mast: mastSprite({ ...LOOKS.player, cactus: 'barrel' }) },
+    ram: { hull: hullSprite(LOOKS.player, 0, { ram: true }), flash: hullSprite(LOOKS.flash, 0, { ram: true }), mast: mastSprite({ ...LOOKS.player, cactus: 'prickly' }) },
   };
   for (const hull of ['prickly', 'sombrero', 'saguaro']) {
     const guns = HULLS[hull].guns;
@@ -252,7 +300,7 @@ export function createView(screen) {
 
   // A boat: the hull turns, the mast stands upright on it. Sunk boats settle and fade.
   function drawBoat(b, look, W, H, wreck = false) {
-    const s = sprites[look] ?? sprites.prickly;
+    const s = sprites[look === 'player' ? b.kind : look] ?? sprites.prickly;
     let sink = 0;
     // The player's boat stops where it's sunk (the Play is over), so it's shown as a wreck.
     if (wreck) {
@@ -284,16 +332,18 @@ export function createView(screen) {
     g.globalAlpha = 1;
   }
 
-  // Faint arcs on each side, bright when that side is loaded and has a target.
+  // An arc on each side: red once that side is loaded (brighter with a boat
+  // to aim at, and a gold bracket on it), faint while it reloads.
   function drawArcs(state) {
     const b = state.boat;
-    if (state.fireMode === 'bow') return drawAim(state);
+    if (b.kind === 'chaser') return drawAim(state);
+    if (b.kind !== 'galleon') return;
     const guns = broadsides(state);
     for (const [side, gun] of [[-1, guns.port], [1, guns.stbd]]) {
       const dir = b.h + (side * Math.PI) / 2;
       const lit = gun.ready && gun.target;
-      g.strokeStyle = lit ? PAL.gold : gun.ready ? PAL.cream : PAL.ink;
-      g.globalAlpha = lit ? 0.55 : 0.14;
+      g.strokeStyle = gun.ready ? PAL.red : PAL.ink;
+      g.globalAlpha = lit ? 0.8 : gun.ready ? 0.45 : 0.14;
       g.lineWidth = 1;
       g.beginPath();
       g.moveTo(b.x, b.y);
@@ -305,12 +355,12 @@ export function createView(screen) {
     }
   }
 
-  // The bow cannon's line: a dotted sight straight ahead, bright once it's loaded.
+  // The bow cannon's line: a dotted sight straight ahead, red once it's loaded.
   function drawAim(state) {
     const b = state.boat;
     const ready = bowGun(state).ready;
-    g.fillStyle = ready ? PAL.gold : PAL.cream;
-    g.globalAlpha = ready ? 0.7 : 0.18;
+    g.fillStyle = ready ? PAL.red : PAL.cream;
+    g.globalAlpha = ready ? 0.8 : 0.18;
     for (let d = b.r + 6; d < BOW.range; d += 8) {
       g.fillRect(Math.round(b.x + Math.cos(b.h) * d), Math.round(b.y + Math.sin(b.h) * d), 1, 1);
     }
@@ -406,6 +456,92 @@ export function createView(screen) {
     g.globalAlpha = 1;
   }
 
+  // A whirlpool: rings of foam that spin in toward a dark eye.
+  function drawWhirls(state) {
+    const t = state.elapsed;
+    for (const w of state.whirls) {
+      const s = whirlStrength(state, w);
+      if (s <= 0) continue;
+      const R = WHIRL.r * (0.4 + 0.6 * s);
+      g.fillStyle = PAL.deep;
+      g.globalAlpha = 0.55 * s;
+      g.beginPath();
+      g.arc(w.x, w.y, R * 0.75, 0, Math.PI * 2);
+      g.fill();
+      g.globalAlpha = 0.9 * s;
+      g.beginPath();
+      g.arc(w.x, w.y, WHIRL.eye * s, 0, Math.PI * 2);
+      g.fillStyle = PAL.ink;
+      g.fill();
+      // Three arms of foam spiralling in, turning faster near the eye.
+      for (let arm = 0; arm < 3; arm++) {
+        for (let k = 0; k < 90; k++) {
+          const f = k / 90;
+          const r = WHIRL.eye + (R - WHIRL.eye) * f;
+          const a = w.spin * (t * (4 - 3 * f) - f * 5) + (arm * Math.PI * 2) / 3;
+          g.fillStyle = f < 0.6 ? PAL.foam : PAL.wave;
+          g.globalAlpha = s * (0.3 + 0.7 * (1 - f));
+          g.fillRect(Math.round(w.x + Math.cos(a) * r), Math.round(w.y + Math.sin(a) * r), 1, 1);
+        }
+      }
+      g.globalAlpha = 1;
+    }
+  }
+
+  // Burning water: flickering embers that die down as the patch goes out.
+  function drawPatches(state) {
+    const t = state.elapsed;
+    const tick = Math.floor(t * 12);
+    for (const [i, p] of state.patches.entries()) {
+      const left = (p.until - t) / GREEK.patch;
+      for (let k = 0; k < 6; k++) {
+        const h = hash(Math.round(p.at * 977) + k, tick + i);
+        if ((h & 7) > 6 * left + 1) continue;
+        const a = (h % 628) / 100;
+        const r = ((h >>> 10) % 100) / 100 * GREEK.patchR;
+        const col = [PAL.red, PAL.orange, PAL.gold][(h >>> 18) % 3];
+        g.fillStyle = col;
+        g.globalAlpha = 0.5 + 0.5 * left;
+        g.fillRect(Math.round(p.x + Math.cos(a) * r), Math.round(p.y + Math.sin(a) * r * 0.7), 1 + ((h >>> 20) & 1), 1);
+      }
+    }
+    g.globalAlpha = 1;
+  }
+
+  // A clay jar of Greek fire, bobbing, with a little flame; it blinks before it sinks.
+  function drawJars(state) {
+    const t = state.elapsed;
+    for (const j of state.jars) {
+      if (j.until - t < 3 && Math.floor(t * 6) % 2) continue;
+      const x = Math.round(j.x);
+      const y = Math.round(j.y + Math.sin(t * 3) * 1.2);
+      g.fillStyle = PAL.foam;
+      g.fillRect(x - 5, y + 4, 10, 1);
+      g.fillStyle = PAL.ink;
+      g.fillRect(x - 4, y - 4, 8, 9);
+      g.fillStyle = PAL.clay;
+      g.fillRect(x - 3, y - 2, 6, 6);
+      g.fillRect(x - 2, y - 4, 4, 2);
+      g.fillStyle = PAL.gold;
+      g.fillRect(x - 3, y, 6, 1);
+      const flick = Math.floor(t * 10) % 2;
+      g.fillStyle = PAL.orange;
+      g.fillRect(x - 1, y - 7, 2, 3);
+      g.fillStyle = PAL.gold;
+      g.fillRect(x - flick, y - 8, 1, 2);
+    }
+  }
+
+  // The stream of Greek fire: hot at the bow, red and smoky as it dies.
+  function drawFlames(state) {
+    for (const f of state.flames) {
+      const k = 1 - f.life / f.max;
+      g.fillStyle = k < 0.3 ? PAL.gold : k < 0.7 ? PAL.orange : PAL.red;
+      const s = k < 0.5 ? 2 : 3;
+      g.fillRect(Math.round(f.x) - 1, Math.round(f.y) - 1, s, s);
+    }
+  }
+
   function draw(state) {
     const { width: W, height: H } = state.sea;
     if (off.width !== W) off.width = W;
@@ -454,11 +590,15 @@ export function createView(screen) {
     }
     g.globalAlpha = 1;
 
+    drawWhirls(state);
+    drawPatches(state);
     drawFx(state, true);
     drawWarnings(state);
+    drawJars(state);
     if (!state.sunk) drawArcs(state);
     for (const e of state.enemies) drawBoat(e, e.hull, W, H);
     drawBoat(state.boat, 'player', W, H, state.sunk);
+    drawFlames(state);
     drawBalls(state);
     drawFx(state, false);
     g.setTransform(1, 0, 0, 1, 0, 0);

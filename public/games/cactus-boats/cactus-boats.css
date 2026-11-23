@@ -9,6 +9,7 @@
   --cb-panel: rgba(7, 26, 32, 0.84);
   --cb-accent: #f2b134;
   --cb-hull: #7fd65a;
+  --cb-red: #e8534a;
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -431,7 +432,7 @@
   gap: 12px;
 }
 
-/* One big FIRE button; the chip above it says what it shoots and switches it. */
+/* One big FIRE button (CHARGE on the Ram). */
 .cb-fire {
   width: 124px;
   height: 124px;
@@ -457,28 +458,109 @@
   background: rgba(242, 177, 52, 0.45);
 }
 
-.cb-mode {
+.cb-fire span {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cb-dim);
+}
+
+/* The Galleon's sides alone, above FIRE: each reloads faster than both at once. */
+.cb-sides {
+  display: flex;
+  gap: 10px;
+}
+
+.cb-sides[hidden] {
+  display: none;
+}
+
+.cb-side {
   display: grid;
   gap: 1px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(243, 234, 210, 0.4);
-  background: var(--cb-panel);
-  color: var(--cb-dim);
+  place-content: center;
+  width: 76px;
+  height: 52px;
+  border-radius: 10px;
+  border: 2px solid var(--cb-red);
+  background: rgba(232, 83, 74, 0.16);
+  color: var(--cb-ink);
   font: inherit;
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  text-align: right;
   pointer-events: auto;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.cb-mode b {
-  color: var(--cb-ink);
-  font-size: 13px;
+.cb-side b {
+  font-size: 14px;
   font-weight: 400;
+}
+
+.cb-side span {
+  color: var(--cb-dim);
+}
+
+.cb-side:active {
+  background: rgba(232, 83, 74, 0.45);
+}
+
+/* Picking a boat, on the title and Sunk! screens. Tappable, unlike the rest of the message. */
+.cb-boats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.cb-boat {
+  display: grid;
+  gap: 1px;
+  min-width: 10.5em;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(243, 234, 210, 0.3);
+  background: transparent;
+  color: var(--cb-dim);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.cb-boat b {
+  color: var(--cb-ink);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cb-boat .cb-fights {
+  font-size: 10px;
+}
+
+.cb-boat:hover,
+.cb-boat:focus-visible {
+  border-color: var(--cb-ink);
+}
+
+.cb-boat.cb-picked {
+  border: 2px solid var(--cb-accent);
+  background: rgba(242, 177, 52, 0.14);
+}
+
+.cb-boat.cb-picked b {
+  color: var(--cb-accent);
+}
+
+.cb-greek {
+  color: #ff8a2a;
+}
+
+.cb-greek[hidden] {
+  display: none;
 }
 
 /* Reloading: still pressable, but you can see it isn't ready. */
@@ -494,6 +576,8 @@
   .cb-guns { bottom: 16px; }
   .cb-fire { width: 96px; height: 96px; }
   .cb-guns { gap: 8px; }
+  .cb-side { width: 64px; height: 44px; }
+  .cb-boat { min-width: 9em; padding: 3px 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5,15 +5,21 @@
 //   step(state, intent, dt)           advances the Play one fixed tick (STEP)
 //   summary(state) -> { survivedMs, sinks, score }
 //   isSunk(state) -> true once the player's hull reaches zero; step then does nothing
-//   setFireMode(state, 'broadside'|'bow')   what the fire button shoots
-//   bowGun(state) -> { ready, reload }  the bow cannon, for the aim line
+//   newRun's `boat` is one of BOAT_KINDS ('galleon', 'chaser', 'ram'): what you sail and how it fights
+//   boatOf(state) -> that boat's BOATS entry
+//   canFire(state) -> whether the fire button would do anything now
+//   bowGun(state) -> { ready, reload }  the Bow Chaser's cannon, for the aim line
+//   ramCharge(state) -> { ready, reload, charging }  the Ram's Charge
 //   broadsides(state) -> { port, stbd }  each side's { ready, reload, target }, for the firing arcs
+//   greekFire(state) -> seconds of Greek fire left
+//   whirlStrength(state, whirl) -> 0..1, how open a whirlpool is
 //   maxSpawnedBy(survivedMs) -> the most enemies that can have been spawned by then
 //   difficultyAt(seconds) -> { every, afloat, mix }  the spawn curve at that time survived
 //
 // intent is the input layer's output: { turn: -1..1, sail: ANCHOR|HALF|FULL,
 // fire: null|'volley'|'auto'|'port'|'stbd' }; 'volley' is the fire button, which
-// shoots what state.fireMode says (both broadsides, or the bow cannon).
+// does what your boat does (both broadsides, the bow cannon, or the Ram's
+// Charge); the other three fire one of the Galleon's sides alone.
 // Time passes only inside step, so a paused
 // game (no step calls) never adds to survivedMs. All randomness comes from a
 // seeded generator kept in the state, so a seed plus a list of intents replays
@@ -24,15 +30,18 @@
 // state.islands [{ x, y, r }],
 // state.enemies [{ id, x, y, h, spd, hp, maxHp, r, flash, entering, sunk, sinkT }],
 // state.balls [{ x, y, vx, vy, life, max, from }], state.warnings [{ x, y, edge, at }],
+// state.jars [{ x, y, at, until }] (Greek fire to grab), state.flames
+// [{ x, y, life, max }], state.patches [{ x, y, at, until }] (fire on the water),
+// state.whirls [{ x, y, at, spin }],
 // state.fx [{ kind, x, y, at, dir }] (kinds: smoke, hit, splash, thud, sink) and
 // state.shake. Everything else in it is the simulation's own.
 //
-// Tuning lives in the named tables below (GUNS, PATROLS, TOKENS) and the spawn
+// Tuning lives in the named tables below (BOATS, GUNS, RAM, GREEK, WHIRL, PATROLS, TOKENS) and the spawn
 // curve in spawn.js (SPAWN), so difficulty is changed in one place. The Score
 // is in score.js.
 
-import { scoreOf } from './score.js?v=2026-11-21-v8';
-import { SPAWN, difficultyAt, maxSpawnedBy } from './spawn.js?v=2026-11-21-v8';
+import { scoreOf } from './score.js?v=2026-11-22-v1';
+import { SPAWN, difficultyAt, maxSpawnedBy } from './spawn.js?v=2026-11-22-v1';
 
 export { SPAWN, difficultyAt, maxSpawnedBy };
 
@@ -48,7 +57,7 @@ export const FULL = 2;
 export const SEA_HEIGHT = 216;
 export const SEA_WIDTHS = { min: 384, max: 468, default: 432 };
 
-// Hull stats, from the Enemy AI prototype. The player sails a Sombrero;
+// Enemy hull stats, from the Enemy AI prototype (the player's boats are in BOATS);
 // enemy patrols climb the ladder Prickly Pear, Sombrero, Saguaro (see SPAWN).
 export const HULLS = {
   prickly: { hp: 80, spd: 50, turn: 1.6, guns: 2, r: 8 },
@@ -56,22 +65,60 @@ export const HULLS = {
   saguaro: { hp: 160, spd: 47, turn: 1.4, guns: 3, r: 10 },
 };
 
+// The boats you can pick, each with its own cactus for a mast and its own way
+// to fight. The Galleon fires broadsides, the Bow Chaser a cannon in the bow,
+// and the Ram has no guns at all: the fire button is a Charge, and it sinks
+// boats by sailing into them bow first.
+export const BOATS = {
+  galleon: { name: 'Galleon', cactus: 'Saguaro', fights: 'broadsides', hp: 120, spd: 45, turn: 1.4, r: 9 },
+  chaser: { name: 'Bow Chaser', cactus: 'Barrel cactus', fights: 'a bow cannon', hp: 100, spd: 52, turn: 1.6, r: 8 },
+  ram: { name: 'Ram', cactus: 'Prickly pear', fights: 'a ram: crash into them', hp: 150, spd: 50, turn: 1.35, r: 10 },
+};
+export const BOAT_KINDS = Object.keys(BOATS);
+
 // The player's broadside guns, from the Combat Toy and Controls prototypes.
-// Each side reloads on its own. A volley bends up to `assist` radians toward
-// a target near the beam; `seek` is how far away and how far off the beam a
-// boat can be and still count as on that side. Balls carry `carry` of the
-// boat's own speed.
+// Each side reloads on its own: both at once (the fire button) takes `reload`,
+// but one side alone (J/L, or the side buttons) only `single`, so working one
+// side and then the other keeps the guns busy. A volley bends up to `assist`
+// radians toward a target near the beam; `seek` is how far away and how far
+// off the beam a boat can be and still count as on that side. Balls carry
+// `carry` of the boat's own speed.
 export const GUNS = {
-  balls: 3, reload: 3, dmg: 8, speed: 140, range: 130, assist: (20 * Math.PI) / 180,
+  balls: 3, reload: 3, single: 1.8, dmg: 8, speed: 140, range: 130, assist: (20 * Math.PI) / 180,
   seek: { range: 156, off: Math.PI / 2 }, spacing: 6, carry: 0.5,
 };
 
-// The bow cannon: the other way to fire. One heavy ball straight ahead along
-// the heading, further and faster than a broadside, on a short reload. The
-// fire button shoots it when state.fireMode is 'bow'; otherwise it shoots both
-// broadsides.
+// The Bow Chaser's cannon: one heavy ball straight ahead along the heading,
+// further and faster than a broadside, on a short reload.
 export const BOW = { dmg: 14, speed: 210, range: 190, reload: 1.1 };
-export const FIRE_MODES = ['broadside', 'bow'];
+
+// The Ram: hitting a boat within `arc` of dead ahead at more than `min` px/s
+// does `per` damage for every px/s, once per boat every `cooldown` s, shoves
+// it `knock` px and keeps `keep` of the Ram's speed, and the Ram takes
+// `recoil` itself. The Charge lifts top speed by `boost` (and acceleration
+// by `kick`) for `burst` s, every `reload` s.
+export const RAM = { arc: 0.9, min: 14, per: 0.55, cooldown: 0.7, knock: 6, keep: 0.45, recoil: 5, boost: 1.6, kick: 5, burst: 1.1, reload: 5 };
+
+// Greek fire: a jar floats up now and then (first after `first` s, then every
+// `every` s or so, for `lasts` s, never more than one). Sail over it and the
+// bow sprays fire for `burns` s: a flame every `rate` s that flies `speed`
+// px/s for `life` s, burning each boat it passes once for `dmg`. Every
+// `patchEvery`-th flame that dies on the water leaves a burning patch of
+// radius `patchR` for `patch` s, which burns any boat on it, yours too, every
+// `pulse` s (`hurtsYou` a pulse to you, `hurtsThem` to them).
+export const GREEK = {
+  first: 22, every: 32, jitter: 14, lasts: 14, grab: 7, burns: 15,
+  rate: 0.05, speed: 115, life: 0.5, spread: 0.2, dmg: 1.6, hitR: 3,
+  patchEvery: 3, patchR: 6, patch: 6, patches: 45, pulse: 0.5, hurtsYou: 3, hurtsThem: 5,
+};
+
+// Whirlpools: one opens now and then (first after `first` s, then every
+// `every` s or so) somewhere open, at least `clear` px from you. It takes
+// `grow` s to open, spins for `lasts` s, and `shrink` s to close. Inside `r`
+// it pulls boats toward the eye (`pull` px/s at the eye, `edge` of that at
+// the rim) and swirls them round (`swirl` px/s); in the eye, radius `eye`, it
+// does `dmg` a pulse. Full sail gets you out; Half sail near the eye doesn't.
+export const WHIRL = { first: 38, every: 42, jitter: 20, clear: 110, grow: 2, lasts: 12, shrink: 1.5, r: 62, eye: 9, pull: 36, edge: 0.3, swirl: 18, dmg: 6 };
 
 // How each patrol hull fights, from the Enemy AI prototype: it closes in,
 // orbits at orbitR, and fires a broadside when a side bears and you're inside
@@ -161,8 +208,9 @@ function placeIslands(state, count) {
  * keeps enemies away, for tests of sailing and gunnery alone; `unsinkable`
  * keeps the player's hull above zero, for tests that watch the whole curve.
  */
-export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = true, unsinkable = false } = {}) {
-  const hull = HULLS.sombrero;
+export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = true, hazards = true, unsinkable = false, boat = 'galleon' } = {}) {
+  const kind = BOATS[boat] ? boat : 'galleon';
+  const hull = BOATS[kind];
   const sea = { width: clamp(Math.round(width), SEA_WIDTHS.min, SEA_WIDTHS.max), height: SEA_HEIGHT };
   const state = {
     seed: seed >>> 0,
@@ -170,8 +218,9 @@ export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = tr
     elapsed: 0,
     sea,
     boat: {
-      x: sea.width / 2, y: sea.height / 2, h: -Math.PI / 2, spd: 0, hp: hull.hp, maxHp: hull.hp, r: hull.r,
-      bump: 0, scraped: 0, flash: 0, reload: { port: 0, stbd: 0, bow: 0 },
+      kind, x: sea.width / 2, y: sea.height / 2, h: -Math.PI / 2, spd: 0, hp: hull.hp, maxHp: hull.hp, r: hull.r,
+      bump: 0, scraped: 0, flash: 0, reload: { port: 0, stbd: 0, bow: 0 }, loads: { port: GUNS.reload, stbd: GUNS.reload },
+      charging: 0, fire: 0, flameAt: 0,
     },
     islands: [],
     enemies: [],
@@ -181,22 +230,29 @@ export function newRun(seed, { width = SEA_WIDTHS.default, islands, enemies = tr
     shake: 0,
     sinks: 0,
     sunk: false,
-    fireMode: 'broadside',
     unsinkable: unsinkable === true,
     // `at` is when the next warning may go up; `bound` is the earliest it
     // could under the curve alone, as maxSpawnedBy counts it.
     spawn: { on: enemies !== false, at: SPAWN.first, bound: SPAWN.first, made: 0, next: 1 },
     tokens: { at: 0, held: [] },
+    // Greek fire and whirlpools; `at` is when the next one comes.
+    hazards: { on: hazards !== false, jarAt: GREEK.first, whirlAt: WHIRL.first, burnAt: 0, flames: 0 },
+    jars: [],
+    flames: [],
+    patches: [],
+    whirls: [],
   };
   state.islands = placeIslands(state, islands);
   return state;
 }
 
 function sail(boat, intent, dt) {
-  const hull = HULLS.sombrero;
+  const hull = BOATS[boat.kind];
   const setting = [ANCHOR, HALF, FULL].includes(intent.sail) ? intent.sail : ANCHOR;
-  const top = hull.spd * [0, HANDLING.half, 1][setting];
-  boat.spd = Math.max(0, boat.spd + clamp(top - boat.spd, -HANDLING.decel * dt, HANDLING.accel * dt));
+  const charge = boat.charging > 0;
+  const top = hull.spd * (charge ? RAM.boost : [0, HANDLING.half, 1][setting]);
+  const accel = HANDLING.accel * (charge ? RAM.kick : 1);
+  boat.spd = Math.max(0, boat.spd + clamp(top - boat.spd, -HANDLING.decel * dt, accel * dt));
   const turn = clamp(Number(intent.turn) || 0, -1, 1);
   const rate = hull.turn * HANDLING.turnx * (HANDLING.floor + (1 - HANDLING.floor) * Math.min(1, boat.spd / (hull.spd * 0.6)));
   boat.h = wrapAngle(boat.h + turn * rate * dt);
@@ -299,7 +355,7 @@ export function broadsides(state) {
   const b = state.boat;
   const side = (s) => ({
     ready: b.reload[sideKey(s)] <= 0,
-    reload: Math.max(0, b.reload[sideKey(s)]) / GUNS.reload,
+    reload: Math.max(0, b.reload[sideKey(s)]) / b.loads[sideKey(s)],
     target: sideTarget(state, s)?.e ?? null,
   });
   return { port: side(-1), stbd: side(1) };
@@ -352,21 +408,43 @@ function volley(state, boat, side, target, o, from) {
 
 const PLAYER_VOLLEY = { balls: GUNS.balls, dmg: GUNS.dmg, speed: GUNS.speed, range: GUNS.range, assist: GUNS.assist, leads: true };
 
-export function setFireMode(state, mode) {
-  state.fireMode = FIRE_MODES.includes(mode) ? mode : 'broadside';
-}
+/** The player's boat's stats (BOATS), from its kind. */
+export const boatOf = (state) => BOATS[state.boat.kind];
 
-/** The bow cannon: loaded or not, and how much reload is left (0..1). */
+/** The bow cannon (the Bow Chaser's): loaded or not, and how much reload is left (0..1). */
 export function bowGun(state) {
   const r = state.boat.reload.bow;
   return { ready: r <= 0, reload: Math.max(0, r) / BOW.reload };
 }
 
+/** The Ram's Charge: ready or not, how much of its reload is left (0..1), and whether it's charging now. */
+export function ramCharge(state) {
+  const r = state.boat.reload.bow;
+  return { ready: r <= 0, reload: Math.max(0, r) / RAM.reload, charging: state.boat.charging > 0 };
+}
+
+/** Whether the fire button would do anything right now, whichever boat you sail. */
+export function canFire(state) {
+  const b = state.boat;
+  return b.kind === 'galleon' ? b.reload.port <= 0 || b.reload.stbd <= 0 : b.reload.bow <= 0;
+}
+
+/** Seconds of Greek fire left (0 when none). */
+export const greekFire = (state) => Math.max(0, state.boat.fire);
+
 // The fire button: both broadsides at once (each side that is loaded, bent
-// toward what it can reach), or one ball from the bow straight ahead.
+// toward what it can reach), one ball from the bow straight ahead, or the
+// Ram's Charge.
 function fireVolley(state) {
   const b = state.boat;
-  if (state.fireMode === 'bow') {
+  if (b.kind === 'ram') {
+    if (b.reload.bow > 0) return;
+    b.reload.bow = RAM.reload;
+    b.charging = RAM.burst;
+    addFx(state, 'smoke', b.x - Math.cos(b.h) * b.r, b.y - Math.sin(b.h) * b.r, b.h + Math.PI);
+    return;
+  }
+  if (b.kind === 'chaser') {
     if (b.reload.bow > 0) return;
     b.reload.bow = BOW.reload;
     volley(state, b, 0, null, { balls: 1, dmg: BOW.dmg, speed: BOW.speed, range: BOW.range, assist: 0 }, 'player');
@@ -376,19 +454,22 @@ function fireVolley(state) {
   let fired = false;
   for (const side of [-1, 1]) {
     if (b.reload[sideKey(side)] > 0) continue;
-    b.reload[sideKey(side)] = GUNS.reload;
+    b.reload[sideKey(side)] = b.loads[sideKey(side)] = GUNS.reload;
     volley(state, b, side, sideTarget(state, side)?.e ?? null, PLAYER_VOLLEY, 'player');
     fired = true;
   }
   if (fired) state.shake = Math.max(state.shake, HIT.recoil);
 }
 
-// Smart fire: of the loaded sides, the one with the best-lined-up target; with
-// no target either side, the side facing the nearest enemy (or any loaded side).
+// One side alone (the Galleon's): smart fire picks, of the loaded sides, the
+// one with the best-lined-up target; with no target either side, the side
+// facing the nearest enemy (or any loaded side). A side fired alone reloads
+// in GUNS.single.
 function fire(state, want) {
   if (want === 'volley') return fireVolley(state);
   if (!['auto', 'port', 'stbd'].includes(want)) return;
   const b = state.boat;
+  if (b.kind !== 'galleon') return;
   const ready = (s) => b.reload[sideKey(s)] <= 0;
   let side = want === 'port' ? -1 : want === 'stbd' ? 1 : 0;
   if (!side) {
@@ -402,7 +483,7 @@ function fire(state, want) {
     }
   }
   if (!ready(side)) return;
-  b.reload[sideKey(side)] = GUNS.reload;
+  b.reload[sideKey(side)] = b.loads[sideKey(side)] = GUNS.single;
   volley(state, b, side, sideTarget(state, side)?.e ?? null, PLAYER_VOLLEY, 'player');
   state.shake = Math.max(state.shake, HIT.recoil);
 }
@@ -571,11 +652,142 @@ function shove(state) {
       if (t.d >= min) continue;
       const nx = t.d ? t.dx / t.d : 1;
       const ny = t.d ? t.dy / t.d : 0;
+      if (i === 0) ram(state, b, t, nx, ny);
       const push = (min - t.d) / 2;
       a.x -= nx * push;
       a.y -= ny * push;
       b.x += nx * push;
       b.y += ny * push;
+    }
+  }
+}
+
+// The Ram's bow meeting enemy boat `e` (the way to it is `t`, n its unit vector).
+function ram(state, e, t, nx, ny) {
+  const b = state.boat;
+  if (b.kind !== 'ram' || b.spd < RAM.min || (e.rammed ?? 0) > 0) return;
+  if (Math.abs(angDiff(Math.atan2(t.dy, t.dx), b.h)) > RAM.arc) return;
+  e.rammed = RAM.cooldown;
+  hurt(state, e, b.spd * RAM.per);
+  hurt(state, b, RAM.recoil);
+  e.x += nx * RAM.knock;
+  e.y += ny * RAM.knock;
+  b.spd *= RAM.keep;
+  addFx(state, 'hit', b.x + nx * b.r, b.y + ny * b.r);
+  state.shake = Math.max(state.shake, HIT.shake);
+}
+
+// Somewhere open on the sea for a jar or a whirlpool: off the islands by
+// `shore` and at least `clear` from the player. Null if nowhere was found.
+function openWater(state, shore, clear) {
+  const { width, height } = state.sea;
+  for (let tries = 0; tries < 40; tries++) {
+    const p = { x: Math.round(16 + random(state) * (width - 32)), y: Math.round(16 + random(state) * (height - 32)) };
+    if (toward(state.sea, p, state.boat).d < clear) continue;
+    if (state.islands.some((isle) => Math.hypot(p.x - isle.x, p.y - isle.y) < isle.r + shore)) continue;
+    return p;
+  }
+  return null;
+}
+
+// How open a whirlpool is right now, 0..1: it grows, spins, then closes.
+export function whirlStrength(state, w) {
+  const age = state.elapsed - w.at;
+  const end = WHIRL.grow + WHIRL.lasts;
+  if (age < 0) return 0;
+  if (age < WHIRL.grow) return age / WHIRL.grow;
+  if (age < end) return 1;
+  return Math.max(0, 1 - (age - end) / WHIRL.shrink);
+}
+
+// Jars of Greek fire and whirlpools come and go; boats in a whirlpool are
+// pulled and spun; flames fly, burn, and leave fire on the water.
+function hazards(state, dt) {
+  const hz = state.hazards;
+  const b = state.boat;
+  const t = state.elapsed;
+  if (hz.on) {
+    state.jars = state.jars.filter((j) => t < j.until);
+    if (t >= hz.jarAt) {
+      hz.jarAt = t + GREEK.every + random(state) * GREEK.jitter;
+      const p = !state.jars.length && openWater(state, 12, 60);
+      if (p) state.jars.push({ ...p, at: t, until: t + GREEK.lasts });
+    }
+    state.whirls = state.whirls.filter((w) => whirlStrength(state, w) > 0 || t - w.at < WHIRL.grow);
+    if (t >= hz.whirlAt) {
+      hz.whirlAt = t + WHIRL.every + random(state) * WHIRL.jitter;
+      const p = !state.whirls.length && openWater(state, WHIRL.r * 0.5, WHIRL.clear);
+      if (p) state.whirls.push({ ...p, at: t, spin: random(state) < 0.5 ? 1 : -1 });
+    }
+  }
+
+  // Sail over a jar to grab it.
+  state.jars = state.jars.filter((j) => {
+    if (toward(state.sea, b, j).d > b.r + GREEK.grab) return true;
+    b.fire = GREEK.burns;
+    addFx(state, 'hit', j.x, j.y);
+    return false;
+  });
+
+  // Whirlpools pull boats toward the eye and spin them round it.
+  const { width, height } = state.sea;
+  const pulse = t >= hz.burnAt;
+  if (pulse) hz.burnAt = t + GREEK.pulse;
+  for (const w of state.whirls) {
+    const s = whirlStrength(state, w);
+    for (const boat of [b, ...state.enemies.filter(afloat)]) {
+      const to = toward(state.sea, boat, w);
+      if (to.d >= WHIRL.r || to.d < 0.5) {
+        if (to.d < 0.5 && pulse) hurt(state, boat, WHIRL.dmg * s);
+        continue;
+      }
+      const near = 1 - to.d / WHIRL.r;
+      const nx = to.dx / to.d;
+      const ny = to.dy / to.d;
+      const pull = Math.min(to.d, WHIRL.pull * (WHIRL.edge + (1 - WHIRL.edge) * near) * s * dt);
+      const swirl = WHIRL.swirl * near * s * dt * w.spin;
+      boat.x = wrap(boat.x + nx * pull - ny * swirl, width);
+      boat.y = wrap(boat.y + ny * pull + nx * swirl, height);
+      if (to.d < WHIRL.eye && pulse) hurt(state, boat, WHIRL.dmg * s);
+    }
+  }
+
+  // The bow sprays Greek fire while it lasts.
+  b.fire = Math.max(0, b.fire - dt);
+  if (b.fire > 0) {
+    b.flameAt -= dt;
+    while (b.flameAt <= 0) {
+      b.flameAt += GREEK.rate;
+      const d = b.h + (random(state) - 0.5) * GREEK.spread * 2;
+      state.flames.push({
+        x: wrap(b.x + Math.cos(b.h) * (b.r + 2), width), y: wrap(b.y + Math.sin(b.h) * (b.r + 2), height),
+        vx: Math.cos(d) * GREEK.speed + Math.cos(b.h) * b.spd, vy: Math.sin(d) * GREEK.speed + Math.sin(b.h) * b.spd,
+        life: GREEK.life, max: GREEK.life, hit: [],
+      });
+    }
+  } else b.flameAt = 0;
+  state.flames = state.flames.filter((f) => {
+    f.x = wrap(f.x + f.vx * dt, width);
+    f.y = wrap(f.y + f.vy * dt, height);
+    f.life -= dt;
+    for (const e of state.enemies) {
+      if (!afloat(e) || f.hit.includes(e.id) || toward(state.sea, f, e).d > e.r + GREEK.hitR) continue;
+      f.hit.push(e.id);
+      hurt(state, e, GREEK.dmg);
+    }
+    if (state.islands.some((isle) => toward(state.sea, f, isle).d < isle.r)) return false;
+    if (f.life > 0) return true;
+    hz.flames += 1;
+    if (hz.flames % GREEK.patchEvery === 0) state.patches.push({ x: f.x, y: f.y, at: t, until: t + GREEK.patch });
+    return false;
+  });
+
+  // Fire on the water burns whoever sails through it.
+  state.patches = state.patches.filter((p) => t < p.until).slice(-GREEK.patches);
+  if (pulse && state.patches.length) {
+    for (const boat of [b, ...state.enemies.filter(afloat)]) {
+      if (!state.patches.some((p) => toward(state.sea, p, boat).d < GREEK.patchR + boat.r * 0.5)) continue;
+      hurt(state, boat, boat === b ? GREEK.hurtsYou : GREEK.hurtsThem);
     }
   }
 }
@@ -614,9 +826,11 @@ function timers(state, dt) {
     b.flash = Math.max(0, b.flash - dt);
     b.reload.port = Math.max(0, b.reload.port - dt);
     b.reload.stbd = Math.max(0, b.reload.stbd - dt);
-    b.reload.bow = Math.max(0, b.reload.bow - dt);
+    b.reload.bow = Math.max(0, (b.reload.bow ?? 0) - dt);
+    b.rammed = Math.max(0, (b.rammed ?? 0) - dt);
   };
   tick(state.boat);
+  state.boat.charging = Math.max(0, state.boat.charging - dt);
   for (const e of state.enemies) {
     tick(e);
     if (e.sunk) e.sinkT += dt;
@@ -638,6 +852,7 @@ export function step(state, intent, dt = STEP) {
   arrivals(state);
   giveTokens(state);
   enemies(state, dt);
+  hazards(state, dt);
   shove(state);
   for (const b of [boat, ...state.enemies.filter(afloat)]) {
     b.x = wrap(b.x, width);
