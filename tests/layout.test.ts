@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { test } from "node:test";
-import { buildSite, pageCss } from "./helpers.ts";
+import { buildSite, pageCss, type Site } from "./helpers.ts";
 
 // The posts fixture has Projects and Posts, so every kind of page is built.
 const site = buildSite({ contentDir: "tests/fixtures/posts/content", mode: "production" });
@@ -189,12 +189,13 @@ test("the brick stack is in the Homepage Intro only, aria-hidden and with nothin
   }
 });
 
-test("no page ships a script, apart from the analytics beacon and a Post's Copy link handler", () => {
+test("no page ships a script, apart from the analytics beacon, the Holiday decorations and a Post's Copy link handler", () => {
   const beacon = /^https:\/\/static\.cloudflareinsights\.com\//;
   for (const page of pages) {
     const isPost = /^writing\/[^/]+\/index\.html$/.test(page);
     for (const s of site.html(page).querySelectorAll("script")) {
       if (isPost && s.hasAttribute("data-copy-link-script")) continue;
+      if (s.hasAttribute("data-holiday-script") && !s.hasAttribute("src")) continue;
       assert.match(s.getAttribute("src") ?? "", beacon, `${page} ships a script`);
     }
   }
@@ -211,27 +212,41 @@ test("production pages carry exactly one analytics beacon with the site token", 
 
 test("preview builds, and sites without a token, ship no beacon", () => {
   const preview = buildSite({ contentDir: "tests/fixtures/posts/content", mode: "preview" });
-  assert.equal(preview.html("index.html").querySelectorAll("script").length, 0);
+  const beacons = (s: Site) => s.html("index.html").querySelectorAll("script:not([data-holiday-script])").length;
+  assert.equal(beacons(preview), 0);
   const noToken = buildSite({ contentDir: "tests/fixtures/content", mode: "production" });
-  assert.equal(noToken.html("index.html").querySelectorAll("script").length, 0);
+  assert.equal(beacons(noToken), 0);
 });
 
 /** Screenshots inside a Post, at writing/<slug>/<file>. */
 const isPostImage = (p: string): boolean =>
   /^writing\/[^/]+\/[^/]+\.(webp|png|jpe?g)$/.test(relative(site.outDir, p));
 
-test("Lighthouse budget: the built site stays under 100 KB", () => {
+test("Lighthouse budget: the built site stays under 106 KB", () => {
   // Share cards are only fetched by link-preview crawlers, never by a page load.
   // Post images load lazily below the fold, so they have their own cap below.
   // Games load only on their own page, so they have their own cap (games.test.ts).
   // How this site counts visits is one text page few readers open; its own cap is below.
+  // The Holiday decorations load only from 20 November to 25 December; their own cap is below.
+  // Was 100 KB; the Holiday's boot script, inline on every page all year, took it to 106.
   const total = (dir: string): number =>
     readdirSync(dir).reduce((sum, f) => {
       const p = join(dir, f);
       if (f === "social.png" || f === "cards" || f === "games" || f === "privacy" || isPostImage(p)) return sum;
+      if (isHolidayDecoration(p)) return sum;
       return sum + (statSync(p).isDirectory() ? total(p) : statSync(p).size);
     }, 0);
-  assert.ok(total(site.outDir) < 100 * 1024);
+  assert.ok(total(site.outDir) < 106 * 1024);
+});
+
+/** The Holiday's lights, snow and switch: a script and a sheet, loaded only in season. */
+const isHolidayDecoration = (p: string): boolean =>
+  /^_astro\/holiday(-decorations)?\.[\w-]+\.(js|css)$/.test(relative(site.outDir, p));
+
+test("Lighthouse budget: the Holiday decorations stay under 16 KB", () => {
+  const files = readdirSync(join(site.outDir, "_astro")).map((f) => join(site.outDir, "_astro", f)).filter(isHolidayDecoration);
+  assert.equal(files.length, 2, "one script, one sheet");
+  assert.ok(files.reduce((sum, p) => sum + statSync(p).size, 0) < 16 * 1024);
 });
 
 test("Lighthouse budget: How this site counts visits is text only, under 8 KB", () => {
