@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { request } from "node:http";
+import { createServer, request, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +9,8 @@ import { after, before, test } from "node:test";
 import { unstable_startWorker } from "wrangler";
 import { parse } from "node-html-parser";
 import { buildSite, type Site } from "./helpers.ts";
-import { dashboardQuery, renderDashboard, sameString, windowDays } from "../worker/dashboard.ts";
+import { dashboardQuery, niceMax, renderDashboard, windowDays, type DashboardData } from "../worker/dashboard.ts";
+import { accessConfig, accessIdentity, certsUrl, parseKeys, teamOrigin, verifyAccessJwt, type AccessKey } from "../worker/access.ts";
 import {
   cleanInitials,
   fromPage,
@@ -43,7 +45,7 @@ let worker: Worker;
 let persist: string;
 
 const LIVE = "https://jspratt.dev";
-const STATS_KEY = "test-stats-key";
+const ACCESS_AUD = "test-access-aud";
 const navigate = { "sec-fetch-mode": "navigate" };
 
 /** Run SQL against the same local D1 the Worker uses. */
@@ -111,7 +113,46 @@ const report = (url: string, event: object, headers: Record<string, string> = {}
 const stats = (body: string) => /<span data-stats[^>]*>([^<]*)<\/span>/.exec(body)?.[1];
 const likeText = (body: string) => /<span data-like-label[^>]*>([^<]*)<\/span>/.exec(body)?.[1];
 
+// Cloudflare Access, played by a local server serving a test key as the team's certs.
+let access: Server;
+let team: string;
+let signingKey: CryptoKey;
+let publicKey: AccessKey;
+const KID = "test-kid";
+
+const b64url = (bytes: Uint8Array | string) =>
+  Buffer.from(bytes).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+/** A JWT as Access would sign it for the owner, with any claims overridden. */
+async function accessJwt(claims: Record<string, unknown> = {}, { kid = KID, key = signingKey } = {}): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "RS256", kid, typ: "JWT" }));
+  const payload = b64url(
+    JSON.stringify({ aud: [ACCESS_AUD], iss: team, email: "owner@example.com", sub: "1", iat: now, nbf: now, exp: now + 3600, ...claims }),
+  );
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(`${header}.${payload}`));
+  return `${header}.${payload}.${b64url(new Uint8Array(sig))}`;
+}
+
+const rsaKeyPair = () =>
+  crypto.subtle.generateKey(
+    { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["sign", "verify"],
+  ) as Promise<CryptoKeyPair>;
+
 before(async () => {
+  const pair = await rsaKeyPair();
+  signingKey = pair.privateKey;
+  const jwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+  publicKey = { kid: KID, kty: "RSA", alg: "RS256", n: jwk.n!, e: jwk.e! };
+  access = createServer((req, res) => {
+    if (req.url !== "/cdn-cgi/access/certs") return void res.writeHead(404).end();
+    res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ keys: [publicKey], public_cert: {}, public_certs: [] }));
+  });
+  await new Promise<void>((r) => access.listen(0, "127.0.0.1", r));
+  team = `http://127.0.0.1:${(access.address() as AddressInfo).port}`;
+
   site = buildSite({ contentDir: "tests/fixtures/posts/content", mode: "production" });
   persist = mkdtempSync(join(tmpdir(), "spratt-dev-d1-"));
   execFileSync("npx", ["wrangler", "d1", "migrations", "apply", "spratt-dev", "--local", "--persist-to", persist], {
@@ -121,13 +162,18 @@ before(async () => {
   worker = await unstable_startWorker({
     config: "wrangler.jsonc",
     assets: site.outDir,
-    bindings: { STATS_KEY: { type: "secret_text", value: STATS_KEY } },
+    bindings: {
+      ACCESS_TEAM_DOMAIN: { type: "secret_text", value: team },
+      ACCESS_AUD: { type: "secret_text", value: ACCESS_AUD },
+    },
     dev: { persist, server: { port: 0 }, inspector: false, watch: false, logLevel: "none" },
   });
+  await worker.ready;
 });
 
 after(async () => {
   await worker?.dispose();
+  access?.close();
 });
 
 test("postSlug matches Post pages only", () => {
@@ -770,116 +816,6 @@ test("a high sink count that fits the spawn curve is accepted", async () => {
   assert.deepEqual([top[0].initials, top[0].sinks], ["ACE", 154]);
 });
 
-/** Opens the dashboard with the key and returns the cookie it sets. */
-async function statsLogin(): Promise<string> {
-  const res = await get(`${LIVE}/stats/?key=${STATS_KEY}`, {});
-  assert.equal(res.status, 303);
-  assert.equal(res.headers.location, "/stats/");
-  return String(res.headers["set-cookie"]).split(";")[0];
-}
-
-test("/stats/ is the ordinary 404 page without the key, with a wrong key or wrong cookie", async () => {
-  for (const [url, headers] of [
-    [`${LIVE}/stats/`, {}],
-    [`${LIVE}/stats/?key=wrong`, {}],
-    [`${LIVE}/stats/`, { cookie: "stats=nope" }],
-    [`${LIVE}/stats/posts.json`, {}],
-  ] as const) {
-    const res = await get(url, headers);
-    assert.equal(res.status, 404, url);
-    assert.equal(res.body, site.read("404.html"));
-    assert.equal(res.headers["set-cookie"], undefined);
-  }
-});
-
-test("the key sets a hashed, /stats/-scoped cookie and redirects the key out of the address bar", async () => {
-  const res = await get(`${LIVE}/stats/?key=${STATS_KEY}`, {});
-  assert.equal(res.headers["cache-control"], "no-store");
-  const cookie = String(res.headers["set-cookie"]);
-  assert.match(cookie, /^stats=[0-9a-f]{64}; /);
-  assert.doesNotMatch(cookie, new RegExp(STATS_KEY));
-  assert.match(cookie, /Path=\/stats\/;/);
-  assert.match(cookie, /HttpOnly/);
-  assert.match(cookie, /Secure/);
-  assert.match(cookie, /SameSite=Strict/);
-});
-
-test("the dashboard shows Views, Likes, sources and tags from D1, uncached and unindexed", async () => {
-  const cookie = await statsLogin();
-  const res = await get(`${LIVE}/stats/`, { cookie });
-  assert.equal(res.status, 200);
-  assert.equal(res.headers["cache-control"], "no-store");
-  assert.match(String(res.headers["x-robots-tag"]), /noindex/);
-  assert.match(String(res.headers["content-security-policy"]), /default-src 'none'/);
-  const page = parse(res.body);
-  assert.equal(page.querySelectorAll("script").length, 0, "no client script");
-  const row = (title: string) =>
-    page.querySelectorAll("tbody tr").find((tr) => tr.querySelector("td")?.text.startsWith(title))!;
-  // Earlier tests: newer-post had 2 counted Views and 1 Like; older-post 2 Views plus one of the owner's.
-  const newer = row("Newer Post").querySelectorAll("td").map((td) => td.text.trim());
-  assert.deepEqual(newer, ["Newer Post", "AI Career", "2", "2", "1", "1"]);
-  const older = row("Older Post").querySelectorAll("td").map((td) => td.text.trim());
-  assert.deepEqual(older.slice(2), ["2", "2", "0", "0"], "the owner's View is left out");
-  assert.ok(row("bluesky"), "a ?ref= tag is a source");
-  assert.ok(row("AI"), "tags are listed");
-  // Earlier tests: one counted View, one Play and one Finish of Twenty Boats, all from hn; the owner's left out.
-  const game = row("Twenty Boats").querySelectorAll("td").map((td) => td.text.trim());
-  assert.deepEqual(game, ["Twenty Boats", "1", "1", "1", "0"]);
-  const hn = row("hn").querySelectorAll("td").map((td) => td.text.trim());
-  assert.deepEqual(hn, ["hn", "1", "1", "1"]);
-  assert.deepEqual(row("water-lost").querySelectorAll("td").map((td) => td.text.trim()), ["water-lost", "no", "1"]);
-  // Cactus Boats sits beside it: one counted View, Play and Finish (sunk), from cb; the owner's left out.
-  const cactus = row("Cactus Boats").querySelectorAll("td").map((td) => td.text.trim());
-  assert.deepEqual(cactus, ["Cactus Boats", "1", "1", "1", "0"]);
-  assert.deepEqual(row("cb").querySelectorAll("td").map((td) => td.text.trim()), ["cb", "1", "1", "1"]);
-  assert.deepEqual(row("sunk").querySelectorAll("td").map((td) => td.text.trim()), ["sunk", "no", "1"]);
-});
-
-test("the dashboard can include the owner's Views", async () => {
-  const cookie = await statsLogin();
-  const page = parse((await get(`${LIVE}/stats/?me`, { cookie })).body);
-  const older = page.querySelectorAll("tbody tr").find((tr) => tr.querySelector("td")?.text.startsWith("Older Post"))!;
-  assert.equal(older.querySelectorAll("td")[2].text.trim(), "3");
-  assert.match(page.text, /\(you\)/);
-});
-
-test("dashboardQuery only accepts the offered windows", () => {
-  assert.deepEqual(dashboardQuery(new URL(`${LIVE}/stats/`)), { days: 30, withMe: false });
-  assert.deepEqual(dashboardQuery(new URL(`${LIVE}/stats/?days=7&me`)), { days: 7, withMe: true });
-  assert.equal(dashboardQuery(new URL(`${LIVE}/stats/?days=1000`)).days, 30);
-});
-
-test("windowDays ends today and has one entry per day", () => {
-  const days = windowDays(7, new Date("2026-03-10T12:00:00Z"));
-  assert.deepEqual([days.length, days[0], days.at(-1)], [7, "2026-03-04", "2026-03-10"]);
-});
-
-test("sameString compares whole strings", () => {
-  assert.equal(sameString("abc", "abc"), true);
-  assert.equal(sameString("abc", "abd"), false);
-  assert.equal(sameString("abc", "ab"), false);
-});
-
-test("the dashboard escapes everything that came from a reader", () => {
-  const html = renderDashboard(
-    { days: 7, withMe: false },
-    {
-      posts: [],
-      daily: [],
-      windowViews: [{ slug: "<b>x</b>", views: 1 }],
-      totals: [],
-      interest: [],
-      sources: [{ source: "<script>alert(1)</script>", views: 1 }],
-      recent: [{ created_at: "2026-03-10 12:00:00", slug: "<i>", source: "\"><img>", is_me: 0 }],
-      games: [{ game: "<u>", views: 1, plays: 1, finishes: 0, lived: 0 }],
-      gameSources: [{ source: "<s>", views: 1, plays: 1, finishes: 0 }],
-      endings: [{ ending: "<em>", survived: 0, finishes: 1 }],
-    },
-  );
-  assert.doesNotMatch(html, /<script>|<img>|<b>x|<i>|<u>|<s>|<em>/);
-  assert.match(html, /&lt;script&gt;/);
-});
-
 // Events: written beside the old tables (docs/database.md).
 
 const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
@@ -1141,4 +1077,236 @@ test("a Click out to a name not on the list is the 404 page; previews and bots a
   // A recorded one after them, so the wait has something to find.
   await get(`${LIVE}/out/linkedin/`, { ...browser, cookie: `visitor=${VISITOR}` });
   assert.deepEqual(await eventsAfter(since), [event({ kind: "click_out", path: "/out/linkedin/", target: "linkedin" })]);
+});
+
+// The dashboard: /stats/, behind Cloudflare Access, read from the Events.
+
+const OWNER = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+
+/** /stats/ as Access passes it on: with a signed JWT for the owner. */
+async function openStats(path = "/stats/", headers: Record<string, string> = {}): Promise<Got> {
+  return get(`${LIVE}${path}`, { ...browser, "cf-access-jwt-assertion": await accessJwt(), ...headers });
+}
+
+const cookiesOf = (res: Got) => [res.headers["set-cookie"] ?? []].flat();
+
+/** The cells of the table row whose first cell is `first`, or undefined. */
+function rowOf(page: ReturnType<typeof parse>, first: string): string[] | undefined {
+  const tr = page.querySelectorAll("tbody tr").find((r) => r.querySelector("td")?.text.trim() === first);
+  return tr?.querySelectorAll("td").map((td) => td.text.trim());
+}
+
+const numbers = (page: ReturnType<typeof parse>, selector: string) =>
+  page.querySelectorAll(selector).map((el) => Number(el.text.replace(/,/g, "")));
+
+test("verifyAccessJwt accepts only the team's RS256 JWT for this application, in date", async () => {
+  const config = { team, aud: ACCESS_AUD };
+  assert.deepEqual(await verifyAccessJwt(await accessJwt(), config, [publicKey]), { email: "owner@example.com", sub: "1" });
+  assert.ok(await verifyAccessJwt(await accessJwt({ aud: ACCESS_AUD }), config, [publicKey]), "aud may be a string");
+  const now = Math.floor(Date.now() / 1000);
+  const other = await rsaKeyPair();
+  for (const [why, token] of [
+    ["another application", await accessJwt({ aud: ["other-aud"] })],
+    ["another team", await accessJwt({ iss: "https://evil.cloudflareaccess.com" })],
+    ["expired", await accessJwt({ exp: now - 3600, nbf: now - 7200 })],
+    ["not yet valid", await accessJwt({ nbf: now + 3600 })],
+    ["no expiry", await accessJwt({ exp: undefined })],
+    ["signed by another key", await accessJwt({}, { key: other.privateKey })],
+    ["an unknown key id", await accessJwt({}, { kid: "nope" })],
+    ["not a JWT", "x.y.z"],
+    ["empty", ""],
+  ] as const) {
+    assert.equal(await verifyAccessJwt(token, config, [publicKey]), null, why);
+  }
+  const [h, p, sig] = (await accessJwt()).split(".");
+  const forged = b64url(JSON.stringify({ ...JSON.parse(Buffer.from(p, "base64url").toString()), email: "x@evil.example" }));
+  assert.equal(await verifyAccessJwt(`${h}.${forged}.${sig}`, config, [publicKey]), null, "a changed payload");
+  const none = b64url(JSON.stringify({ alg: "none", kid: KID }));
+  assert.equal(await verifyAccessJwt(`${none}.${p}.`, config, [publicKey]), null, "alg none");
+});
+
+test("without both Access secrets nothing opens, whatever the request carries", async () => {
+  assert.equal(accessConfig({}), null);
+  assert.equal(accessConfig({ ACCESS_TEAM_DOMAIN: "jspratt.cloudflareaccess.com" }), null);
+  assert.equal(accessConfig({ ACCESS_TEAM_DOMAIN: "jspratt.cloudflareaccess.com", ACCESS_AUD: " " }), null);
+  assert.deepEqual(accessConfig({ ACCESS_TEAM_DOMAIN: " a.cloudflareaccess.com ", ACCESS_AUD: "x" }), { team: "a.cloudflareaccess.com", aud: "x" });
+  const signed = req(`${LIVE}/stats/`, { "cf-access-jwt-assertion": await accessJwt() });
+  assert.equal(await accessIdentity(signed, null), null);
+  assert.equal(teamOrigin("jspratt.cloudflareaccess.com"), "https://jspratt.cloudflareaccess.com");
+  assert.equal(certsUrl("https://jspratt.cloudflareaccess.com/"), "https://jspratt.cloudflareaccess.com/cdn-cgi/access/certs");
+  assert.deepEqual(parseKeys({ keys: [publicKey, { kid: "ec", kty: "EC" }, null] }), [publicKey]);
+  assert.deepEqual(parseKeys("nope"), []);
+});
+
+test("/stats/ is the ordinary 404 page without a valid Access JWT, and sets no cookie", async () => {
+  const cases: [string, Record<string, string>][] = [
+    ["/stats/", {}],
+    ["/stats/", { "cf-access-jwt-assertion": "x.y.z" }],
+    ["/stats/", { "cf-access-jwt-assertion": await accessJwt({ aud: ["other-aud"] }) }],
+    ["/stats/", { "cf-access-jwt-assertion": await accessJwt({ exp: 1, nbf: 0 }) }],
+    ["/stats/", { "cf-access-jwt-assertion": await accessJwt({}, { key: (await rsaKeyPair()).privateKey }) }],
+    ["/stats/", { cookie: "stats=0123abcd", "cf-access-jwt-assertion": "" }],
+    ["/stats/?key=test-stats-key", {}],
+    ["/stats/posts.json", { "cf-access-jwt-assertion": await accessJwt() }],
+    ["/stats/other/", { "cf-access-jwt-assertion": await accessJwt() }],
+  ];
+  for (const [path, headers] of cases) {
+    const res = await get(`${LIVE}${path}`, { ...browser, ...headers });
+    assert.equal(res.status, 404, `${path} ${JSON.stringify(headers).slice(0, 60)}`);
+    assert.equal(res.body, site.read("404.html"));
+    assert.equal(res.headers["set-cookie"], undefined);
+  }
+  const post = await send("POST", `${LIVE}/stats/`, { "cf-access-jwt-assertion": await accessJwt() });
+  assert.equal(post.status, 404);
+});
+
+test("the dashboard is uncached, unindexed, scriptless, and says who is signed in", async () => {
+  const res = await openStats();
+  assert.equal(res.status, 200);
+  assert.equal(res.headers["cache-control"], "no-store");
+  assert.match(String(res.headers["x-robots-tag"]), /noindex/);
+  assert.match(String(res.headers["content-security-policy"]), /default-src 'none'/);
+  const page = parse(res.body);
+  assert.equal(page.querySelectorAll("script").length, 0, "no client script");
+  assert.match(page.text, /Signed in as owner@example\.com/);
+  assert.ok(page.querySelector('a[href="/privacy/"]'));
+  assert.deepEqual(
+    page.querySelectorAll("h2").map((h) => h.childNodes[0].text.trim()),
+    ["Active Visitors", "Views", "New and returning Visitors", "Games", "Posts", "Click outs"],
+  );
+  assert.deepEqual(rowOf(page, "Twenty Boats")?.length, 5, "every Game has a row");
+  assert.ok(rowOf(page, "Newer Post"), "every Post has a row");
+});
+
+test("opening /stats/ through Access marks the browser as the owner's, its past and future Events too", async () => {
+  const cookie = `visitor=${OWNER}`;
+  let since = lastEventId();
+  await get(`${LIVE}/writing/`, { ...browser, cookie });
+  assert.deepEqual(await eventsAfter(since), [event({ path: "/writing/", visitor: OWNER })], "not yet the owner's");
+
+  const res = await openStats("/stats/", { cookie: `${cookie}; stats=0123abcd` });
+  assert.equal(res.status, 200);
+  const set = cookiesOf(res);
+  assert.ok(set.includes("me=1; Path=/; Max-Age=34560000; HttpOnly; Secure; SameSite=Lax"), String(set));
+  assert.ok(set.includes("stats=; Path=/stats/; Max-Age=0; HttpOnly; Secure; SameSite=Strict"), "the old STATS_KEY cookie is cleared");
+  assert.ok(!set.some((c) => c.startsWith("visitor=")), "an existing Visitor keeps its id");
+  assert.deepEqual(sql(`SELECT COUNT(*) AS n FROM owner_visitors WHERE visitor = '${OWNER}'`), [{ n: 1 }]);
+  assert.deepEqual(sql(`SELECT DISTINCT is_me FROM events WHERE visitor = '${OWNER}'`), [{ is_me: 1 }], "past Events flagged");
+
+  // Later, even without the `me` cookie, this Visitor's Events are the owner's.
+  since = lastEventId();
+  await get(`${LIVE}/games/`, { ...browser, cookie });
+  await get(`${LIVE}/out/github/`, { ...browser, cookie, referer: `${LIVE}/games/` });
+  assert.deepEqual(await eventsAfter(since, 2), [
+    event({ path: "/games/", visitor: OWNER, is_me: 1 }),
+    event({ kind: "click_out", path: "/games/", visitor: OWNER, is_me: 1, target: "github" }),
+  ]);
+
+  // A browser with no Visitor id yet gets one, and it's the owner's.
+  const fresh = await openStats();
+  const id = /^visitor=([0-9a-f-]{36});/.exec(cookiesOf(fresh).find((c) => c.startsWith("visitor=")) ?? "")?.[1];
+  assert.ok(id);
+  assert.deepEqual(sql(`SELECT COUNT(*) AS n FROM owner_visitors WHERE visitor = '${id}'`), [{ n: 1 }]);
+  assert.equal((await openStats("/stats/", { cookie })).status, 200, "opening it again is fine");
+});
+
+test("the dashboard counts active, new and returning Visitors, Views, Plays, Likes and Click outs from the Events, without the owner", async () => {
+  const before = parse((await openStats()).body);
+  const [a, b, c] = ["d1d1d1d1-0000-4000-8000-000000000001", "d1d1d1d1-0000-4000-8000-000000000002", "d1d1d1d1-0000-4000-8000-000000000003"];
+  const at = (ago: string) => `datetime('now', '${ago}')`;
+  const row = (kind: string, path: string, visitor: string | null, when: string, more: { ref?: string; game?: string; target?: string; is_me?: number } = {}) =>
+    `('${kind}', '${path}', ${more.ref ? `'${more.ref}'` : "NULL"}, ${visitor ? `'${visitor}'` : "NULL"}, ${more.is_me ?? 0}, ${more.game ? `'${more.game}'` : "NULL"}, ${more.target ? `'${more.target}'` : "NULL"}, ${when})`;
+  sql(`INSERT INTO events (kind, path, ref, visitor, is_me, game, target, created_at) VALUES ${[
+    // Three Visitors: today, 3 days ago and 20 days ago; the last was here 60 days ago too.
+    row("view", "/dash/page/", a, at("-1 minute"), { ref: "dash-src" }),
+    row("view", "/dash/page/", b, at("-3 days"), { ref: "dash-src" }),
+    row("view", "/dash/page/", c, at("-20 days"), { ref: "dash-src" }),
+    row("view", "/dash/old/", c, at("-60 days"), { ref: "dash-old" }),
+    // Plays and a Finish of one Game, by two Visitors.
+    row("play", "/games/dash-game/", a, at("-2 minutes"), { game: "dash-game" }),
+    row("play", "/games/dash-game/", a, at("-2 minutes"), { game: "dash-game" }),
+    row("play", "/games/dash-game/", b, at("-3 days"), { game: "dash-game" }),
+    row("finish", "/games/dash-game/", a, at("-2 minutes"), { game: "dash-game" }),
+    // Likes and an Interest on a Post.
+    row("like", "/writing/dash-post/", a, at("-1 minute")),
+    row("like", "/writing/dash-post/", b, at("-3 days")),
+    row("interest", "/writing/dash-post/", a, at("-1 minute")),
+    // Click outs.
+    row("click_out", "/", a, at("-1 minute"), { target: "dash-target" }),
+    row("click_out", "/", a, at("-1 minute"), { target: "dash-target" }),
+    row("click_out", "/", b, at("-3 days"), { target: "dash-target" }),
+    // The owner: a marked Visitor's Event that somehow isn't flagged, and a flagged one with no Visitor.
+    row("view", "/dash/page/", OWNER, at("-1 minute"), { ref: "dash-owner" }),
+    row("view", "/dash/page/", null, at("-1 minute"), { ref: "dash-me", is_me: 1 }),
+    row("click_out", "/", OWNER, at("-1 minute"), { target: "dash-owner-target" }),
+  ].join(", ")}`);
+
+  const page = parse((await openStats()).body);
+  const delta = (sel: string) => numbers(page, sel).map((n, i) => n - numbers(before, sel)[i]);
+  assert.deepEqual(delta(".tile .value"), [1, 2, 3], "daily, weekly and monthly active Visitors");
+  assert.deepEqual(delta(".pair b"), [2, 1], "two new Visitors, one returning");
+  const today = (p: typeof page) => rowOf(p, page.querySelector("details tbody td")!.text.trim())!.slice(1).map(Number);
+  assert.deepEqual(today(page).map((n, i) => n - today(before)[i]), [1, 2, 3], "the trend's last day");
+
+  assert.deepEqual(rowOf(page, "/dash/page/"), ["/dash/page/", "3", "3"]);
+  assert.deepEqual(rowOf(page, "dash-src"), ["dash-src", "3", "3"]);
+  assert.equal(rowOf(page, "/dash/old/"), undefined, "before the window");
+  assert.deepEqual(rowOf(page, "/games/dash-game/"), ["/games/dash-game/", "3", "1", "2", "1.5"]);
+  assert.deepEqual(rowOf(page, "/writing/dash-post/"), ["/writing/dash-post/", "2", "1"]);
+  assert.deepEqual(rowOf(page, "dash-target"), ["dash-target", "3", "2"]);
+  for (const owners of ["dash-owner", "dash-me", "dash-owner-target"]) assert.equal(rowOf(page, owners), undefined, owners);
+
+  const withMe = parse((await openStats("/stats/?me")).body);
+  assert.deepEqual(rowOf(withMe, "/dash/page/"), ["/dash/page/", "5", "4"], "with the owner: two more Views, one more Visitor");
+  assert.ok(rowOf(withMe, "dash-owner") && rowOf(withMe, "dash-me") && rowOf(withMe, "dash-owner-target"));
+
+  const week = parse((await openStats("/stats/?days=7")).body);
+  assert.deepEqual(rowOf(week, "/dash/page/"), ["/dash/page/", "2", "2"], "7 days leaves the 20-day-old View out");
+  assert.equal(week.querySelectorAll("details tbody tr").length, 7);
+});
+
+test("the daily cron strips Visitor ids from Events older than 13 months, keeping the Events", async () => {
+  const old = "0c0c0c0c-0000-4000-8000-000000000001";
+  const recent = "0c0c0c0c-0000-4000-8000-000000000002";
+  sql(`INSERT INTO events (kind, path, visitor, created_at) VALUES
+    ('view', '/cron/', '${old}', datetime('now', '-14 months')),
+    ('view', '/cron/', '${recent}', datetime('now', '-12 months'))`);
+  // worker.scheduled() looks in the proxy, not the runtime that holds the Worker, so reach the runtime's Miniflare.
+  const runtime = (worker.raw.runtimes as unknown as { mf?: { getWorker(name: string): Promise<{ scheduled(o: { cron: string }): Promise<{ outcome: string }> }> } }[]).find((r) => r.mf)!;
+  const res = await (await runtime.mf!.getWorker("spratt-dev")).scheduled({ cron: "17 3 * * *" });
+  assert.equal(res.outcome, "ok");
+  assert.deepEqual(sql("SELECT visitor FROM events WHERE path = '/cron/' ORDER BY created_at"), [{ visitor: null }, { visitor: recent }]);
+});
+
+test("dashboardQuery only accepts the offered windows", () => {
+  assert.deepEqual(dashboardQuery(new URL(`${LIVE}/stats/`)), { days: 30, withMe: false });
+  assert.deepEqual(dashboardQuery(new URL(`${LIVE}/stats/?days=7&me`)), { days: 7, withMe: true });
+  assert.equal(dashboardQuery(new URL(`${LIVE}/stats/?days=365`)).days, 365);
+  assert.equal(dashboardQuery(new URL(`${LIVE}/stats/?days=1000`)).days, 30);
+});
+
+test("windowDays ends today and has one entry per day", () => {
+  const days = windowDays(7, new Date("2026-03-10T12:00:00Z"));
+  assert.deepEqual([days.length, days[0], days.at(-1)], [7, "2026-03-04", "2026-03-10"]);
+});
+
+test("niceMax rounds the chart's top up to 1, 2 or 5 × 10ⁿ", () => {
+  assert.deepEqual([0, 1, 3, 7, 12, 50, 51, 999].map(niceMax), [1, 1, 5, 10, 20, 50, 100, 1000]);
+});
+
+test("the dashboard escapes everything that came from a reader", () => {
+  const data: DashboardData = {
+    posts: [],
+    active: [{ day: "2026-03-10", dau: 1, wau: 1, mau: 1 }],
+    current: { dau: 1, wau: 1, mau: 1 },
+    pages: [{ path: "/<b>x</b>/", views: 1, visitors: 1 }],
+    sources: [{ source: "<script>alert(1)</script>", views: 1, visitors: 1 }],
+    visitors: { fresh: 1, returning: 0 },
+    games: [{ game: "<u>", plays: 1, finishes: 0, players: 1 }],
+    reactions: [{ path: "/writing/<i>/", likes: 1, interest: 0 }],
+    clicks: [{ target: "\"><img>", clicks: 1, visitors: 1 }],
+  };
+  const html = renderDashboard({ days: 7, withMe: false }, data, { email: "<em>@x" }, new Date("2026-03-10T12:00:00Z"));
+  assert.doesNotMatch(html, /<script>|<img>|<b>x|<i>|<u>|<em>/);
+  assert.match(html, /&lt;script&gt;/);
 });

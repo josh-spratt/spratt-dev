@@ -8,21 +8,12 @@
  * and for a Game it logs the page's Views and the Plays and Finishes the game
  * reports, and keeps its Leaderboard. A Like and the email-interest answer are
  * plain form POSTs, so the page ships no client script. /stats/ is the owner's
- * private traffic dashboard.
+ * private traffic dashboard, read from the Events, behind Cloudflare Access. A
+ * daily cron strips Visitor ids from Events older than 13 months.
  */
 
-import {
-  STATS_COOKIE,
-  cookieValue,
-  dashboardQuery,
-  isDashboard,
-  renderDashboard,
-  sameString,
-  statsCookie,
-  statsToken,
-  type DashboardData,
-  type PostMeta,
-} from "./dashboard.ts";
+import { dashboardQuery, isDashboard, loadDashboard, renderDashboard, type PostMeta } from "./dashboard.ts";
+import { accessConfig, accessIdentity } from "./access.ts";
 
 import {
   INTEREST_ANCHOR,
@@ -85,12 +76,15 @@ const LOG_GAME =
 // Events. Written apart from the old tables' statements, and never awaited by
 // the response, so an Event that fails can't change what the old tables or the
 // reader get.
-const RECORD_EVENT =
-  "INSERT INTO events (kind, path, ref, referrer, visitor, is_me, game, ending, survived, target) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+// An Event is the owner's when the browser has the `me` cookie or its Visitor
+// has opened /stats/ through Access (owner_visitors).
+const OWNER_VISITOR = (visitor: string) => `EXISTS (SELECT 1 FROM owner_visitors WHERE visitor = ${visitor})`;
+const RECORD_EVENT = `INSERT INTO events (kind, path, ref, referrer, visitor, is_me, game, ending, survived, target)
+  VALUES (?1, ?2, ?3, ?4, ?5, MAX(?6, ${OWNER_VISITOR("?5")}), ?7, ?8, ?9, ?10)`;
 // A Like, Interest or Click out has no source of its own: it takes the source
 // of this Visitor's latest View of the page (?2), or none (direct).
 const RECORD_FROM_VIEW = `INSERT INTO events (kind, path, ref, referrer, visitor, is_me, target)
-  SELECT ?1, ?2, v.ref, v.referrer, ?3, ?4, ?5 FROM (SELECT 1) LEFT JOIN (
+  SELECT ?1, ?2, v.ref, v.referrer, ?3, MAX(?4, ${OWNER_VISITOR("?3")}), ?5 FROM (SELECT 1) LEFT JOIN (
     SELECT ref, referrer FROM events WHERE visitor = ?3 AND kind = 'view' AND path = ?2 ORDER BY id DESC LIMIT 1
   ) v ON 1`;
 
@@ -435,8 +429,8 @@ async function topScores(request: Request, env: Env, game: LeaderboardGame): Pro
 }
 
 /**
- * Anyone without the key gets the ordinary 404 page, so /stats/ looks like it
- * isn't there. The path is one no asset has, so the assets serve the 404 page.
+ * Anyone who isn't the owner gets the ordinary 404 page, so /stats/ looks like
+ * it isn't there. The path is one no asset has, so the assets serve the 404 page.
  */
 async function notFound(env: Env, request: Request): Promise<Response> {
   const page = await env.ASSETS.fetch(new URL("/stats/not-found/", request.url));
@@ -444,24 +438,6 @@ async function notFound(env: Env, request: Request): Promise<Response> {
   headers.set("cache-control", "no-store");
   return new Response(page.body, { status: 404, headers });
 }
-
-// The window is the last N UTC days including today: ?1 is "-(N-1) days".
-// ?2 = 1 includes the owner's Views.
-const IN_WINDOW = "created_at >= date('now', ?1) AND (?2 = 1 OR is_me = 0)";
-const SOURCE = "COALESCE(ref, referrer, 'direct')";
-const DASHBOARD_SQL = [
-  `SELECT date(created_at) AS day, COUNT(*) AS views FROM view_log WHERE ${IN_WINDOW} GROUP BY day`,
-  `SELECT slug, COUNT(*) AS views FROM view_log WHERE ${IN_WINDOW} GROUP BY slug`,
-  `SELECT ${SOURCE} AS source, COUNT(*) AS views FROM view_log WHERE ${IN_WINDOW} GROUP BY source ORDER BY views DESC, source LIMIT 25`,
-  `SELECT created_at, slug, ${SOURCE} AS source, is_me FROM view_log WHERE ${IN_WINDOW} ORDER BY created_at DESC, id DESC LIMIT 25`,
-  "SELECT slug, views, likes FROM post_stats",
-  "SELECT slug, COUNT(*) AS answers FROM interest GROUP BY slug",
-  `SELECT game, SUM(event = 'view') AS views, SUM(event = 'play') AS plays, SUM(event = 'finish') AS finishes, SUM(event = 'finish' AND survived = 1) AS lived FROM game_log WHERE ${IN_WINDOW} GROUP BY game ORDER BY game`,
-  `SELECT ${SOURCE} AS source, SUM(event = 'view') AS views, SUM(event = 'play') AS plays, SUM(event = 'finish') AS finishes FROM game_log WHERE ${IN_WINDOW} GROUP BY source ORDER BY views DESC, plays DESC, source LIMIT 25`,
-  `SELECT ending, survived, COUNT(*) AS finishes FROM game_log WHERE event = 'finish' AND ${IN_WINDOW} GROUP BY ending, survived ORDER BY finishes DESC, ending LIMIT 25`,
-];
-/** The queries above that take the window (?1) and the owner switch (?2). */
-const WINDOWED = new Set([0, 1, 2, 3, 6, 7, 8]);
 
 /** The Posts in this build (src/pages/stats/posts.json.ts), read straight from the assets. */
 async function buildPosts(env: Env, request: Request): Promise<PostMeta[]> {
@@ -479,48 +455,54 @@ const PRIVATE_HEADERS = {
   "x-robots-tag": "noindex, nofollow",
 };
 
+// Marking the owner: this Visitor joins owner_visitors, and its Events so far
+// are flagged, so the dashboard and every later count leave them out.
+const MARK_OWNER = "INSERT INTO owner_visitors (visitor) VALUES (?1) ON CONFLICT (visitor) DO NOTHING";
+const FLAG_OWNER_EVENTS = "UPDATE events SET is_me = 1 WHERE visitor = ?1 AND is_me = 0";
+
+/** The old STATS_KEY dashboard's cookie, cleared from any browser that still sends it. */
+const OLD_STATS_COOKIE = "stats=; Path=/stats/; Max-Age=0; HttpOnly; Secure; SameSite=Strict";
+
+// Secrets, so not in wrangler.jsonc; `wrangler types` only knows them when .dev.vars has them.
+type AccessEnv = Env & { ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string };
+
 /**
- * /stats/?key=<STATS_KEY> once per browser sets a cookie holding a hash of the
- * key, then redirects to /stats/ so the key leaves the address bar. With no
- * STATS_KEY set (branch previews, local runs without .dev.vars) nothing opens.
+ * /stats/: the owner's dashboard, behind Cloudflare Access. Access signs the
+ * owner in before the request gets here; the Worker checks Access's signed
+ * JWT too, and without a valid one (or without ACCESS_TEAM_DOMAIN and
+ * ACCESS_AUD set, as on branch previews) it's the 404 page. Opening it marks
+ * this browser as the owner's: its Visitor id and the site-wide `me` cookie.
  */
 async function dashboard(request: Request, env: Env, url: URL): Promise<Response> {
-  // A secret, so not in wrangler.jsonc; `wrangler types` only knows it when .dev.vars has it.
-  const key = (env as Env & { STATS_KEY?: string }).STATS_KEY;
-  if (!key || request.method !== "GET" || !isDashboard(url.pathname)) return notFound(env, request);
-  const token = await statsToken(key);
+  if (request.method !== "GET" || !isDashboard(url.pathname)) return notFound(env, request);
+  const identity = await accessIdentity(request, accessConfig(env as AccessEnv));
+  if (!identity) return notFound(env, request);
 
-  const given = url.searchParams.get("key");
-  if (given !== null) {
-    if (!sameString(await statsToken(given), token)) return notFound(env, request);
-    return new Response(null, {
-      status: 303,
-      headers: { ...PRIVATE_HEADERS, location: "/stats/", "set-cookie": statsCookie(token) },
-    });
+  const visitor = visitorOf(request);
+  try {
+    await env.DB.batch([env.DB.prepare(MARK_OWNER).bind(visitor.id), env.DB.prepare(FLAG_OWNER_EVENTS).bind(visitor.id)]);
+  } catch (err) {
+    console.error("marking the owner failed", err);
   }
-  if (!sameString(cookieValue(request, STATS_COOKIE) ?? "", token)) return notFound(env, request);
 
   const q = dashboardQuery(url);
-  const since = `-${q.days - 1} days`;
-  const withMe = q.withMe ? 1 : 0;
-  const [posts, results] = await Promise.all([
-    buildPosts(env, request),
-    env.DB.batch(
-      DASHBOARD_SQL.map((sql, i) => (WINDOWED.has(i) ? env.DB.prepare(sql).bind(since, withMe) : env.DB.prepare(sql))),
-    ),
-  ]);
-  const [daily, windowViews, sources, recent, totals, interest, games, gameSources, endings] = results.map((r) => r.results);
-  const data = { posts, daily, windowViews, sources, recent, totals, interest, games, gameSources, endings } as DashboardData;
-
-  return new Response(renderDashboard(q, data), {
-    headers: {
-      ...PRIVATE_HEADERS,
-      "content-type": "text/html; charset=utf-8",
-      "content-security-policy":
-        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-    },
+  const data = await loadDashboard(env.DB, q, await buildPosts(env, request));
+  const headers = new Headers({
+    ...PRIVATE_HEADERS,
+    "content-type": "text/html; charset=utf-8",
+    "content-security-policy":
+      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
+  headers.append("set-cookie", meCookie());
+  if (visitor.cookie) headers.append("set-cookie", visitor.cookie);
+  if (/(?:^|;\s*)stats=/.test(request.headers.get("cookie") ?? "")) headers.append("set-cookie", OLD_STATS_COOKIE);
+  return new Response(renderDashboard(q, data, { email: identity.email }), { headers });
 }
+
+// Visitor ids are kept for 13 months, then stripped from the Events, which
+// stay (docs/adr/0001-first-party-visitor-cookie.md). Run daily by the cron
+// trigger in wrangler.jsonc.
+const STRIP_VISITORS = "UPDATE events SET visitor = NULL WHERE visitor IS NOT NULL AND created_at < datetime('now', '-13 months')";
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -575,5 +557,10 @@ export default {
     const isHtml = page.headers.get("content-type")?.startsWith("text/html");
     if (!slug || page.status !== 200 || !isHtml) return page;
     return post(request, env, slug, page);
+  },
+
+  async scheduled(_controller, env): Promise<void> {
+    const { meta } = await env.DB.prepare(STRIP_VISITORS).run();
+    console.log(`stripped Visitor ids from ${meta.changes} Events older than 13 months`);
   },
 } satisfies ExportedHandler<Env>;

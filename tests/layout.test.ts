@@ -224,13 +224,19 @@ test("Lighthouse budget: the built site stays under 100 KB", () => {
   // Share cards are only fetched by link-preview crawlers, never by a page load.
   // Post images load lazily below the fold, so they have their own cap below.
   // Games load only on their own page, so they have their own cap (games.test.ts).
+  // How this site counts visits is one text page few readers open; its own cap is below.
   const total = (dir: string): number =>
     readdirSync(dir).reduce((sum, f) => {
       const p = join(dir, f);
-      if (f === "social.png" || f === "cards" || f === "games" || isPostImage(p)) return sum;
+      if (f === "social.png" || f === "cards" || f === "games" || f === "privacy" || isPostImage(p)) return sum;
       return sum + (statSync(p).isDirectory() ? total(p) : statSync(p).size);
     }, 0);
   assert.ok(total(site.outDir) < 100 * 1024);
+});
+
+test("Lighthouse budget: How this site counts visits is text only, under 8 KB", () => {
+  assert.ok(statSync(join(site.outDir, "privacy/index.html")).size < 8 * 1024);
+  assert.equal(site.html("privacy/index.html").querySelectorAll("img").length, 0);
 });
 
 test("Lighthouse budget: each image inside a Post stays under 80 KB", () => {
@@ -243,4 +249,16 @@ test("Lighthouse budget: each image inside a Post stays under 80 KB", () => {
     const kb = statSync(p).size / 1024;
     assert.ok(kb < 80, `${relative(site.outDir, p)} is ${kb.toFixed(1)} KB`);
   }
+});
+
+test("every page's footer links to How this site counts visits", () => {
+  for (const page of pages) {
+    assert.ok(site.html(page).querySelector('footer a[href="/privacy/"]'), `${page} links to it`);
+  }
+});
+
+test("How this site counts visits says what is kept, and for how long", () => {
+  const text = site.html("privacy/index.html").querySelector("main")!.text.replace(/\s+/g, " ");
+  for (const promise of [/400 days/, /never stores your IP address/, /13 months/, /kept for good/]) assert.match(text, promise);
+  for (const kind of ["A View", "A Play", "A Finish", "A Like", "An Interest", "A Click out"]) assert.ok(text.includes(kind), kind);
 });
