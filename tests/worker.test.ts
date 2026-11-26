@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { after, before, test } from "node:test";
 import { unstable_startWorker } from "wrangler";
 import { parse } from "node-html-parser";
@@ -54,14 +55,25 @@ const browser = { ...navigate, "user-agent": BROWSER };
 const ME = "eeeeeeee-0000-4000-8000-00000000000e";
 const mine = { ...browser, cookie: `visitor=${ME}` };
 
-/** Run SQL against the same local D1 the Worker uses. */
+let db: DatabaseSync;
+
+/**
+ * Run SQL against the same local D1 the Worker uses, by opening its SQLite file directly.
+ * (Spawning `wrangler d1 execute` per query cost ~0.8s each and was most of this file's runtime.)
+ */
 function sql(command: string): Record<string, unknown>[] {
-  const out = execFileSync(
-    "npx",
-    ["wrangler", "d1", "execute", "spratt-dev", "--local", "--persist-to", persist, "--json", "--command", command],
-    { stdio: "pipe", env: { ...process.env, CI: "1" } },
-  );
-  return JSON.parse(out.toString())[0].results;
+  if (!db) {
+    const dir = join(persist, "v3", "d1", "miniflare-D1DatabaseObject");
+    const file = readdirSync(dir).find((f) => f.endsWith(".sqlite") && f !== "metadata.sqlite");
+    db = new DatabaseSync(join(dir, file!));
+    db.exec("PRAGMA busy_timeout = 5000");
+  }
+  const stmt = db.prepare(command);
+  if (stmt.columns().length === 0) {
+    stmt.run();
+    return [];
+  }
+  return stmt.all().map((row) => ({ ...row }));
 }
 
 /** How many Events of a kind a page has, the owner's included. Post Views, Likes and Interest are written before the response. */
@@ -180,6 +192,7 @@ before(async () => {
 });
 
 after(async () => {
+  db?.close();
   await worker?.dispose();
   access?.close();
 });

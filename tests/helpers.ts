@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse } from "node-html-parser";
 
@@ -20,13 +19,18 @@ export interface Site {
 }
 
 const root = resolve(import.meta.dirname, "..");
+const buildsDir = join(root, "node_modules", ".cache", "test-builds");
 
 /** Build the site into a temp dir and return a reader over the output. */
 export function buildSite(options: BuildOptions = {}): Site {
-  const outDir = mkdtempSync(join(tmpdir(), "spratt-dev-build-"));
+  // Inside the project, so Astro keeps its prerender chunks in outDir. Outside it, every build
+  // shares ./.astro/.prerender, and test files building at once break each other.
+  mkdirSync(buildsDir, { recursive: true });
+  const outDir = mkdtempSync(join(buildsDir, "build-"));
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (options.contentDir) env.CONTENT_DIR = resolve(options.contentDir);
   if (options.mode) env.BUILD_MODE = options.mode;
+  env.ASTRO_CACHE_DIR = `${outDir}-cache`;
   execFileSync(
     "npx",
     ["astro", "build", "--outDir", outDir, "--silent"],

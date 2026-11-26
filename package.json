@@ -11,7 +11,7 @@
     "preview": "astro preview",
     "check": "astro check && npm run check:worker",
     "check:worker": "wrangler types worker/worker-configuration.d.ts > /dev/null && tsc -p worker",
-    "test": "node --test --test-concurrency=1 tests/*.test.ts tests/*/*.test.js",
+    "test": "rm -rf node_modules/.cache/test-builds && node --test tests/*.test.ts tests/*/*.test.js",
     "check:links": "node scripts/check-links.mjs dist",
     "lhci": "lhci autorun",
     "cards": "node scripts/post-cards.mjs"
