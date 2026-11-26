@@ -1,23 +1,33 @@
 # Database
 
-Events, Views, the View log, Likes, Interest, the Game log and the Leaderboard are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
+Events, the owner's Visitors, Views, the View log, Likes, Interest, the Game log and the Leaderboard are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
 
 Every page of the site (`/`, `/games/`, `/writing/*`, each Game's page), a Game's event and Leaderboard addresses, `/out/*` and `/stats*` (`run_worker_first` in `wrangler.jsonc`) run the Worker script (`worker/index.ts`). Every other path (CSS, images, a Game's files) is served straight from `dist/`. A test checks that every built page is on the list, so a new page that isn't fails `npm test`.
 
 ## Events
 
-Since 2026-11, the Worker records every View, Play, Finish, Like, Interest and Click out as one row in `events` (see `GLOSSARY.md`), all in the same shape: `kind`, `path` (the page), `created_at`, its source (`ref`, `referrer`), its `visitor`, `is_me`, and for some kinds `game`, `ending`, `survived` or `target`. This runs **beside** the old tables below, which are written exactly as before and still drive "Read N times", `npm run views` and `/stats/`. A later change moves those onto Events, copies the old history across and drops the old tables.
+Since 2026-11, the Worker records every View, Play, Finish, Like, Interest and Click out as one row in `events` (see `GLOSSARY.md`), all in the same shape: `kind`, `path` (the page), `created_at`, its source (`ref`, `referrer`), its `visitor`, `is_me`, and for some kinds `game`, `ending`, `survived` or `target`. This runs **beside** the old tables below, which are written exactly as before and still drive "Read N times" and `npm run views`. The dashboard at `/stats/` reads only Events. A later change moves the rest onto Events, copies the old history across and drops the old tables.
 
 - **View**: a browser navigation (`Sec-Fetch-Mode: navigate`, GET) to any page on `jspratt.dev`, answered with the page (200) or the browser's cached copy (304). A user agent on the short `BOT_AGENTS` list in `worker/stats.ts` (link previews, uptime checkers, headless browsers), or none at all, isn't a View; add to the list when a bot shows up in the Events. `?liked` and `?interested` (the redirects back after a form) aren't Views. On a Game's page `game` is set too.
 - **Play** and **Finish**: each report the game sends to `/games/<name>/event`, with its own `ref` and `referrer` as for `game_log`, and `game`, `ending`, `survived`. `path` is the Game's page.
 - **Like** and **Interest**: each one that writes to the old tables. They take the source of this Visitor's latest View of the Post.
 - **Click out**: the Homepage's Projects and the header Links point at `/out/<name>/` (e.g. `/out/github/`, `/out/marinaradb/`). The Worker records the Click out, with `path` the page it was clicked on (from `Referer`; the `/out/` address itself when there's none), `target` the name and the source of this Visitor's latest View of that page, then answers 302 to the real address. Names come from `/out/links.json`, which the build writes from `site.json`'s Links and `projects.json` (a Project's name is its title, lowercased to letters, digits and dashes), so only those addresses can be reached and any other name is the 404 page. The build also writes a plain `/out/<name>/` page that goes on to the address, which is what `astro dev` and the link checkers see.
 
-Only the live hostname records Events; previews and local runs serve pages and redirect Click outs without writing. The owner's `me` cookie sets `is_me = 1`, as for the old tables. Events are written after the response is sent and apart from the old tables' writes, so a failed Event never changes a count or what a reader sees.
+Only the live hostname records Events; previews and local runs serve pages and redirect Click outs without writing. An Event is the owner's (`is_me = 1`) when the browser has the `me` cookie, or its Visitor is in `owner_visitors` (below). Events are written after the response is sent and apart from the old tables' writes, so a failed Event never changes a count or what a reader sees.
 
 ### The Visitor cookie
 
-So the site can count daily, weekly and monthly active Visitors (distinct `visitor` with an Event in the last 1, 7 or 30 days), the Worker gives each browser a random id (a UUID) in a `visitor` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`, 400 days, set the first time the browser has an Event on the live site and never renewed. Every Event records it. It says nothing about who the person is, and no IP is ever stored. Visitor ids are to be stripped from Events older than 13 months. Why a cookie and not a hash: `docs/adr/0001-first-party-visitor-cookie.md`.
+So the site can count daily, weekly and monthly active Visitors (distinct `visitor` with an Event in the last 1, 7 or 30 days), the Worker gives each browser a random id (a UUID) in a `visitor` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`, 400 days, set the first time the browser has an Event on the live site and never renewed. Every Event records it. It says nothing about who the person is, and no IP is ever stored. Why a cookie and not a hash: `docs/adr/0001-first-party-visitor-cookie.md`. The public page at `/privacy/` ("How this site counts visits", linked from every page's footer) explains all this in plain words; change it whenever what's recorded changes.
+
+Events are kept for good, but a Visitor id isn't: a cron trigger (`triggers.crons` in `wrangler.jsonc`, daily at 03:17 UTC) runs the Worker's `scheduled` handler, which sets `visitor` to NULL on every Event older than 13 months. The Event stays, so the counts don't change; it just can't be tied to the browser's other Events any more. Free plans include cron triggers. To run it by hand, use the same `UPDATE`:
+
+```sh
+npx wrangler d1 execute spratt-dev --remote --command "UPDATE events SET visitor = NULL WHERE visitor IS NOT NULL AND created_at < datetime('now', '-13 months')"
+```
+
+### The owner's Visitors
+
+`owner_visitors` holds the Visitor id of every browser that has opened `/stats/` through Cloudflare Access (below). Opening it adds the browser's id (giving it one first if it has none), flags that Visitor's Events so far `is_me = 1`, and sets the site-wide `me` cookie, so the old tables flag it too. Every later Event from that Visitor is flagged when it's written, even without the `me` cookie. The dashboard also leaves out any Event whose Visitor is in `owner_visitors`, flagged or not. These ids are the owner's own browsers, so they aren't stripped after 13 months.
 
 Count active Visitors, leaving yours out:
 
@@ -40,7 +50,9 @@ For a Post page, the Worker also:
 
 ## Your own Views
 
-Visit `https://jspratt.dev/writing/?me` once in each browser you use, phone included. It sets a `me=1` cookie on the whole site that lasts 400 days. That browser's Views, Plays and Finishes, and all its Events, are still logged, with `is_me = 1`, but Views don't add to `post_stats`, so the "Read N times" readers see leaves you out. Until 2026-11-17 the cookie was scoped to `/writing/` only, so a browser marked before then needs to visit the address again before its Plays are flagged. Clearing cookies undoes it; visit the address again. Cloudflare Web Analytics doesn't know about the cookie.
+Open `https://jspratt.dev/stats/` once in each browser you use, phone included, and sign in to Access. That marks the browser as yours (see "The owner's Visitors" above) and sets the `me` cookie. Until the old tables go, `https://jspratt.dev/writing/?me` still works too, and sets only the cookie.
+
+The `me=1` cookie is on the whole site and lasts 400 days. That browser's Views, Plays and Finishes, and all its Events, are still logged, with `is_me = 1`, but Views don't add to `post_stats`, so the "Read N times" readers see leaves you out. Clearing cookies undoes it; open `/stats/` again. Cloudflare Web Analytics doesn't know about the cookie.
 
 ## Tagging shared links
 
@@ -126,17 +138,29 @@ Add the next numbered `.sql` file to `migrations/`. Run `npx wrangler d1 migrati
 
 ## The dashboard
 
-`https://jspratt.dev/stats/` shows Views per day, per Post, per source and per tag, plus Likes, Interest, the latest Views, and each Game's Views, Plays and Finishes by source and by Ending. The Worker renders it straight from D1 on each load, with no client script. Tags come from each Post's frontmatter via `/stats/posts.json`, which the build writes, so no migration was needed for them.
+`https://jspratt.dev/stats/` is the one place to read the counts. The Worker renders it straight from `events` on each load, with no client script, and it reads fine on a phone. It shows six things, leaving your own Events out:
 
-It's private. Without a `STATS_KEY` secret, `/stats/` (and everything under it) is the ordinary 404 page.
+1. **Active Visitors**: daily, weekly and monthly (distinct Visitors with an Event in the last 24 hours, 7 days and 30 days, rolling from now), and the three as lines over the window, one point per UTC day.
+2. **Views** by page and by source.
+3. **New and returning Visitors**: of the Visitors in the window, those whose first Event is in it, and those who had one before it.
+4. **Games**: per Game, Plays, Finishes, the Visitors who played, and Plays per Visitor (Plays over those Visitors).
+5. **Posts**: Likes and Interest per Post.
+6. **Click outs** by target.
 
-- [ ] Pick a long random key, e.g. `openssl rand -hex 32`, and keep it in your password manager.
-- [ ] `npx wrangler secret put STATS_KEY` and paste it.
-- [ ] Visit `https://jspratt.dev/stats/?key=<the key>` once in each browser you use. It sets a `stats` cookie on `/stats/` holding a hash of the key, not the key, for 400 days, then redirects to `/stats/`.
+The window is 7, 30, 90 or 365 UTC days including today (`?days=7`; 30 by default), and `?me` (**Include me**) puts your own Events back in. Post titles come from `/stats/posts.json`, which the build writes; the Worker reads it from the assets and never serves it.
 
-Changing the secret signs every browser out. Branch previews don't get the secret, so they show the 404. Locally, put `STATS_KEY=...` in `.dev.vars` (gitignored) before `npx wrangler dev`.
+### Cloudflare Access
 
-The window is 7, 30 or 90 UTC days (`?days=7`), and `?me` includes your own Views. The all-time numbers come from `post_stats`, which never includes yours.
+The page sits behind a free Cloudflare Zero Trust Access application on `jspratt.dev/stats*`, so Cloudflare signs you in before the request reaches the Worker (`docs/adr/0002-cloudflare-access-for-stats.md`). Access adds a signed JWT in the `Cf-Access-Jwt-Assertion` header, and the Worker checks it too (`worker/access.ts`): signed with RS256 by one of the team's keys at `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` (fetched at most once an hour), issued by the team, for this application's AUD, and in date. Without a valid one, `/stats/` and everything under it is the ordinary 404 page.
+
+It fails closed. The Worker needs two secrets, `ACCESS_TEAM_DOMAIN` (e.g. `jspratt.cloudflareaccess.com`) and `ACCESS_AUD` (the application's Application Audience tag). With either missing or blank, as on branch previews and local runs, nothing opens, whatever headers the request carries. Setup steps are in `docs/launch-checklist.md` (Cloudflare Access).
+
+- To sign in on a new browser, open `https://jspratt.dev/stats/` and sign in to Access. That browser is then marked as yours.
+- To let in another browser or person, change the Access policy, not the code.
+- If Cloudflare rotates the signing keys, nothing to do: the Worker fetches the new ones when it sees a key id it hasn't got.
+- If the AUD changes (the application was recreated), `npx wrangler secret put ACCESS_AUD` again.
+
+Locally, put `ACCESS_TEAM_DOMAIN=...` and `ACCESS_AUD=...` in `.dev.vars` (gitignored) to try it, but `wrangler dev` has no Access in front of it, so a real JWT has to be pasted into the header by hand. The tests stand in for Access with their own key (`tests/worker.test.ts`).
 
 ## Reading the counts
 

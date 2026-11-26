@@ -1,0 +1,83 @@
+---
+// How this site counts visits: the public account of what the Worker records
+// (docs/database.md, docs/adr/0001-first-party-visitor-cookie.md). Keep it in
+// step with what the Worker actually does.
+import Page from "../layouts/Page.astro";
+import { site } from "../lib/site";
+---
+
+<Page
+  title={`How this site counts visits | ${site.name}`}
+  description="What this site records when you read or play something, and what it doesn't.">
+  <article class="post privacy">
+    <header class="post-head">
+      <h1>How this site counts visits</h1>
+    </header>
+
+    <p>
+      I like knowing whether anyone reads what I write or plays what I make. So the site keeps a small record of
+      what happens on it. Here's all of it.
+    </p>
+
+    <h2>An anonymous id for your browser</h2>
+    <p>
+      The first time your browser does something here, the site gives it a cookie called <code>visitor</code>
+      holding a random id, like <code>0b3c9d5e-1f2a-4b6c-8d7e-9f0a1b2c3d4e</code>. It's made up on the spot and
+      says nothing about who you are. It lets me count how many different browsers visit in a day, a week or a
+      month, and whether people come back.
+    </p>
+    <ul>
+      <li>It lasts about 400 days and isn't renewed, so after that your browser gets a new one.</li>
+      <li>It's only ever sent to this site. No other site, advertiser or tracker sees it.</li>
+      <li>One person on a phone and a laptop counts as two browsers.</li>
+      <li>Clearing your cookies for this site throws it away.</li>
+    </ul>
+
+    <h2>No IP addresses</h2>
+    <p>
+      The site never stores your IP address, your location, your name or your email. Cloudflare, which hosts the
+      site, handles every request the way any web host does, but nothing it sees is added to the record.
+    </p>
+
+    <h2>What gets recorded</h2>
+    <p>Each thing below is one line in the record, with the page it happened on, the time, and the browser's id.</p>
+    <ul>
+      <li><strong>A View</strong>: opening any page of the site.</li>
+      <li><strong>A Play</strong>: starting a run of a game.</li>
+      <li><strong>A Finish</strong>: a run reaching its ending, and which ending.</li>
+      <li><strong>A Like</strong>: pressing Like at the end of a post.</li>
+      <li>
+        <strong>An Interest</strong>: answering "I would" to whether you'd subscribe by email. No address is asked
+        for.
+      </li>
+      <li><strong>A Click out</strong>: following a link from here to another site, such as GitHub.</li>
+    </ul>
+    <p>
+      Each line also notes how you arrived: the <code>?ref=</code> tag on the link if it had one (like
+      <code>?ref=bluesky</code>), else the name of the site that linked here, else "direct". Link previews, crawlers
+      and other bots aren't counted.
+    </p>
+
+    <h2>How long it's kept</h2>
+    <p>
+      The counts are kept for good. The browser ids aren't: once a line is 13 months old, its id is wiped, so it
+      can no longer be tied to anything else your browser did.
+    </p>
+
+    <h2>Other cookies</h2>
+    <ul>
+      <li><code>liked</code> and <code>interested</code> remember that you've already liked a post or answered, so you can't do it twice.</li>
+      <li><code>me</code> is on my own browsers, so my visits don't count.</li>
+    </ul>
+    <p>
+      For a short while longer the pages also load Cloudflare Web Analytics, which counts visits without cookies.
+      It's being removed now that the site counts for itself.
+    </p>
+
+    <h2>Who sees it</h2>
+    <p>
+      Only me, on a private page. The one number anyone else sees is how many times a post has been read, shown at
+      its top. If you'd like to ask about any of this, <a href="/out/email/">email me</a>.
+    </p>
+  </article>
+</Page>

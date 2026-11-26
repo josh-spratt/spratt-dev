@@ -47,3 +47,21 @@ Steps that happen outside the repo, in the Cloudflare dashboard or GitHub. Tick 
   - Result (2026-11-12): returns `1` after #42 deployed. Dashboard visits not confirmed yet; they should appear by 2026-11-13.
 - [x] Turn off automatic injection for the site (Manage site → Advanced Options) so the beacon is never added twice.
   - Done (2026-11-12): RUM switched to **Enable with JS Snippet installation**.
+
+## Cloudflare Access for /stats/ (analytics rebuild, PR 2)
+
+Do these in order. The Worker fails closed (no secrets or no valid Access JWT means `/stats/` is the 404 page), so no order leaves `/stats/` open, but this order means no gap where you can't reach it.
+
+- [ ] Apply the migration before merging: `npx wrangler d1 migrations apply spratt-dev --remote` (adds `owner_visitors`).
+- [ ] Zero Trust (one.dash.cloudflare.com) → pick a team name if asked (free plan). Your team domain is `<team>.cloudflareaccess.com` (Settings → Custom Pages shows it).
+- [ ] Settings → Authentication: keep **One-time PIN** (email codes), optionally add GitHub as a login method.
+- [ ] Access → Applications → Add an application → **Self-hosted**. Name `jspratt.dev stats`; Session duration e.g. 1 month; Application domain `jspratt.dev`, path `stats*` (covers `/stats` and `/stats/…`).
+- [ ] Add a policy: Action **Allow**, Include → **Emails** → your own email address. Save.
+- [ ] Open the application's **Overview** and copy the **Application Audience (AUD) Tag**.
+- [ ] `npx wrangler secret put ACCESS_TEAM_DOMAIN` → `<team>.cloudflareaccess.com`
+- [ ] `npx wrangler secret put ACCESS_AUD` → the AUD tag.
+- [ ] Merge the PR and wait for the deploy.
+- [ ] Open `https://jspratt.dev/stats/` in each browser you use, phone included, and sign in. Check the page footer says "Signed in as …".
+- [ ] Check a private window without signing in gets the Access login, and `curl -s -o /dev/null -w '%{http_code}' -H 'cf-access-jwt-assertion: x' https://<branch>-spratt-dev.jaspratt42.workers.dev/stats/` returns 404.
+- [ ] Remove the old secret: `npx wrangler secret delete STATS_KEY`.
+- [ ] The next day, check the cron ran: Worker → Settings → Trigger Events shows `17 3 * * *`, and its log says "stripped Visitor ids …".

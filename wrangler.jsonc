@@ -5,8 +5,8 @@
 	// /out/* to record Click outs, and for /stats* to serve the private traffic
 	// dashboard (see worker/index.ts). Every other path (CSS, images, a Game's
 	// files) is served straight from the assets without running the script. The
-	// dashboard needs the STATS_KEY secret (`npx wrangler secret put STATS_KEY`);
-	// without it /stats/ is a 404.
+	// dashboard sits behind Cloudflare Access and needs the ACCESS_TEAM_DOMAIN and
+	// ACCESS_AUD secrets (docs/database.md); without them /stats/ is a 404.
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "spratt-dev",
 	"main": "worker/index.ts",
@@ -37,6 +37,7 @@
 			"/",
 			"/games/",
 			"/writing/*",
+			"/privacy/",
 			"/games/twenty-boats/",
 			"/games/twenty-boats/event",
 			"/games/cactus-boats/",
@@ -50,6 +51,11 @@
 			"/stats",
 			"/stats/*"
 		]
+	},
+	// Daily at 03:17 UTC: strip Visitor ids from Events older than 13 months
+	// (the Worker's scheduled handler). Free plans include cron triggers.
+	"triggers": {
+		"crons": ["17 3 * * *"]
 	},
 	// Create once with `npx wrangler d1 create spratt-dev`; see docs/database.md.
 	"d1_databases": [

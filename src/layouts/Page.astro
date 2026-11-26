@@ -92,6 +92,7 @@ const hasHero = Astro.slots.has("hero");
       <p>
         © {new Date().getUTCFullYear()} {site.name}
         {hasPosts && <> · <a href="/writing/rss.xml">RSS</a></>}
+        {" · "}<a href="/privacy/">How this site counts visits</a>
       </p>
     </footer>
   </body>
