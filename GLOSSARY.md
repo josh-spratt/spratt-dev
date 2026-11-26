@@ -45,7 +45,7 @@ The Homepage block listing the latest three Posts. It doesn't exist until the fi
 _Avoid_: blog section, latest posts
 
 **View**:
-One browser visit to any page of the live site: the Homepage, the Games page, the Writing list, a Post or a Game's page. Crawlers, previews and local runs don't count, and Josh's own Views (from any browser he has signed into the private stats page with) are logged but not counted. A Post's View count is shown in its header once it has one. Each View's source is its `?ref=` tag, else the site that linked to it, else direct.
+One browser visit to any page of the live site: the Homepage, the Games page, the Writing list, a Post or a Game's page. Crawlers, previews and local runs don't count, and Josh's own Views (from any browser he has signed into the private stats page with) are recorded but not counted. A Post's View count is shown in its header once it has one. Each View's source is its `?ref=` tag, else the site that linked to it, else direct.
 _Avoid_: hit, pageview, read count
 
 **Play**:

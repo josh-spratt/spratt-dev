@@ -31,7 +31,7 @@ Each Game's page preloads its modules and data with `gamePreloads()` from `src/l
 
 ## Deploy
 
-Workers Builds deploys `main` to production and gives every other branch a preview URL. `wrangler.jsonc` serves `dist/`. A small Worker script (`worker/`) runs only for `/writing/*` and the Games, where it counts and logs Views (and a Game's Plays and Finishes) in a D1 database (`npm run views` shows where they came from, and the private dashboard at `/stats/` charts them): see [docs/database.md](docs/database.md). The dashboard setup is in [docs/launch-checklist.md](docs/launch-checklist.md).
+Workers Builds deploys `main` to production and gives every other branch a preview URL. `wrangler.jsonc` serves `dist/`. A small Worker script (`worker/`) runs for every page, where it records each View, Play, Finish, Like, Interest and Click out as an Event in a D1 database (the private dashboard at `/stats/` charts them): see [docs/database.md](docs/database.md). The dashboard setup is in [docs/launch-checklist.md](docs/launch-checklist.md).
 
 ## License
 

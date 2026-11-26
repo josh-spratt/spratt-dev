@@ -1,7 +1,7 @@
 {
 	// Static build output, plus a small Worker script that runs for every page of
-	// the site to record its Views as Events in D1 (and, for /writing/*, the old
-	// Post counts), for a Game's event address to log Plays and Finishes, for
+	// the site to record its Views as Events in D1 (and, for a Post, to show its
+	// counts), for a Game's event address to record Plays and Finishes, for
 	// /out/* to record Click outs, and for /stats* to serve the private traffic
 	// dashboard (see worker/index.ts). Every other path (CSS, images, a Game's
 	// files) is served straight from the assets without running the script. The

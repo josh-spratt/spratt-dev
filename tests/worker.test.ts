@@ -47,6 +47,12 @@ let persist: string;
 const LIVE = "https://jspratt.dev";
 const ACCESS_AUD = "test-access-aud";
 const navigate = { "sec-fetch-mode": "navigate" };
+const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
+/** A reader's browser navigating to a page. */
+const browser = { ...navigate, "user-agent": BROWSER };
+/** One of the owner's browsers: its Visitor is in owner_visitors from the start. */
+const ME = "eeeeeeee-0000-4000-8000-00000000000e";
+const mine = { ...browser, cookie: `visitor=${ME}` };
 
 /** Run SQL against the same local D1 the Worker uses. */
 function sql(command: string): Record<string, unknown>[] {
@@ -58,12 +64,13 @@ function sql(command: string): Record<string, unknown>[] {
   return JSON.parse(out.toString())[0].results;
 }
 
-const views = (slug: string) => sql(`SELECT views FROM post_stats WHERE slug = '${slug}'`)[0]?.views;
-const likes = (slug: string) => sql(`SELECT likes FROM post_stats WHERE slug = '${slug}'`)[0]?.likes;
+/** How many Events of a kind a page has, the owner's included. Post Views, Likes and Interest are written before the response. */
+const count = (kind: string, path: string) => Number(sql(`SELECT COUNT(*) AS n FROM events WHERE kind = '${kind}' AND path = '${path}'`)[0].n);
+const views = (slug: string) => count("view", `/writing/${slug}/`);
+const likes = (slug: string) => count("like", `/writing/${slug}/`);
+const interest = (slug: string) => count("interest", `/writing/${slug}/`);
 const viewLog = (slug: string) =>
-  sql(`SELECT referrer, ref, is_me FROM view_log WHERE slug = '${slug}' ORDER BY id`);
-const gameLog = () => sql("SELECT game, event, ending, survived, referrer, ref, is_me FROM game_log ORDER BY id");
-const interest = (slug: string) => sql(`SELECT COUNT(*) AS n FROM interest WHERE slug = '${slug}'`)[0].n;
+  sql(`SELECT referrer, ref, is_me FROM events WHERE kind = 'view' AND path = '/writing/${slug}/' ORDER BY id`);
 
 interface Got {
   status: number;
@@ -100,7 +107,7 @@ async function send(method: string, url: string, headers: Record<string, string>
   });
 }
 
-const get = (url: string, headers: Record<string, string> = navigate) => send("GET", url, headers);
+const get = (url: string, headers: Record<string, string> = browser) => send("GET", url, headers);
 
 /** A browser submitting a Post form (Like or email interest) on the page at `url`'s origin. */
 const like = (url: string, headers: Record<string, string> = {}) =>
@@ -159,6 +166,7 @@ before(async () => {
     stdio: "pipe",
     env: { ...process.env, CI: "1" },
   });
+  sql(`INSERT INTO owner_visitors (visitor) VALUES ('${ME}')`);
   worker = await unstable_startWorker({
     config: "wrangler.jsonc",
     assets: site.outDir,
@@ -218,7 +226,7 @@ test("a browser View on the live site is counted and shown, uncached", async () 
   assert.equal(first.headers["cache-control"], "no-store");
   const second = await get(`${LIVE}/writing/newer-post/`);
   assert.equal(stats(second.body), " · Read 2 times");
-  assert.equal(views("newer-post"), 2);
+  assert.equal(views("newer-post"), 2, "each one is a View Event");
 });
 
 test("a request without Sec-Fetch-Mode (crawler, curl) is not counted but still sees the count", async () => {
@@ -229,15 +237,16 @@ test("a request without Sec-Fetch-Mode (crawler, curl) is not counted but still 
 });
 
 test("a preview hostname reads counts but never writes", async () => {
-  await get("https://views.spratt-dev.example.workers.dev/writing/older-post/");
-  assert.equal(views("older-post"), undefined);
+  const { body } = await get("https://views.spratt-dev.example.workers.dev/writing/newer-post/");
+  assert.equal(stats(body), " · Read 2 times");
+  assert.equal(views("newer-post"), 2);
 });
 
-test("an unknown slug creates no row and still gets the 404 page", async () => {
+test("an unknown slug records nothing and still gets the 404 page", async () => {
   const { status, body } = await get(`${LIVE}/writing/not-a-post/`);
   assert.equal(status, 404);
   assert.equal(body, site.read("404.html"));
-  assert.equal(views("not-a-post"), undefined);
+  assert.equal(views("not-a-post"), 0);
 });
 
 test("/writing/ and the feed pass through unchanged", async () => {
@@ -260,7 +269,7 @@ test("a Like on the live site adds one, sets the cookie and redirects back", asy
 
 test("the redirect back after a Like isn't a new View, and shows Liked", async () => {
   const before = views("newer-post");
-  const { body } = await get(`${LIVE}/writing/newer-post/?liked`, { ...navigate, cookie: "liked=1" });
+  const { body } = await get(`${LIVE}/writing/newer-post/?liked`, { ...browser, cookie: "liked=1" });
   assert.equal(views("newer-post"), before);
   assert.equal(likeText(body), "Liked · 1");
 });
@@ -288,16 +297,16 @@ test("a Like only accepts POST", async () => {
   assert.equal(res.headers.allow, "POST");
 });
 
-test("a Like for an unknown slug creates no row", async () => {
+test("a Like for an unknown slug records nothing", async () => {
   assert.equal((await like(`${LIVE}/writing/not-a-post/like`)).status, 404);
-  assert.equal(likes("not-a-post"), undefined);
+  assert.equal(likes("not-a-post"), 0);
 });
 
 test("a Like on a preview redirects back but never writes", async () => {
   const res = await like("https://views.spratt-dev.example.workers.dev/writing/older-post/like");
   assert.equal(res.status, 303);
   assert.equal(res.headers["set-cookie"], undefined);
-  assert.equal(likes("older-post"), undefined);
+  assert.equal(likes("older-post"), 0);
 });
 
 test("interestSlug matches the email-interest action only", () => {
@@ -307,7 +316,7 @@ test("interestSlug matches the email-interest action only", () => {
 });
 
 test("the redirect back after answering isn't a View", () => {
-  const nav = (url: string) => new Request(url, { headers: navigate });
+  const nav = (url: string) => new Request(url, { headers: browser });
   assert.equal(shouldCount(nav(`${LIVE}/writing/newer-post/`)), true);
   assert.equal(shouldCount(nav(`${LIVE}/writing/newer-post/?interested`)), false);
 });
@@ -323,7 +332,7 @@ test("the static Post ships the email-interest question as a plain form", () => 
   assert.equal(form?.querySelectorAll("input").length, 0, "nothing is collected");
 });
 
-test("answering on the live site records a row, sets a site-wide cookie and redirects to the thank-you", async () => {
+test("answering on the live site records an Interest, sets a site-wide cookie and redirects to the thank-you", async () => {
   const res = await like(`${LIVE}/writing/newer-post/interest`);
   assert.equal(res.status, 303);
   assert.equal(res.headers.location, "/writing/newer-post/?interested#interest");
@@ -381,42 +390,46 @@ test("refTag is cleaned and capped", () => {
   assert.equal(refTag(new URL(`${LIVE}/writing/newer-post/`)), null);
 });
 
-test("every counted View is logged with where it came from", async () => {
+test("every counted View is recorded with where it came from", async () => {
   const slug = "older-post";
-  await get(`${LIVE}/writing/${slug}/?ref=bluesky`, { ...navigate, referer: "https://bsky.app/" });
+  await get(`${LIVE}/writing/${slug}/?ref=bluesky`, { ...browser, referer: "https://bsky.app/" });
   await get(`${LIVE}/writing/${slug}/`);
-  await get(`${LIVE}/writing/${slug}/`, {}); // a crawler: neither counted nor logged
+  await get(`${LIVE}/writing/${slug}/`, {}); // a crawler: not a View
   assert.deepEqual(viewLog(slug), [
     { referrer: "bsky.app", ref: "bluesky", is_me: 0 },
     { referrer: null, ref: null, is_me: 0 },
   ]);
-  assert.equal(views(slug), 2);
 });
 
-test("a preview never logs a View", async () => {
+test("a preview never records a View", async () => {
   await get("https://views.spratt-dev.example.workers.dev/writing/older-post/");
   assert.equal(viewLog("older-post").length, 2);
 });
 
-test("/writing/?me marks the browser as the owner's", async () => {
-  const res = await get(`${LIVE}/writing/?me`);
+test("/writing/?me is just the Writing list, and sets no cookie", async () => {
+  const res = await get(`${LIVE}/writing/?me`, {});
   assert.equal(res.status, 200);
-  assert.match(res.body, /marked as yours/);
-  assert.equal(res.headers["cache-control"], "no-store");
-  const cookie = String(res.headers["set-cookie"]);
-  assert.match(cookie, /^me=1; /);
-  assert.match(cookie, /Path=\/;/, "the whole site, so it reaches the Games too");
-  assert.match(cookie, /HttpOnly/);
-  assert.match(cookie, /Secure/);
-  assert.equal((await get(`${LIVE}/writing/`)).body, site.read("writing/index.html"), "plain /writing/ is unchanged");
+  assert.equal(res.body, site.read("writing/index.html"));
+  assert.equal(res.headers["set-cookie"], undefined);
 });
 
-test("the owner's Views are logged as theirs but leave the public count alone", async () => {
+test("the owner's Views are recorded as theirs but leave the public count alone", async () => {
   const slug = "older-post";
-  const { body } = await get(`${LIVE}/writing/${slug}/`, { ...navigate, cookie: "me=1" });
+  const { body } = await get(`${LIVE}/writing/${slug}/`, mine);
   assert.equal(stats(body), " · Read 2 times");
-  assert.equal(views(slug), 2);
   assert.deepEqual(viewLog(slug).at(-1), { referrer: null, ref: null, is_me: 1 });
+  const { body: theirs } = await get(`${LIVE}/writing/${slug}/`, { ...browser, cookie: "me=1" });
+  assert.equal(stats(theirs), " · Read 3 times", "the old `me` cookie means nothing now");
+});
+
+test("a Post's count includes Views copied from before Events, and leaves the owner's out", async () => {
+  const path = "/writing/older-post/";
+  const before = Number(/Read (\d+)/.exec(stats((await get(`${LIVE}${path}`, {})).body) ?? "")?.[1]);
+  sql(`INSERT INTO events (kind, path, created_at, referrer, is_me) VALUES
+    ('view', '${path}', '2026-11-20 10:00:00', 'news.ycombinator.com', 0),
+    ('view', '${path}', '2026-11-20 11:00:00', NULL, 1)`);
+  const { body } = await get(`${LIVE}${path}`, {});
+  assert.equal(stats(body), ` · Read ${before + 1} times`, "the copied View counts; the owner's copied View doesn't");
 });
 
 test("gamePage and gameEventPath match a known Game only", () => {
@@ -458,44 +471,47 @@ test("parseGameEvent keeps a Play or a Finish and cleans where it came from", ()
   }
 });
 
-test("a browser View of a Game's page is logged with its source, and the page is served as built", async () => {
-  const res = await get(`${LIVE}/games/twenty-boats/?ref=hn`, { ...navigate, referer: "https://news.ycombinator.com/" });
-  assert.equal(res.status, 200);
-  assert.equal(res.body, site.read("games/twenty-boats/index.html"));
-  await get(`${LIVE}/games/twenty-boats/`, {}); // a crawler: not logged
-  await get("https://views.spratt-dev.example.workers.dev/games/twenty-boats/"); // a preview: not logged
-  await get(`${LIVE}/games/twenty-boats/`, { ...navigate, cookie: "me=1" });
-  assert.deepEqual(gameLog(), [
-    { game: "twenty-boats", event: "view", ending: null, survived: null, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
-    { game: "twenty-boats", event: "view", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
-  ]);
-});
+/** Every Play and Finish Event of a Game, oldest first. */
+const plays = (game: string) =>
+  sql(`SELECT kind, ending, survived, referrer, ref, is_me FROM events WHERE game = '${game}' AND kind IN ('play', 'finish') ORDER BY id`);
 
-test("the game's other files don't run the Worker's logging", async () => {
-  const before = gameLog().length;
-  const res = await get(`${LIVE}/games/twenty-boats/play.js`);
-  assert.equal(res.status, 200);
-  assert.equal(gameLog().length, before);
+/** A Game's Play and Finish Events after the first `from`, waiting for `expect` of them: they're written after the 204. */
+async function playsAfter(game: string, from: number, expect: number) {
+  let rows = plays(game).slice(from);
+  for (let i = 0; i < 10 && rows.length < expect; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    rows = plays(game).slice(from);
+  }
+  return rows;
+}
+
+test("a Game's page is served as built", async () => {
+  for (const game of ["twenty-boats", "cactus-boats"]) {
+    const res = await get(`${LIVE}/games/${game}/?ref=hn`, { ...browser, referer: "https://news.ycombinator.com/" });
+    assert.equal(res.status, 200);
+    assert.equal(res.body, site.read(`games/${game}/index.html`));
+  }
 });
 
 test("the game reports Plays and Finishes on the live site, the owner's flagged", async () => {
   const url = `${LIVE}/games/twenty-boats/event`;
   const from = { ref: "hn", referrer: "https://news.ycombinator.com/" };
+  const before = plays("twenty-boats").length;
   const play = await report(url, { event: "play", ...from });
   assert.equal(play.status, 204);
   assert.equal(play.headers["cache-control"], "no-store");
   assert.equal((await report(url, { event: "finish", ending: "water-lost", survived: false, ...from })).status, 204);
-  assert.equal((await report(url, { event: "play" }, { cookie: "me=1" })).status, 204);
-  assert.deepEqual(gameLog().slice(-3), [
-    { game: "twenty-boats", event: "play", ending: null, survived: null, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
-    { game: "twenty-boats", event: "finish", ending: "water-lost", survived: 0, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
-    { game: "twenty-boats", event: "play", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
+  assert.equal((await report(url, { event: "play" }, { cookie: `visitor=${ME}` })).status, 204);
+  assert.deepEqual(await playsAfter("twenty-boats", before, 3), [
+    { kind: "play", ending: null, survived: null, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
+    { kind: "finish", ending: "water-lost", survived: 0, referrer: "news.ycombinator.com", ref: "hn", is_me: 0 },
+    { kind: "play", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
   ]);
 });
 
 test("a game report from another site, by GET, malformed, or on a preview writes nothing", async () => {
-  const before = gameLog().length;
   const url = `${LIVE}/games/twenty-boats/event`;
+  const before = plays("twenty-boats").length;
   assert.equal((await report(url, { event: "play" }, { origin: "https://evil.example" })).status, 403);
   assert.equal((await send("POST", url, {}, JSON.stringify({ event: "play" }))).status, 403);
   assert.equal((await get(url)).status, 405);
@@ -503,45 +519,27 @@ test("a game report from another site, by GET, malformed, or on a preview writes
   assert.equal((await report("https://views.spratt-dev.example.workers.dev/games/twenty-boats/event", { event: "play" })).status, 204);
   // Not a Game, so the Worker doesn't run and the assets refuse the POST.
   assert.equal((await report(`${LIVE}/games/not-a-game/event`, { event: "play" })).status, 405);
-  assert.equal(gameLog().length, before);
-});
-
-test("Cactus Boats' page View is logged with its source, and the page is served as built", async () => {
-  const before = gameLog().length;
-  const res = await get(`${LIVE}/games/cactus-boats/?ref=cb`, { ...navigate, referer: "https://www.reddit.com/r/webgames/" });
-  assert.equal(res.status, 200);
-  assert.equal(res.body, site.read("games/cactus-boats/index.html"));
-  await get(`${LIVE}/games/cactus-boats/`, {}); // a crawler: not logged
-  await get("https://views.spratt-dev.example.workers.dev/games/cactus-boats/"); // a preview: not logged
-  await get(`${LIVE}/games/cactus-boats/`, { ...navigate, cookie: "me=1" });
-  assert.deepEqual(gameLog().slice(before), [
-    { game: "cactus-boats", event: "view", ending: null, survived: null, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
-    { game: "cactus-boats", event: "view", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
-  ]);
+  // One recorded report after them, so the wait has something to find.
+  await report(url, { event: "play", ref: "last" });
+  const rows = await playsAfter("twenty-boats", before, 1);
+  assert.deepEqual(rows.map((r) => r.ref), ["last"]);
 });
 
 test("Cactus Boats reports Plays and sunk Finishes on the live site, the owner's flagged", async () => {
-  const before = gameLog().length;
   const url = `${LIVE}/games/cactus-boats/event`;
   const from = { ref: "cb", referrer: "https://www.reddit.com/r/webgames/" };
+  const before = plays("cactus-boats").length;
+  const owner = { cookie: `visitor=${ME}` };
   assert.equal((await report(url, { event: "play", ...from })).status, 204);
   assert.equal((await report(url, { event: "finish", ending: "sunk", survived: false, ...from })).status, 204);
-  assert.equal((await report(url, { event: "play" }, { cookie: "me=1" })).status, 204);
-  assert.equal((await report(url, { event: "finish", ending: "sunk", survived: false }, { cookie: "me=1" })).status, 204);
-  assert.deepEqual(gameLog().slice(before), [
-    { game: "cactus-boats", event: "play", ending: null, survived: null, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
-    { game: "cactus-boats", event: "finish", ending: "sunk", survived: 0, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
-    { game: "cactus-boats", event: "play", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
-    { game: "cactus-boats", event: "finish", ending: "sunk", survived: 0, referrer: null, ref: null, is_me: 1 },
+  assert.equal((await report(url, { event: "play" }, owner)).status, 204);
+  assert.equal((await report(url, { event: "finish", ending: "sunk", survived: false }, owner)).status, 204);
+  assert.deepEqual(await playsAfter("cactus-boats", before, 4), [
+    { kind: "play", ending: null, survived: null, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
+    { kind: "finish", ending: "sunk", survived: 0, referrer: "www.reddit.com", ref: "cb", is_me: 0 },
+    { kind: "play", ending: null, survived: null, referrer: null, ref: null, is_me: 1 },
+    { kind: "finish", ending: "sunk", survived: 0, referrer: null, ref: null, is_me: 1 },
   ]);
-});
-
-test("a Cactus Boats report from another site or on a preview writes nothing", async () => {
-  const before = gameLog().length;
-  const url = `${LIVE}/games/cactus-boats/event`;
-  assert.equal((await report(url, { event: "play" }, { origin: "https://evil.example" })).status, 403);
-  assert.equal((await report("https://views.spratt-dev.example.workers.dev/games/cactus-boats/event", { event: "play" })).status, 204);
-  assert.equal(gameLog().length, before);
 });
 
 // The Leaderboard (Cactus Boats). scoreOf is 10 a whole second plus 250 a sink.
@@ -733,9 +731,9 @@ test("a preview reads the live board, but start hands out no run and score write
 });
 
 test("the owner's runs are stored as theirs and their Score still shows on the board", async () => {
-  const run = await startRun({ cookie: "me=1" });
+  const run = await startRun({ cookie: `visitor=${ME}` });
   backdate(run, 610);
-  const res = await submitScore(run, "JSP", 600_000, 20, {}, { cookie: "me=1" });
+  const res = await submitScore(run, "JSP", 600_000, 20, {}, { cookie: `visitor=${ME}` });
   assert.equal(res.status, 200);
   const { rank, top } = JSON.parse(res.body);
   assert.equal(rank, 1);
@@ -816,10 +814,8 @@ test("a high sink count that fits the spawn curve is accepted", async () => {
   assert.deepEqual([top[0].initials, top[0].sinks], ["ACE", 154]);
 });
 
-// Events: written beside the old tables (docs/database.md).
+// Events (docs/database.md).
 
-const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
-const browser = { ...navigate, "user-agent": BROWSER };
 const VISITOR = "0b3c9d5e-1f2a-4b6c-8d7e-9f0a1b2c3d4e";
 
 interface EventRow {
@@ -876,7 +872,7 @@ test("isBot catches link previews, uptime checkers, headless browsers and no use
 });
 
 test("a Visitor id is only ever a random UUID from its own cookie", () => {
-  assert.equal(visitorId(req(LIVE, { cookie: `me=1; visitor=${VISITOR}` })), VISITOR);
+  assert.equal(visitorId(req(LIVE, { cookie: `liked=1; visitor=${VISITOR}` })), VISITOR);
   assert.equal(visitorId(req(LIVE, { cookie: "visitor=not-an-id" })), null);
   assert.equal(visitorId(req(LIVE, { cookie: `xvisitor=${VISITOR}` })), null);
   assert.deepEqual(visitorOf(req(LIVE, { cookie: `visitor=${VISITOR}` })), { id: VISITOR, cookie: null });
@@ -985,24 +981,25 @@ test("crawlers, bots, previews, missing pages, a Game's files and the redirect a
   assert.deepEqual(await eventsAfter(since), [event({ path: "/writing/" })]);
 });
 
-test("a Post View is both an Event and the old count, and the owner's is flagged", async () => {
+test("a Post View is an Event counted in the page, and the owner's is flagged and not counted", async () => {
   const slug = "older-post";
-  const before = Number(views(slug));
-  const logged = viewLog(slug).length;
+  const shown = async (headers: Record<string, string>) => stats((await get(`${LIVE}/writing/${slug}/?ref=hn`, headers)).body);
+  const before = Number(/Read (\d+)/.exec((await shown({})) ?? "")?.[1]);
   const since = lastEventId();
-  const res = await get(`${LIVE}/writing/${slug}/?ref=hn`, { ...browser, cookie: `visitor=${VISITOR}` });
-  assert.equal(stats(res.body), ` · Read ${before + 1} times`);
-  await get(`${LIVE}/writing/${slug}/`, { ...browser, cookie: `me=1; visitor=${VISITOR}` });
-  assert.equal(views(slug), before + 1, "the owner's View leaves the public count alone");
-  assert.equal(viewLog(slug).length, logged + 2);
-  assert.deepEqual(await eventsAfter(since, 2), [
+  const res = await get(`${LIVE}/writing/${slug}/?ref=hn`, browser);
+  assert.equal(stats(res.body), ` · Read ${before + 1} times`, "the reader's own View is in the count");
+  const id = /^visitor=([0-9a-f-]{36});/.exec(String(res.headers["set-cookie"]))?.[1];
+  assert.ok(id, "a new browser gets its Visitor cookie on a Post too");
+  assert.equal(await shown({ ...browser, cookie: `visitor=${VISITOR}` }), ` · Read ${before + 2} times`);
+  assert.equal(await shown(mine), ` · Read ${before + 2} times`, "the owner's View leaves the public count alone");
+  assert.deepEqual(await eventsAfter(since, 3), [
+    event({ path: `/writing/${slug}/`, ref: "hn", visitor: id }),
     event({ path: `/writing/${slug}/`, ref: "hn" }),
-    event({ path: `/writing/${slug}/`, is_me: 1 }),
+    event({ path: `/writing/${slug}/`, ref: "hn", visitor: ME, is_me: 1 }),
   ]);
 });
 
-test("a Game's page View, Plays and Finishes are Events with the Game, beside the Game log", async () => {
-  const logged = gameLog().length;
+test("a Game's page View, Plays and Finishes are Events with the Game", async () => {
   const since = lastEventId();
   const cookie = `visitor=${VISITOR}`;
   await get(`${LIVE}/games/cactus-boats/?ref=hn`, { ...browser, cookie });
@@ -1013,7 +1010,6 @@ test("a Game's page View, Plays and Finishes are Events with the Game, beside th
   const fresh = await report(url, { event: "play" });
   assert.match(String(fresh.headers["set-cookie"]), /^visitor=/, "a browser without one gets a Visitor id");
   await report("https://views.spratt-dev.example.workers.dev/games/cactus-boats/event", { event: "play" }, { cookie });
-  assert.equal(gameLog().length, logged + 4, "the Game log still gets its rows");
   const rows = await eventsAfter(since, 4);
   const game = { path: "/games/cactus-boats/", game: "cactus-boats" };
   assert.deepEqual(rows.slice(0, 3), [
@@ -1031,9 +1027,9 @@ test("a Like and an Interest are Events with the source of the Visitor's View of
   const cookie = `visitor=${visitor}`;
   await get(`${LIVE}/writing/newer-post/?ref=bluesky`, { ...browser, cookie, referer: "https://bsky.app/" });
   const since = lastEventId();
-  const before = Number(likes("newer-post"));
+  const before = likes("newer-post");
   assert.equal((await like(`${LIVE}/writing/newer-post/like`, { cookie })).status, 303);
-  assert.equal(likes("newer-post"), before + 1, "the old Like count still goes up");
+  assert.equal(likes("newer-post"), before + 1, "written before the redirect, so the page shows it");
   assert.equal((await like(`${LIVE}/writing/newer-post/interest`, { cookie })).status, 303);
   // Already liked: no second Like, and no Event for it.
   await like(`${LIVE}/writing/newer-post/like`, { cookie: `liked=1; ${cookie}` });
@@ -1145,8 +1141,7 @@ test("/stats/ is the ordinary 404 page without a valid Access JWT, and sets no c
     ["/stats/", { "cf-access-jwt-assertion": await accessJwt({ aud: ["other-aud"] }) }],
     ["/stats/", { "cf-access-jwt-assertion": await accessJwt({ exp: 1, nbf: 0 }) }],
     ["/stats/", { "cf-access-jwt-assertion": await accessJwt({}, { key: (await rsaKeyPair()).privateKey }) }],
-    ["/stats/", { cookie: "stats=0123abcd", "cf-access-jwt-assertion": "" }],
-    ["/stats/?key=test-stats-key", {}],
+    ["/stats/", { "cf-access-jwt-assertion": "" }],
     ["/stats/posts.json", { "cf-access-jwt-assertion": await accessJwt() }],
     ["/stats/other/", { "cf-access-jwt-assertion": await accessJwt() }],
   ];
@@ -1174,7 +1169,8 @@ test("the dashboard is uncached, unindexed, scriptless, and says who is signed i
     page.querySelectorAll("h2").map((h) => h.childNodes[0].text.trim()),
     ["Active Visitors", "Views", "New and returning Visitors", "Games", "Posts", "Click outs"],
   );
-  assert.deepEqual(rowOf(page, "Twenty Boats")?.length, 5, "every Game has a row");
+  const gameRows = page.querySelectorAll("tbody tr").filter((r) => r.querySelectorAll("td").length === 5);
+  assert.ok(gameRows.some((r) => r.querySelector("td")?.text.trim() === "Twenty Boats"), "every Game has a row");
   assert.ok(rowOf(page, "Newer Post"), "every Post has a row");
 });
 
@@ -1184,16 +1180,13 @@ test("opening /stats/ through Access marks the browser as the owner's, its past 
   await get(`${LIVE}/writing/`, { ...browser, cookie });
   assert.deepEqual(await eventsAfter(since), [event({ path: "/writing/", visitor: OWNER })], "not yet the owner's");
 
-  const res = await openStats("/stats/", { cookie: `${cookie}; stats=0123abcd` });
+  const res = await openStats("/stats/", { cookie });
   assert.equal(res.status, 200);
-  const set = cookiesOf(res);
-  assert.ok(set.includes("me=1; Path=/; Max-Age=34560000; HttpOnly; Secure; SameSite=Lax"), String(set));
-  assert.ok(set.includes("stats=; Path=/stats/; Max-Age=0; HttpOnly; Secure; SameSite=Strict"), "the old STATS_KEY cookie is cleared");
-  assert.ok(!set.some((c) => c.startsWith("visitor=")), "an existing Visitor keeps its id");
+  assert.deepEqual(cookiesOf(res), [], "an existing Visitor keeps its id, and no other cookie is set");
   assert.deepEqual(sql(`SELECT COUNT(*) AS n FROM owner_visitors WHERE visitor = '${OWNER}'`), [{ n: 1 }]);
   assert.deepEqual(sql(`SELECT DISTINCT is_me FROM events WHERE visitor = '${OWNER}'`), [{ is_me: 1 }], "past Events flagged");
 
-  // Later, even without the `me` cookie, this Visitor's Events are the owner's.
+  // Later, this Visitor's Events are the owner's.
   since = lastEventId();
   await get(`${LIVE}/games/`, { ...browser, cookie });
   await get(`${LIVE}/out/github/`, { ...browser, cookie, referer: `${LIVE}/games/` });

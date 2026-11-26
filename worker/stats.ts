@@ -12,13 +12,6 @@ export const LIKED_COOKIE = "liked";
  */
 export const INTERESTED_COOKIE = "interested";
 
-/**
- * Marks a browser as the site owner's. Set by visiting /writing/?me, for the
- * whole site so it reaches the Games too. Its Views, Plays and Finishes are
- * still logged (flagged) but don't add to the public count.
- */
-export const ME_COOKIE = "me";
-
 /** Where the redirect back after answering lands, so the thank-you is in view. */
 export const INTEREST_ANCHOR = "interest";
 
@@ -86,20 +79,6 @@ export function likedCookie(slug: string): string {
   return `${LIKED_COOKIE}=1; Path=/writing/${slug}/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`;
 }
 
-export function isMe(request: Request): boolean {
-  return hasCookie(request, ME_COOKIE);
-}
-
-/** 400 days is the longest any browser keeps a cookie. */
-export function meCookie(): string {
-  return `${ME_COOKIE}=1; Path=/; Max-Age=34560000; HttpOnly; Secure; SameSite=Lax`;
-}
-
-/** "/writing/?me" is the address that sets the owner cookie. */
-export function isMeSetup(url: URL): boolean {
-  return url.pathname === "/writing/" && url.searchParams.has("me");
-}
-
 /** The hostname of a URL, or null. */
 export function hostOf(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -131,7 +110,7 @@ export function refTag(url: URL): string | null {
   return cleanTag(url.searchParams.get("ref"));
 }
 
-/** The Games whose Views, Plays and Finishes are logged, by their name in /games/<name>/. */
+/** The Games whose Plays and Finishes are recorded, by their name in /games/<name>/. */
 export const GAMES = ["twenty-boats", "cactus-boats"] as const;
 export type Game = (typeof GAMES)[number];
 
@@ -190,7 +169,7 @@ export function parseGameEvent(body: string): GameEvent | null {
   return null;
 }
 
-// The Leaderboard. Kept apart from GAMES: a Game can be logged without having
+// The Leaderboard. Kept apart from GAMES: a Game can be recorded without having
 // a Leaderboard. The Score is the game's own scoreOf, so the two can't disagree.
 
 import { scoreOf } from "../public/games/cactus-boats/score.js";
@@ -312,8 +291,7 @@ export function likeLabel(likes: number, liked: boolean): string {
   return likes > 0 ? `${word} · ${likes.toLocaleString("en-GB")}` : word;
 }
 
-// Events: one row per View, Play, Finish, Like, Interest or Click out, written
-// alongside the old tables (docs/database.md).
+// Events: one row per View, Play, Finish, Like, Interest or Click out (docs/database.md).
 
 export type EventKind = "view" | "play" | "finish" | "like" | "interest" | "click_out";
 
@@ -380,7 +358,7 @@ export function isBot(request: Request): boolean {
 
 /**
  * A page View Event: a reader's browser navigating to a page of the live site
- * (as for the old counts, see shouldCount), not a known bot, answered with the
+ * (see shouldCount), not a known bot, answered with the
  * page. A 304 is the browser's cached copy of the page being revalidated,
  * which is still a View.
  */

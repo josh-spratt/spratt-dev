@@ -63,5 +63,4 @@ Do these in order. The Worker fails closed (no secrets or no valid Access JWT me
 - [ ] Merge the PR and wait for the deploy.
 - [ ] Open `https://jspratt.dev/stats/` in each browser you use, phone included, and sign in. Check the page footer says "Signed in as …".
 - [ ] Check a private window without signing in gets the Access login, and `curl -s -o /dev/null -w '%{http_code}' -H 'cf-access-jwt-assertion: x' https://<branch>-spratt-dev.jaspratt42.workers.dev/stats/` returns 404.
-- [ ] Remove the old secret: `npx wrangler secret delete STATS_KEY`.
 - [ ] The next day, check the cron ran: Worker → Settings → Trigger Events shows `17 3 * * *`, and its log says "stripped Visitor ids …".
