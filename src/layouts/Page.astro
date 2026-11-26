@@ -1,6 +1,6 @@
 ---
 import Head from "../components/Head.astro";
-import { site, games, getPosts } from "../lib/site";
+import { site, games, getPosts, outHref } from "../lib/site";
 // Only the site's own pages get its styles: a Game page brings its own.
 import "../styles/global.css";
 
@@ -72,9 +72,9 @@ const hasHero = Astro.slots.has("hero");
           )
         }
         <nav class="links" aria-label="Links">
-          <a href={site.links.github}>GitHub</a>
-          <a href={site.links.linkedin}>LinkedIn</a>
-          <a href={`mailto:${site.links.email}`}>Email</a>
+          <a href={outHref("github")}>GitHub</a>
+          <a href={outHref("linkedin")}>LinkedIn</a>
+          <a href={outHref("email")}>Email</a>
         </nav>
       </div>
     </header>

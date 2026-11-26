@@ -17,18 +17,30 @@ test("Homepage builds from the real content by default", () => {
 
 const fixtures = { contentDir: "tests/fixtures/content", mode: "production" } as const;
 
-test("Intro shows the role line, bio and Links including a mailto", () => {
+test("Intro shows the role line, bio and Links, each a Click out", () => {
   const html = buildSite(fixtures).html("index.html");
   const screen = html.querySelector("main");
   assert.ok(screen);
   assert.match(screen.text, /Fixture role line/);
   assert.match(screen.text, /Fixture bio sentence one/);
   const hrefs = html.querySelectorAll('nav[aria-label="Links"] a').map((a) => a.getAttribute("href"));
-  assert.deepEqual(hrefs, [
-    "https://github.com/fixture",
-    "https://www.linkedin.com/in/fixture",
-    "mailto:fixture@example.com",
-  ]);
+  assert.deepEqual(hrefs, ["/out/github/", "/out/linkedin/", "/out/email/"]);
+});
+
+test("every Click out name is on the build's list, with a plain page that goes on to the real address", () => {
+  const built = buildSite(fixtures);
+  assert.deepEqual(JSON.parse(built.read("out/links.json")), {
+    github: "https://github.com/fixture",
+    linkedin: "https://www.linkedin.com/in/fixture",
+    email: "mailto:fixture@example.com",
+    "fixture-alpha": "https://example.com/alpha",
+    "fixture-beta": "https://example.com/beta",
+  });
+  const page = built.html("out/fixture-alpha/index.html");
+  assert.equal(page.querySelector('meta[name="robots"]')?.getAttribute("content"), "noindex");
+  assert.equal(page.querySelector('meta[http-equiv="refresh"]')?.getAttribute("content"), "0; url=https://example.com/alpha");
+  assert.equal(page.querySelector("a")?.getAttribute("href"), "https://example.com/alpha");
+  assert.doesNotMatch(built.read("sitemap-0.xml"), /\/out\//, "Click outs aren't in the sitemap");
 });
 
 const projectRows = 'section[aria-labelledby="projects"] > ul > li';
@@ -39,10 +51,10 @@ test("Homepage shows every Project with its link, after the Intro", () => {
   const rows = html.querySelectorAll(projectRows);
   assert.equal(rows.length, 2);
   const [alpha, beta] = rows.map((r) => r.querySelector("a"));
-  assert.equal(alpha?.getAttribute("href"), "https://example.com/alpha");
+  assert.equal(alpha?.getAttribute("href"), "/out/fixture-alpha/");
   assert.match(alpha?.text ?? "", /Fixture Alpha/);
   assert.match(alpha?.text ?? "", /First fixture project\./);
-  assert.equal(beta?.getAttribute("href"), "https://example.com/beta");
+  assert.equal(beta?.getAttribute("href"), "/out/fixture-beta/");
   const body = html.querySelector("main")!.innerHTML;
   assert.ok(body.indexOf("Fixture bio") < body.indexOf("Fixture Alpha"));
 });
@@ -61,12 +73,15 @@ test("Building with a Project missing url fails", () => {
 });
 
 test("Real content has the Projects, the Games apart from them, and a real mailto", () => {
-  const html = buildSite().html("index.html");
+  const built = buildSite();
+  const html = built.html("index.html");
   const hrefs = (block: string) =>
     html.querySelectorAll(`section[aria-labelledby="${block}"] li > a`).map((a) => a.getAttribute("href"));
-  assert.deepEqual(hrefs("projects"), ["https://github.com/josh-spratt/marinaraDB"]);
+  assert.deepEqual(hrefs("projects"), ["/out/marinaradb/"]);
   assert.deepEqual(hrefs("games"), ["/games/cactus-boats/", "/games/twenty-boats/"]);
-  assert.ok(html.querySelector('a[href="mailto:josh@jspratt.dev"]'));
+  const out = JSON.parse(built.read("out/links.json"));
+  assert.equal(out.marinaradb, "https://github.com/josh-spratt/marinaraDB");
+  assert.equal(out.email, "mailto:josh@jspratt.dev");
 });
 
 test("Homepage shows the Games block, each Game leading to its own page, between the Intro and Projects", () => {

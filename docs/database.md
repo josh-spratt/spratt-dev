@@ -1,15 +1,46 @@
 # Database
 
-Views, the View log, Likes, Interest, the Game log and the Leaderboard are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
+Events, Views, the View log, Likes, Interest, the Game log and the Leaderboard are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
 
-Only `/writing/*`, `/stats*`, a Game's page and event address, and the Leaderboard's addresses (`run_worker_first` in `wrangler.jsonc`) run the Worker script (`worker/index.ts`), and every other path is served straight from `dist/`. For a Post page, the Worker:
+Every page of the site (`/`, `/games/`, `/writing/*`, each Game's page), a Game's event and Leaderboard addresses, `/out/*` and `/stats*` (`run_worker_first` in `wrangler.jsonc`) run the Worker script (`worker/index.ts`). Every other path (CSS, images, a Game's files) is served straight from `dist/`. A test checks that every built page is on the list, so a new page that isn't fails `npm test`.
+
+## Events
+
+Since 2026-11, the Worker records every View, Play, Finish, Like, Interest and Click out as one row in `events` (see `GLOSSARY.md`), all in the same shape: `kind`, `path` (the page), `created_at`, its source (`ref`, `referrer`), its `visitor`, `is_me`, and for some kinds `game`, `ending`, `survived` or `target`. This runs **beside** the old tables below, which are written exactly as before and still drive "Read N times", `npm run views` and `/stats/`. A later change moves those onto Events, copies the old history across and drops the old tables.
+
+- **View**: a browser navigation (`Sec-Fetch-Mode: navigate`, GET) to any page on `jspratt.dev`, answered with the page (200) or the browser's cached copy (304). A user agent on the short `BOT_AGENTS` list in `worker/stats.ts` (link previews, uptime checkers, headless browsers), or none at all, isn't a View; add to the list when a bot shows up in the Events. `?liked` and `?interested` (the redirects back after a form) aren't Views. On a Game's page `game` is set too.
+- **Play** and **Finish**: each report the game sends to `/games/<name>/event`, with its own `ref` and `referrer` as for `game_log`, and `game`, `ending`, `survived`. `path` is the Game's page.
+- **Like** and **Interest**: each one that writes to the old tables. They take the source of this Visitor's latest View of the Post.
+- **Click out**: the Homepage's Projects and the header Links point at `/out/<name>/` (e.g. `/out/github/`, `/out/marinaradb/`). The Worker records the Click out, with `path` the page it was clicked on (from `Referer`; the `/out/` address itself when there's none), `target` the name and the source of this Visitor's latest View of that page, then answers 302 to the real address. Names come from `/out/links.json`, which the build writes from `site.json`'s Links and `projects.json` (a Project's name is its title, lowercased to letters, digits and dashes), so only those addresses can be reached and any other name is the 404 page. The build also writes a plain `/out/<name>/` page that goes on to the address, which is what `astro dev` and the link checkers see.
+
+Only the live hostname records Events; previews and local runs serve pages and redirect Click outs without writing. The owner's `me` cookie sets `is_me = 1`, as for the old tables. Events are written after the response is sent and apart from the old tables' writes, so a failed Event never changes a count or what a reader sees.
+
+### The Visitor cookie
+
+So the site can count daily, weekly and monthly active Visitors (distinct `visitor` with an Event in the last 1, 7 or 30 days), the Worker gives each browser a random id (a UUID) in a `visitor` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/`, 400 days, set the first time the browser has an Event on the live site and never renewed. Every Event records it. It says nothing about who the person is, and no IP is ever stored. Visitor ids are to be stripped from Events older than 13 months. Why a cookie and not a hash: `docs/adr/0001-first-party-visitor-cookie.md`.
+
+Count active Visitors, leaving yours out:
+
+```sh
+npx wrangler d1 execute spratt-dev --remote --command "SELECT COUNT(DISTINCT CASE WHEN created_at >= datetime('now', '-1 day') THEN visitor END) AS dau, COUNT(DISTINCT CASE WHEN created_at >= datetime('now', '-7 days') THEN visitor END) AS wau, COUNT(DISTINCT visitor) AS mau FROM events WHERE created_at >= datetime('now', '-30 days') AND is_me = 0"
+```
+
+Views by page and source this month:
+
+```sh
+npx wrangler d1 execute spratt-dev --remote --command "SELECT path, COALESCE(ref, referrer, 'direct') AS source, COUNT(*) AS views FROM events WHERE kind = 'view' AND is_me = 0 AND created_at >= datetime('now', '-30 days') GROUP BY path, source ORDER BY views DESC LIMIT 50"
+```
+
+## Posts (old tables)
+
+For a Post page, the Worker also:
 
 1. counts a View when the request is a browser navigation (`Sec-Fetch-Mode: navigate`) to `jspratt.dev`, and logs it as a row in `view_log` with the time, the linking site's hostname (from `Referer`) and any `?ref=` tag
 2. writes " · Read N times" into the page's `[data-stats]` placeholder
 
 ## Your own Views
 
-Visit `https://jspratt.dev/writing/?me` once in each browser you use, phone included. It sets a `me=1` cookie on the whole site that lasts 400 days. That browser's Views, Plays and Finishes are still logged, with `is_me = 1`, but Views don't add to `post_stats`, so the "Read N times" readers see leaves you out. Until 2026-11-17 the cookie was scoped to `/writing/` only, so a browser marked before then needs to visit the address again before its Plays are flagged. Clearing cookies undoes it; visit the address again. Cloudflare Web Analytics doesn't know about the cookie.
+Visit `https://jspratt.dev/writing/?me` once in each browser you use, phone included. It sets a `me=1` cookie on the whole site that lasts 400 days. That browser's Views, Plays and Finishes, and all its Events, are still logged, with `is_me = 1`, but Views don't add to `post_stats`, so the "Read N times" readers see leaves you out. Until 2026-11-17 the cookie was scoped to `/writing/` only, so a browser marked before then needs to visit the address again before its Plays are flagged. Clearing cookies undoes it; visit the address again. Cloudflare Web Analytics doesn't know about the cookie.
 
 ## Tagging shared links
 
@@ -144,4 +175,4 @@ npx wrangler d1 migrations apply spratt-dev --local
 npx wrangler dev
 ```
 
-Local requests come from `localhost`, not `jspratt.dev`, so they read counts and the Leaderboard but don't add Views, Likes, Plays, Finishes or Scores. The game still sends its reports, and the Worker answers each with 204, which is how to see them fire in the browser's network panel.
+Local requests come from `localhost`, not `jspratt.dev`, so they read counts and the Leaderboard but don't add Events, Views, Likes, Plays, Finishes or Scores. The game still sends its reports, and the Worker answers each with 204, which is how to see them fire in the browser's network panel.

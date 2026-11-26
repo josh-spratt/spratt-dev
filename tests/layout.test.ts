@@ -21,7 +21,10 @@ function htmlFiles(dir: string): string[] {
 
 // A Game's own page fills the screen with the game and has its own tests
 // (games.test.ts). The Games page listing them is an ordinary page.
-const pages = htmlFiles(site.outDir).filter((p) => !p.startsWith("games/") || p === "games/index.html");
+// /out/<name>/ pages are Click out redirects, not pages of the site.
+const pages = htmlFiles(site.outDir).filter(
+  (p) => (!p.startsWith("games/") || p === "games/index.html") && !p.startsWith("out/"),
+);
 
 test("every kind of page is built", () => {
   for (const p of ["index.html", "404.html", "writing/index.html", "writing/newer-post/index.html", "games/index.html"]) {
@@ -39,8 +42,8 @@ test("every page has the header with Writing, Games and the three Links", () => 
     const links = header.querySelectorAll('nav[aria-label="Links"] a').map((a) => a.getAttribute("href"));
     assert.deepEqual(
       links,
-      ["https://github.com/fixture", "https://www.linkedin.com/in/fixture", "mailto:fixture@example.com"],
-      `${page} shows the Links`,
+      ["/out/github/", "/out/linkedin/", "/out/email/"],
+      `${page} shows the Links, through Click outs`,
     );
   }
 });

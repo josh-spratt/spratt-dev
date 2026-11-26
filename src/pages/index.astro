@@ -1,5 +1,5 @@
 ---
-import { site, projects, games, getPosts, formatDate } from "../lib/site";
+import { site, projects, games, getPosts, formatDate, outHref, outName } from "../lib/site";
 import Page from "../layouts/Page.astro";
 import Tags from "../components/Tags.astro";
 import GameCards from "../components/GameCards.astro";
@@ -72,7 +72,7 @@ const recent = posts.slice(0, 3);
       {
         projects.map((p) => (
           <li>
-            <a href={p.url}>
+            <a href={outHref(outName(p))}>
               {p.image ? (
                 <img class="logo" src={p.image} alt="" width="64" height="64" loading="lazy" />
               ) : (

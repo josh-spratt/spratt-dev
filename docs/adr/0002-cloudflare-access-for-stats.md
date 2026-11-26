@@ -1,0 +1,3 @@
+# Cloudflare Access guards /stats/, not our own auth
+
+The private dashboard at `/stats/` used to check a shared `STATS_KEY` secret held in a cookie, which meant setup on every new machine. It now sits behind a free Cloudflare Zero Trust Access policy on `jspratt.dev/stats*`, so Cloudflare signs Josh in (email code or GitHub) before the request reaches the Worker, and the site has no login code. Getting through Access also marks that browser's Visitor as Josh's, replacing the old `/writing/?me` address. The cost is that the dashboard depends on Cloudflare Access configuration living outside this repo.
