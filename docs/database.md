@@ -1,19 +1,21 @@
 # Database
 
-Events, the owner's Visitors, Views, the View log, Likes, Interest, the Game log and the Leaderboard are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
+Events, the owner's Visitors and the Leaderboard are kept in a Cloudflare D1 database called `spratt-dev`, bound to the Worker as `DB`. The schema lives in `migrations/`.
 
 Every page of the site (`/`, `/games/`, `/writing/*`, each Game's page), a Game's event and Leaderboard addresses, `/out/*` and `/stats*` (`run_worker_first` in `wrangler.jsonc`) run the Worker script (`worker/index.ts`). Every other path (CSS, images, a Game's files) is served straight from `dist/`. A test checks that every built page is on the list, so a new page that isn't fails `npm test`.
 
 ## Events
 
-Since 2026-11, the Worker records every View, Play, Finish, Like, Interest and Click out as one row in `events` (see `GLOSSARY.md`), all in the same shape: `kind`, `path` (the page), `created_at`, its source (`ref`, `referrer`), its `visitor`, `is_me`, and for some kinds `game`, `ending`, `survived` or `target`. This runs **beside** the old tables below, which are written exactly as before and still drive "Read N times" and `npm run views`. The dashboard at `/stats/` reads only Events. A later change moves the rest onto Events, copies the old history across and drops the old tables.
+Since 2026-11, the Worker records every View, Play, Finish, Like, Interest and Click out as one row in `events` (see `GLOSSARY.md`), all in the same shape: `kind`, `path` (the page), `created_at`, its source (`ref`, `referrer`), its `visitor`, `is_me`, and for some kinds `game`, `ending`, `survived` or `target`. Everything the site counts is read from them: a Post's "Read N times" and Like count, and the dashboard at `/stats/`.
+
+History from before Events (Post Views from 2026-11-15, a Game's Views, Plays and Finishes from 2026-11-18) was copied in by `migrations/0009_events_cutover.sql`, with no Visitor id, so Visitor counts start on 2026-11-26. Post Views from before 2026-11-15 and Likes from before Events were only ever totals, so they weren't copied, and those Posts' counts went down at the cutover.
 
 - **View**: a browser navigation (`Sec-Fetch-Mode: navigate`, GET) to any page on `jspratt.dev`, answered with the page (200) or the browser's cached copy (304). A user agent on the short `BOT_AGENTS` list in `worker/stats.ts` (link previews, uptime checkers, headless browsers), or none at all, isn't a View; add to the list when a bot shows up in the Events. `?liked` and `?interested` (the redirects back after a form) aren't Views. On a Game's page `game` is set too.
-- **Play** and **Finish**: each report the game sends to `/games/<name>/event`, with its own `ref` and `referrer` as for `game_log`, and `game`, `ending`, `survived`. `path` is the Game's page.
-- **Like** and **Interest**: each one that writes to the old tables. They take the source of this Visitor's latest View of the Post.
+- **Play** and **Finish**: each report the game sends to `/games/<name>/event`, with its own `ref` and `referrer` (cleaned like a View's), and `game`, `ending`, `survived`. `path` is the Game's page.
+- **Like** and **Interest**: each accepted form POST (below). They take the source of this Visitor's latest View of the Post.
 - **Click out**: the Homepage's Projects and the header Links point at `/out/<name>/` (e.g. `/out/github/`, `/out/marinaradb/`). The Worker records the Click out, with `path` the page it was clicked on (from `Referer`; the `/out/` address itself when there's none), `target` the name and the source of this Visitor's latest View of that page, then answers 302 to the real address. Names come from `/out/links.json`, which the build writes from `site.json`'s Links and `projects.json` (a Project's name is its title, lowercased to letters, digits and dashes), so only those addresses can be reached and any other name is the 404 page. The build also writes a plain `/out/<name>/` page that goes on to the address, which is what `astro dev` and the link checkers see.
 
-Only the live hostname records Events; previews and local runs serve pages and redirect Click outs without writing. An Event is the owner's (`is_me = 1`) when the browser has the `me` cookie, or its Visitor is in `owner_visitors` (below). Events are written after the response is sent and apart from the old tables' writes, so a failed Event never changes a count or what a reader sees.
+Only the live hostname records Events; previews and local runs serve pages and redirect Click outs without writing. An Event is the owner's (`is_me = 1`) when its Visitor is in `owner_visitors` (below). Most Events are written after the response is sent, so a failed one never changes what a reader sees. Two are written before it: a Post's View, in the same D1 batch that reads the Post's counts, so the count a reader sees includes their own View; and a Like or Interest, so the cookie is only set once it's recorded.
 
 ### The Visitor cookie
 
@@ -27,7 +29,7 @@ npx wrangler d1 execute spratt-dev --remote --command "UPDATE events SET visitor
 
 ### The owner's Visitors
 
-`owner_visitors` holds the Visitor id of every browser that has opened `/stats/` through Cloudflare Access (below). Opening it adds the browser's id (giving it one first if it has none), flags that Visitor's Events so far `is_me = 1`, and sets the site-wide `me` cookie, so the old tables flag it too. Every later Event from that Visitor is flagged when it's written, even without the `me` cookie. The dashboard also leaves out any Event whose Visitor is in `owner_visitors`, flagged or not. These ids are the owner's own browsers, so they aren't stripped after 13 months.
+`owner_visitors` holds the Visitor id of every browser that has opened `/stats/` through Cloudflare Access (below). Opening it adds the browser's id (giving it one first if it has none), and flags that Visitor's Events so far `is_me = 1`. Every later Event from that Visitor, and its Leaderboard runs, are flagged when they're written. The dashboard also leaves out any Event whose Visitor is in `owner_visitors`, flagged or not. These ids are the owner's own browsers, so they aren't stripped after 13 months.
 
 Count active Visitors, leaving yours out:
 
@@ -41,18 +43,13 @@ Views by page and source this month:
 npx wrangler d1 execute spratt-dev --remote --command "SELECT path, COALESCE(ref, referrer, 'direct') AS source, COUNT(*) AS views FROM events WHERE kind = 'view' AND is_me = 0 AND created_at >= datetime('now', '-30 days') GROUP BY path, source ORDER BY views DESC LIMIT 50"
 ```
 
-## Posts (old tables)
+## Posts
 
-For a Post page, the Worker also:
-
-1. counts a View when the request is a browser navigation (`Sec-Fetch-Mode: navigate`) to `jspratt.dev`, and logs it as a row in `view_log` with the time, the linking site's hostname (from `Referer`) and any `?ref=` tag
-2. writes " · Read N times" into the page's `[data-stats]` placeholder
+A Post's page gets " · Read N times" written into its `[data-stats]` placeholder (its View Events that aren't the owner's, as on the dashboard) and its Like count into the Like button (every Like Event). The page is `no-store`, since the counts change.
 
 ## Your own Views
 
-Open `https://jspratt.dev/stats/` once in each browser you use, phone included, and sign in to Access. That marks the browser as yours (see "The owner's Visitors" above) and sets the `me` cookie. Until the old tables go, `https://jspratt.dev/writing/?me` still works too, and sets only the cookie.
-
-The `me=1` cookie is on the whole site and lasts 400 days. That browser's Views, Plays and Finishes, and all its Events, are still logged, with `is_me = 1`, but Views don't add to `post_stats`, so the "Read N times" readers see leaves you out. Clearing cookies undoes it; open `/stats/` again. Cloudflare Web Analytics doesn't know about the cookie.
+Open `https://jspratt.dev/stats/` once in each browser you use, phone included, and sign in to Access. That marks the browser as yours (see "The owner's Visitors" above): its Events are still recorded, with `is_me = 1`, but left out of "Read N times" and the dashboard. Clearing cookies gives the browser a new Visitor id; open `/stats/` again. Cloudflare Web Analytics doesn't know about any of this.
 
 ## Tagging shared links
 
@@ -63,26 +60,26 @@ Add `?ref=<where>` when sharing a Post, e.g. `https://jspratt.dev/writing/the-gr
 A Like is a plain form POST to `/writing/<slug>/like`. The Worker:
 
 1. refuses it unless `Origin` matches the site, and 404s for a slug that isn't a Post
-2. adds one to `likes` and sets a `liked=1` cookie scoped to that Post's path
+2. records a Like Event and sets a `liked=1` cookie scoped to that Post's path
 3. redirects back to `/writing/<slug>/?liked`, which isn't counted as a new View
 
 A browser that already has the cookie can't like the Post again. Clearing cookies resets that, which is fine for a personal site.
 
-Interest works the same way at `/writing/<slug>/interest`, with two differences. Each answer is a row in `interest` (slug and time), not a counter, and the `interested=1` cookie is scoped to `/writing/`, so a browser answers once across all Posts. A browser with the cookie sees a thank-you in place of the question on every Post. Nobody else sees a count.
+Interest works the same way at `/writing/<slug>/interest`, with two differences. Nobody but the owner sees a count, and the `interested=1` cookie is scoped to `/writing/`, so a browser answers once across all Posts. A browser with the cookie sees a thank-you in place of the question on every Post.
 
 Branch previews read the live counts but never write them. If D1 fails, the static page is served unchanged.
 
 ## Games
 
-Twenty Boats (`/games/twenty-boats/`) and Cactus Boats (`/games/cactus-boats/`) are logged in `game_log`, one row per event, with the same source and owner rules as Posts. Cactus Boats reports a `play` each time you set sail and a `finish` with ending `sunk` and `survived: false` each time you're sunk:
+Twenty Boats (`/games/twenty-boats/`) and Cactus Boats (`/games/cactus-boats/`) record their page's Views, Plays and Finishes as Events, with the same source and owner rules as Posts. Cactus Boats reports a `play` each time you set sail and a `finish` with ending `sunk` and `survived: false` each time you're sunk:
 
-- `view`: the Worker logs a browser navigation to the game's page on `jspratt.dev`, like a Post's View. The page is served as built.
+- `view`: a browser navigation to the game's page on `jspratt.dev` is a View, like any page's. The page is served as built.
 - `play`: the game's `play.js` POSTs `{ "event": "play" }` to `/games/twenty-boats/event` when a run starts (a Draw, or Live this night again).
 - `finish`: it POSTs `{ "event": "finish", "ending": "boat-7", "survived": true }` once when that run reaches its Ending.
 
-Each report carries the page's `?ref=` tag and `document.referrer`, which the Worker cleans the same way as a View's (tag rules above, hostname only), so a Play has the same source as the View it came from. The Worker refuses a report from another site, answers 204 and writes nothing off the live hostname, and stores no IP, address or id: a row is the Game, the event, the Ending, the time, the source and `is_me`. Someone could POST fake reports from the page's own origin; for a personal site that's fine.
+Each report carries the page's `?ref=` tag and `document.referrer`, which the Worker cleans the same way as a View's (tag rules above, hostname only), so a Play has the same source as the View it came from. The Worker refuses a report from another site, answers 204 and writes nothing off the live hostname, and stores no IP or address: an Event is the Game, the kind, the Ending, the time, the source, the Visitor and `is_me`. Someone could POST fake reports from the page's own origin; for a personal site that's fine.
 
-To log another Game, add its name to `GAMES` in `worker/stats.ts` and its title to `GAME_TITLES` in `worker/dashboard.ts`, its page and `event` address to `run_worker_first`, and an `onEvent` hook like Twenty Boats'.
+To record another Game, add its name to `GAMES` in `worker/stats.ts` and its title to `GAME_TITLES` in `worker/dashboard.ts`, its page and `event` address to `run_worker_first`, and an `onEvent` hook like Twenty Boats'.
 
 ## Leaderboard
 
@@ -94,7 +91,7 @@ Cactus Boats keeps a global Leaderboard in `scores`, one row per Play that asked
 
 The board is the highest Scores first, the earlier run winning a tie. Only submitted rows are on it; a Play that didn't make the board, or was skipped, leaves a row with only `started_at` and its source.
 
-The two POSTs refuse another Origin (403), anything but POST (405) and a body over 512 bytes (413). Like the Game log, a row stores no IP, address or browser id, and the owner's `me` cookie sets `is_me = 1`, but the owner's Scores still show on the board.
+The two POSTs refuse another Origin (403), anything but POST (405) and a body over 512 bytes (413). A row stores no IP, address or browser id; a run from one of the owner's Visitors (`owner_visitors`) sets `is_me = 1`, but the owner's Scores still show on the board.
 
 ### Plausibility checks
 
@@ -109,7 +106,7 @@ To stop the casual cheats, `score` also refuses a Score with a 400 and writes no
 
 The run checks are part of the `UPDATE` itself, so two Scores sent at the same moment for one run can't both land. The game shows a refused Score as "not accepted" and carries on.
 
-These checks stop hand-edited requests and replayed runs. They don't stop someone scripting a plausible Score from the page's own origin: start a run, wait, then send a time and sink count that fit. For a personal site that's accepted, as it is for the Game log. If it happens, remove the Score by hand (below).
+These checks stop hand-edited requests and replayed runs. They don't stop someone scripting a plausible Score from the page's own origin: start a run, wait, then send a time and sink count that fit. For a personal site that's accepted, as it is for Plays. If it happens, remove the Score by hand (below).
 
 Read the board, the owner's included:
 
@@ -130,11 +127,13 @@ A browser that read the board just before may show it for up to 10 seconds more.
 - [ ] `npx wrangler login`, then `npx wrangler d1 create spratt-dev`.
 - [ ] Paste the `database_id` it prints into `wrangler.jsonc`, replacing the all-zero placeholder. The id isn't a secret.
 - [ ] `npx wrangler d1 migrations apply spratt-dev --remote`.
-- [ ] After the first deploy, open a live Post twice in a browser and check the count with the query below.
+- [ ] After the first deploy, open a live Post twice in a browser and check its "Read N times" goes up.
 
 ## Adding a migration
 
 Add the next numbered `.sql` file to `migrations/`. Run `npx wrangler d1 migrations apply spratt-dev --remote` **before** merging the PR that uses it, because the deploy from `main` expects the new schema to already be there. Every migration should be safe to run while the old code is still live, e.g. adding a column with a default.
+
+The one exception so far is `0009_events_cutover.sql`, which drops the tables the Worker before it still wrote. It was applied right **after** its PR deployed: the new Worker only reads `events`, so it runs fine on the old schema, and during the minute or so before the migration, Posts showed only their counts since Events began. Events written in that minute are kept, since the copy only takes old rows from before 2026-11-26 00:39 UTC.
 
 ## The dashboard
 
@@ -164,30 +163,13 @@ Locally, put `ACCESS_TEAM_DOMAIN=...` and `ACCESS_AUD=...` in `.dev.vars` (gitig
 
 ## Reading the counts
 
-From the terminal, where Views came from, by source, by Post and by day:
+The dashboard at `/stats/` is the place to read them. For anything it doesn't show, query `events` directly, e.g. the Endings reached:
 
 ```sh
-npm run views                 # last 14 days, your own Views left out
-npm run views -- --days 60
-npm run views -- --with-me    # include your own
+npx wrangler d1 execute spratt-dev --remote --command "SELECT game, ending, survived, COUNT(*) AS finishes FROM events WHERE kind = 'finish' AND is_me = 0 GROUP BY game, ending, survived ORDER BY game, finishes DESC"
 ```
 
-It ends with the Games: Views, Plays, Finishes and how many lived, by Game and source, then the Endings reached.
-
-A View's source is its `?ref=` tag if it has one, else the linking site, else `direct`. Views before `view_log` existed (2026-11-15) are only in the `post_stats` totals.
-
-The totals:
-
-```sh
-npx wrangler d1 execute spratt-dev --remote --command "SELECT * FROM post_stats ORDER BY views DESC"
-```
-
-How many browsers would subscribe, and which Posts prompted them:
-
-```sh
-npx wrangler d1 execute spratt-dev --remote --command "SELECT slug, COUNT(*) AS answers, MAX(created_at) AS latest FROM interest GROUP BY slug ORDER BY answers DESC"
-npx wrangler d1 execute spratt-dev --remote --command "SELECT COUNT(*) AS total FROM interest"
-```
+A View's source is its `?ref=` tag if it has one, else the linking site, else `direct`.
 
 ## Local
 
