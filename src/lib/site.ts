@@ -140,6 +140,41 @@ export const site: Site = loadSite();
 export const projects: Project[] = loadProjects();
 export const games: Game[] = loadGames();
 
+/**
+ * Where a Click out leaves the site to: the header Links, then each Project by
+ * its title, lowercased to letters, digits and dashes. Pages link to
+ * /out/<name>/ (outHref), which the Worker logs and redirects to the url. The
+ * build writes this list to /out/links.json, and the Worker only redirects to
+ * a name on it, so /out/ can't be used to send people anywhere else.
+ */
+function loadOutLinks(): Record<string, string> {
+  const out: Record<string, string> = {
+    github: site.links.github,
+    linkedin: site.links.linkedin,
+    email: `mailto:${site.links.email}`,
+  };
+  for (const p of projects) {
+    const name = outName(p);
+    if (!name) fail("projects.json", `${p.title}: title needs a letter or digit for its /out/ name`);
+    if (name in out) fail("projects.json", `${p.title}: /out/${name}/ is already taken`);
+    out[name] = p.url;
+  }
+  return out;
+}
+
+/** A Project's name in /out/<name>/, e.g. "MarinaraDB" → "marinaradb". */
+export function outName(p: Project): string {
+  return p.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export const outLinks: Record<string, string> = loadOutLinks();
+
+/** The on-site address of a Click out, e.g. "/out/github/". */
+export const outHref = (name: string) => `/out/${name}/`;
+
 /** Posts that should appear in the current build mode, newest first. */
 export async function getPosts() {
   const { getCollection } = await import("astro:content");

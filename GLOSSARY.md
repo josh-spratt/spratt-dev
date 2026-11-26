@@ -45,7 +45,7 @@ The Homepage block listing the latest three Posts. It doesn't exist until the fi
 _Avoid_: blog section, latest posts
 
 **View**:
-One browser visit to a Post, or to a Game's page, on the live site. Crawlers, previews and local runs don't count, and Josh's own Views (from a browser marked with `/writing/?me`) are logged but not counted. A Post's View count is shown in its header once it has one. Each View's source is its `?ref=` tag, else the site that linked to it, else direct.
+One browser visit to any page of the live site: the Homepage, the Games page, the Writing list, a Post or a Game's page. Crawlers, previews and local runs don't count, and Josh's own Views (from any browser he has signed into the private stats page with) are logged but not counted. A Post's View count is shown in its header once it has one. Each View's source is its `?ref=` tag, else the site that linked to it, else direct.
 _Avoid_: hit, pageview, read count
 
 **Play**:
@@ -75,3 +75,15 @@ _Avoid_: upvote, heart, favourite
 **Interest**:
 A reader's answer to "Would you subscribe by email if I set it up?" at the end of a Post. It measures whether an email list is worth building. No address is collected. Each browser can answer once across all Posts, and only the live site records it.
 _Avoid_: signup, subscriber, lead
+
+**Event**:
+One thing a reader did that the live site records: a View, a Play, a Finish, a Like, an Interest or a Click out. Every Event has the same shape (what happened, on which page, when, its source, its Visitor, and whether it was Josh's) so all of them are counted the same way.
+_Avoid_: hit, log entry, metric
+
+**Visitor**:
+One browser, recognised across visits for about 400 days by an anonymous id the site gives it. It says nothing about who the person is. Daily, weekly and monthly active Visitors (DAU, WAU, MAU) count distinct Visitors with at least one Event in the last 1, 7 or 30 days. One person on a phone and a laptop is two Visitors.
+_Avoid_: user, unique, session
+
+**Click out**:
+A reader following a Project's link or one of the Links off the site. Its source is that of the page's View.
+_Avoid_: outbound click, exit, referral

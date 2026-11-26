@@ -1,11 +1,14 @@
 /**
- * Runs only for /writing/*, /stats* and a Game's page and event address (see
- * run_worker_first in wrangler.jsonc). Every page is still built statically.
- * For a Post page this counts the View in D1 and writes the View and Like
- * counts into the HTML. For a Game it logs the page's Views and the Plays and
- * Finishes the game reports, and keeps its Leaderboard. A Like and the
- * email-interest answer are plain form POSTs, so the page ships no client
- * script. /stats/ is the owner's private traffic dashboard.
+ * Runs for every page of the site, a Game's event and Leaderboard addresses,
+ * /out/* and /stats* (see run_worker_first in wrangler.jsonc). Every page is
+ * still built statically. Each page View is recorded as an Event, and so is
+ * every Play, Finish, Like, Interest and Click out (docs/database.md). Beside
+ * that, the old tables keep their own counts until the cutover: for a Post
+ * page this counts the View and writes the View and Like counts into the HTML,
+ * and for a Game it logs the page's Views and the Plays and Finishes the game
+ * reports, and keeps its Leaderboard. A Like and the email-interest answer are
+ * plain form POSTs, so the page ships no client script. /stats/ is the owner's
+ * private traffic dashboard.
  */
 
 import {
@@ -41,6 +44,13 @@ import {
   type LeaderboardGame,
   isLive,
   isMe,
+  fromPage,
+  isPageView,
+  outPath,
+  outTarget,
+  visitorOf,
+  type EventKind,
+  isBot,
   isMeSetup,
   isSameOrigin,
   likeLabel,
@@ -71,6 +81,94 @@ const RECORD_INTEREST = "INSERT INTO interest (slug) VALUES (?1)";
 const LOG_VIEW = "INSERT INTO view_log (slug, referrer, ref, is_me) VALUES (?1, ?2, ?3, ?4)";
 const LOG_GAME =
   "INSERT INTO game_log (game, event, ending, survived, referrer, ref, is_me) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
+
+// Events. Written apart from the old tables' statements, and never awaited by
+// the response, so an Event that fails can't change what the old tables or the
+// reader get.
+const RECORD_EVENT =
+  "INSERT INTO events (kind, path, ref, referrer, visitor, is_me, game, ending, survived, target) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+// A Like, Interest or Click out has no source of its own: it takes the source
+// of this Visitor's latest View of the page (?2), or none (direct).
+const RECORD_FROM_VIEW = `INSERT INTO events (kind, path, ref, referrer, visitor, is_me, target)
+  SELECT ?1, ?2, v.ref, v.referrer, ?3, ?4, ?5 FROM (SELECT 1) LEFT JOIN (
+    SELECT ref, referrer FROM events WHERE visitor = ?3 AND kind = 'view' AND path = ?2 ORDER BY id DESC LIMIT 1
+  ) v ON 1`;
+
+interface Event {
+  kind: EventKind;
+  path: string;
+  ref: string | null;
+  referrer: string | null;
+  visitor: string | null;
+  game?: string | null;
+  ending?: string | null;
+  survived?: 0 | 1 | null;
+}
+
+function recordEvent(env: Env, ctx: ExecutionContext, request: Request, e: Event): void {
+  const stmt = env.DB.prepare(RECORD_EVENT).bind(
+    e.kind, e.path, e.ref, e.referrer, e.visitor, isMe(request) ? 1 : 0, e.game ?? null, e.ending ?? null, e.survived ?? null, null,
+  );
+  ctx.waitUntil(stmt.run().catch((err) => console.error(`${e.kind} event failed`, err)));
+}
+
+function recordFromView(
+  env: Env, ctx: ExecutionContext, request: Request, kind: EventKind, path: string, visitor: string | null, target: string | null = null,
+): void {
+  const stmt = env.DB.prepare(RECORD_FROM_VIEW).bind(kind, path, visitor, isMe(request) ? 1 : 0, target);
+  ctx.waitUntil(stmt.run().catch((err) => console.error(`${kind} event failed`, err)));
+}
+
+/** The response with a header added; asset responses' headers can't be changed in place. */
+function withCookie(res: Response, cookie: string | null): Response {
+  if (!cookie) return res;
+  const out = new Response(res.body, res);
+  out.headers.append("set-cookie", cookie);
+  return out;
+}
+
+/**
+ * Records a View Event for a page response when it is one (isPageView), giving
+ * a new browser its Visitor cookie. The page itself is served unchanged.
+ */
+function pageView(env: Env, ctx: ExecutionContext, request: Request, res: Response, game: Game | null = null): Response {
+  if (!isPageView(request, res)) return res;
+  const url = new URL(request.url);
+  const visitor = visitorOf(request);
+  recordEvent(env, ctx, request, {
+    kind: "view", path: url.pathname, ref: refTag(url), referrer: referrerHost(request), visitor: visitor.id, game,
+  });
+  return withCookie(res, visitor.cookie);
+}
+
+/**
+ * GET /out/<name>/: a Click out. Redirects (302) to the address the build's
+ * list has for that name, and on the live site records the Click out first,
+ * with the source of the page's View. A name not on the list is the ordinary
+ * 404 page, so this can't send anyone anywhere else.
+ */
+async function clickOut(request: Request, env: Env, ctx: ExecutionContext, name: string): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
+  }
+  let links: unknown = null;
+  try {
+    const res = await env.ASSETS.fetch(new URL("/out/links.json", request.url));
+    if (res.ok) links = await res.json();
+  } catch (err) {
+    console.error("out links failed", err);
+  }
+  const target = outTarget(links, name);
+  if (!target) return notFound(env, request);
+
+  const headers = new Headers({ location: target, "cache-control": "no-store" });
+  if (request.method === "GET" && shouldCount(request) && !isBot(request)) {
+    const visitor = visitorOf(request);
+    recordFromView(env, ctx, request, "click_out", fromPage(request) ?? `/out/${name}/`, visitor.id, name);
+    if (visitor.cookie) headers.set("set-cookie", visitor.cookie);
+  }
+  return new Response(null, { status: 302, headers });
+}
 
 const INTEREST_THANKS =
   `<p class="interest" id="${INTEREST_ANCHOR}">Thanks. If enough people say so, I’ll set up email.</p>`;
@@ -111,12 +209,12 @@ interface FormAction {
   cookie: string;
   /** Where to send the browser back to. */
   location: string;
-  /** For the error log. */
-  name: string;
+  /** For the error log, and the Event it records. */
+  name: "like" | "interest";
 }
 
 /** A Post's form POST: same-site, real Posts only, once per browser, and only the live site writes. */
-async function submit(request: Request, env: Env, slug: string, action: FormAction): Promise<Response> {
+async function submit(request: Request, env: Env, ctx: ExecutionContext, slug: string, action: FormAction): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: { allow: "POST" } });
   if (!isSameOrigin(request)) return new Response("Forbidden", { status: 403 });
   if (!(await postExists(env, request, slug))) return new Response("Not Found", { status: 404 });
@@ -126,6 +224,9 @@ async function submit(request: Request, env: Env, slug: string, action: FormActi
     try {
       await env.DB.prepare(action.sql).bind(slug).run();
       headers.set("set-cookie", action.cookie);
+      const visitor = visitorOf(request);
+      recordFromView(env, ctx, request, action.name, `/writing/${slug}/`, visitor.id);
+      if (visitor.cookie) headers.append("set-cookie", visitor.cookie);
     } catch (err) {
       console.error(`${action.name} failed`, err);
     }
@@ -178,8 +279,9 @@ async function post(request: Request, env: Env, slug: string, page: Response): P
  * A Game's page: served as built, with a View logged under the same rules as
  * a Post's (a browser navigation to the live site; the owner's flagged).
  */
-async function gameView(request: Request, env: Env, game: Game): Promise<Response> {
-  const page = await env.ASSETS.fetch(request);
+async function gameView(request: Request, env: Env, ctx: ExecutionContext, game: Game): Promise<Response> {
+  const asset = await env.ASSETS.fetch(request);
+  const page = pageView(env, ctx, request, asset, game);
   const isHtml = page.headers.get("content-type")?.startsWith("text/html");
   if (page.status !== 200 || !isHtml || !shouldCount(request)) return page;
   try {
@@ -197,12 +299,19 @@ async function gameView(request: Request, env: Env, game: Game): Promise<Respons
  * only, and only the live site writes. Always 204, so the game never waits
  * on it or shows an error.
  */
-async function gameEvent(request: Request, env: Env, game: Game): Promise<Response> {
+async function gameEvent(request: Request, env: Env, ctx: ExecutionContext, game: Game): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: { allow: "POST" } });
   if (!isSameOrigin(request)) return new Response("Forbidden", { status: 403 });
   const event = parseGameEvent(await request.text());
   if (!event) return new Response("Bad Request", { status: 400 });
+  const headers = new Headers({ "cache-control": "no-store" });
   if (isLive(request)) {
+    const visitor = visitorOf(request);
+    recordEvent(env, ctx, request, {
+      kind: event.event, path: `/games/${game}/`, ref: event.ref, referrer: event.referrer, visitor: visitor.id,
+      game, ending: event.ending, survived: event.survived,
+    });
+    if (visitor.cookie) headers.set("set-cookie", visitor.cookie);
     try {
       await env.DB.prepare(LOG_GAME)
         .bind(game, event.event, event.ending, event.survived, event.referrer, event.ref, isMe(request) ? 1 : 0)
@@ -211,7 +320,7 @@ async function gameEvent(request: Request, env: Env, game: Game): Promise<Respon
       console.error("game event failed", err);
     }
   }
-  return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+  return new Response(null, { status: 204, headers });
 }
 
 // The Leaderboard: the board is the top Scores, highest first, the earlier
@@ -414,16 +523,16 @@ async function dashboard(request: Request, env: Env, url: URL): Promise<Response
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
 
     if (pathname === "/stats" || pathname.startsWith("/stats/")) return dashboard(request, env, url);
 
     const playing = gamePage(pathname);
-    if (playing) return gameView(request, env, playing);
+    if (playing) return gameView(request, env, ctx, playing);
     const reporting = gameEventPath(pathname);
-    if (reporting) return gameEvent(request, env, reporting);
+    if (reporting) return gameEvent(request, env, ctx, reporting);
     const board = leaderboardPath(pathname);
     if (board?.action === "start") return startRun(request, env, board.game);
     if (board?.action === "score") return submitScore(request, env, board.game);
@@ -437,7 +546,7 @@ export default {
 
     const liking = likeSlug(pathname);
     if (liking) {
-      return submit(request, env, liking, {
+      return submit(request, env, ctx, liking, {
         name: "like",
         done: hasLiked(request),
         sql: COUNT_LIKE,
@@ -448,7 +557,7 @@ export default {
 
     const answering = interestSlug(pathname);
     if (answering) {
-      return submit(request, env, answering, {
+      return submit(request, env, ctx, answering, {
         name: "interest",
         done: hasAnsweredInterest(request),
         sql: RECORD_INTEREST,
@@ -457,7 +566,11 @@ export default {
       });
     }
 
-    const page = await env.ASSETS.fetch(request);
+    const leaving = outPath(pathname);
+    if (leaving) return clickOut(request, env, ctx, leaving);
+
+    // Every other page: a View Event, then for a Post the old counts.
+    const page = pageView(env, ctx, request, await env.ASSETS.fetch(request));
     const slug = postSlug(pathname);
     const isHtml = page.headers.get("content-type")?.startsWith("text/html");
     if (!slug || page.status !== 200 || !isHtml) return page;

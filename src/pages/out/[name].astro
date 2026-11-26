@@ -1,0 +1,28 @@
+---
+import { outLinks } from "../../lib/site";
+
+/**
+ * A plain page for each Click out. On the live site the Worker answers
+ * /out/<name>/ itself, logging the Click out and redirecting, so this page is
+ * only seen locally (astro dev, astro preview) or if the Worker is down. It
+ * also keeps the real address in the build, for the link checkers.
+ */
+export function getStaticPaths() {
+  return Object.entries(outLinks).map(([name, url]) => ({ params: { name }, props: { url } }));
+}
+
+const { url } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <meta http-equiv="refresh" content={`0; url=${url}`} />
+    <title>Leaving jspratt.dev</title>
+  </head>
+  <body>
+    <p><a href={url}>Continue to {url.replace(/^mailto:/, "")}</a></p>
+  </body>
+</html>

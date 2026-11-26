@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -11,7 +11,14 @@ import { buildSite, type Site } from "./helpers.ts";
 import { dashboardQuery, renderDashboard, sameString, windowDays } from "../worker/dashboard.ts";
 import {
   cleanInitials,
+  fromPage,
   gameEventPath,
+  isBot,
+  isPageView,
+  outPath,
+  outTarget,
+  visitorId,
+  visitorOf,
   gamePage,
   interestSlug,
   leaderboardPath,
@@ -871,4 +878,267 @@ test("the dashboard escapes everything that came from a reader", () => {
   );
   assert.doesNotMatch(html, /<script>|<img>|<b>x|<i>|<u>|<s>|<em>/);
   assert.match(html, /&lt;script&gt;/);
+});
+
+// Events: written beside the old tables (docs/database.md).
+
+const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
+const browser = { ...navigate, "user-agent": BROWSER };
+const VISITOR = "0b3c9d5e-1f2a-4b6c-8d7e-9f0a1b2c3d4e";
+
+interface EventRow {
+  kind: string;
+  path: string;
+  ref: string | null;
+  referrer: string | null;
+  visitor: string | null;
+  is_me: number;
+  game: string | null;
+  ending: string | null;
+  survived: number | null;
+  target: string | null;
+}
+
+const lastEventId = () => Number(sql("SELECT COALESCE(MAX(id), 0) AS id FROM events")[0].id);
+
+/**
+ * The Events after `since`, waiting a little: the Worker writes them after it
+ * has answered, so they can land just after the response.
+ */
+async function eventsAfter(since: number, expect = 1): Promise<EventRow[]> {
+  const read = () =>
+    sql(`SELECT kind, path, ref, referrer, visitor, is_me, game, ending, survived, target FROM events WHERE id > ${since} ORDER BY id`) as unknown as EventRow[];
+  let rows = read();
+  for (let i = 0; i < 10 && rows.length < expect; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    rows = read();
+  }
+  return rows;
+}
+
+const event = (e: Partial<EventRow>): EventRow => ({
+  kind: "view", path: "/", ref: null, referrer: null, visitor: VISITOR, is_me: 0,
+  game: null, ending: null, survived: null, target: null, ...e,
+});
+
+const req = (url: string, headers: Record<string, string> = {}, method = "GET") => new Request(url, { method, headers });
+
+test("isBot catches link previews, uptime checkers, headless browsers and no user agent, not browsers", () => {
+  assert.equal(isBot(req(LIVE, { "user-agent": BROWSER })), false);
+  assert.equal(isBot(req(LIVE, { "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1" })), false);
+  for (const agent of [
+    "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+    "facebookexternalhit/1.1",
+    "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 HeadlessChrome/140.0 Safari/537.36",
+    "Mozilla/5.0 (compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)",
+    "WhatsApp/2.23.20.0",
+    "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+  ]) {
+    assert.equal(isBot(req(LIVE, { "user-agent": agent })), true, agent);
+  }
+  assert.equal(isBot(req(LIVE)), true);
+});
+
+test("a Visitor id is only ever a random UUID from its own cookie", () => {
+  assert.equal(visitorId(req(LIVE, { cookie: `me=1; visitor=${VISITOR}` })), VISITOR);
+  assert.equal(visitorId(req(LIVE, { cookie: "visitor=not-an-id" })), null);
+  assert.equal(visitorId(req(LIVE, { cookie: `xvisitor=${VISITOR}` })), null);
+  assert.deepEqual(visitorOf(req(LIVE, { cookie: `visitor=${VISITOR}` })), { id: VISITOR, cookie: null });
+  const fresh = visitorOf(req(LIVE));
+  assert.match(fresh.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(fresh.cookie, `visitor=${fresh.id}; Path=/; Max-Age=34560000; HttpOnly; Secure; SameSite=Lax`);
+});
+
+test("isPageView is a browser navigation to a live page, answered with the page or a 304", () => {
+  const html = new Response("", { headers: { "content-type": "text/html; charset=utf-8" } });
+  const ok = req(`${LIVE}/`, browser);
+  assert.equal(isPageView(ok, html), true);
+  assert.equal(isPageView(ok, new Response(null, { status: 304 })), true);
+  assert.equal(isPageView(ok, new Response("", { status: 404, headers: { "content-type": "text/html" } })), false);
+  assert.equal(isPageView(ok, new Response("", { headers: { "content-type": "application/xml" } })), false);
+  assert.equal(isPageView(req(`${LIVE}/`, navigate), html), false, "no user agent");
+  assert.equal(isPageView(req(`${LIVE}/`, { "user-agent": BROWSER }), html), false, "not a navigation");
+  assert.equal(isPageView(req("https://x.spratt-dev.example.workers.dev/", browser), html), false, "a preview");
+  assert.equal(isPageView(req(`${LIVE}/writing/a/?liked`, browser), html), false, "back from a Like");
+});
+
+test("outPath, outTarget and fromPage only accept what they should", () => {
+  assert.equal(outPath("/out/github/"), "github");
+  assert.equal(outPath("/out/github"), "github");
+  assert.equal(outPath("/out/"), null);
+  assert.equal(outPath("/out/a/b/"), null);
+  assert.equal(outPath("/out/links.json"), null);
+  const links = { github: "https://github.com/x", email: "mailto:x@example.com", bad: "javascript:alert(1)" };
+  assert.equal(outTarget(links, "github"), "https://github.com/x");
+  assert.equal(outTarget(links, "email"), "mailto:x@example.com");
+  assert.equal(outTarget(links, "bad"), null);
+  assert.equal(outTarget(links, "constructor"), null);
+  assert.equal(outTarget(links, "nope"), null);
+  assert.equal(outTarget(null, "github"), null);
+  assert.equal(fromPage(req(`${LIVE}/out/github/`, { referer: `${LIVE}/writing/a/?ref=x` })), "/writing/a/");
+  assert.equal(fromPage(req(`${LIVE}/out/github/`, { referer: "https://evil.example/" })), null);
+  assert.equal(fromPage(req(`${LIVE}/out/github/`)), null);
+});
+
+/** A run_worker_first pattern as a regex: `*` is anything, the rest is literal. */
+const routeMatcher = (pattern: string) =>
+  new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
+
+test("run_worker_first covers every built page, so each one's Views are recorded", () => {
+  const config = JSON.parse(
+    readFileSync("wrangler.jsonc", "utf8")
+      .split("\n")
+      .filter((l) => !/^\s*\/\//.test(l))
+      .join("\n"),
+  );
+  const routes: RegExp[] = config.assets.run_worker_first.map(routeMatcher);
+  const pages = execFileSync("find", [site.outDir, "-name", "index.html"])
+    .toString()
+    .trim()
+    .split("\n")
+    .map((f) => f.slice(site.outDir.length).replace(/index\.html$/, ""));
+  assert.ok(pages.includes("/") && pages.includes("/games/"));
+  for (const page of pages) assert.ok(routes.some((r) => r.test(page)), `${page} runs the Worker`);
+  assert.ok(!routes.some((r) => r.test("/_astro/x.css")), "assets don't run it");
+});
+
+test("a browser View of any page is an Event, giving a new browser its Visitor cookie", async () => {
+  const since = lastEventId();
+  const res = await get(`${LIVE}/?ref=Mastodon`, { ...browser, referer: "https://mastodon.social/@x" });
+  assert.equal(res.status, 200);
+  assert.equal(res.body, site.read("index.html"), "the page is served as built");
+  const cookie = String(res.headers["set-cookie"]);
+  const id = /^visitor=([0-9a-f-]{36}); Path=\/; Max-Age=34560000; HttpOnly; Secure; SameSite=Lax$/.exec(cookie)?.[1];
+  assert.ok(id, cookie);
+  assert.deepEqual(await eventsAfter(since), [event({ path: "/", ref: "mastodon", referrer: "mastodon.social", visitor: id })]);
+});
+
+test("a returning Visitor keeps its id and gets no new cookie, on the Games page and the Writing list too", async () => {
+  const since = lastEventId();
+  const headers = { ...browser, cookie: `visitor=${VISITOR}` };
+  const games = await get(`${LIVE}/games/`, headers);
+  assert.equal(games.headers["set-cookie"], undefined);
+  assert.equal(games.body, site.read("games/index.html"));
+  await get(`${LIVE}/writing/`, headers);
+  assert.deepEqual(await eventsAfter(since, 2), [event({ path: "/games/" }), event({ path: "/writing/" })]);
+});
+
+test("a revalidated page (304) is still a View", async () => {
+  const first = await get(`${LIVE}/games/`, { ...browser, cookie: `visitor=${VISITOR}` });
+  const etag = String(first.headers.etag ?? "");
+  assert.ok(etag, "the assets send an ETag");
+  const since = lastEventId();
+  const again = await get(`${LIVE}/games/`, { ...browser, cookie: `visitor=${VISITOR}`, "if-none-match": etag });
+  assert.equal(again.status, 304);
+  assert.deepEqual(await eventsAfter(since), [event({ path: "/games/" })]);
+});
+
+test("crawlers, bots, previews, missing pages, a Game's files and the redirect after a Like aren't Views", async () => {
+  const since = lastEventId();
+  await get(`${LIVE}/`, { "user-agent": BROWSER }); // not a navigation
+  await get(`${LIVE}/`, { ...navigate, "user-agent": "Slackbot-LinkExpanding 1.0" });
+  await get(`${LIVE}/`, navigate); // no user agent
+  const preview = await get("https://views.spratt-dev.example.workers.dev/", browser);
+  assert.equal(preview.headers["set-cookie"], undefined, "previews set no Visitor cookie");
+  await get(`${LIVE}/writing/not-a-post/`, browser);
+  await get(`${LIVE}/games/twenty-boats/play.js`, browser);
+  await get(`${LIVE}/writing/newer-post/?liked`, browser);
+  await get(`${LIVE}/stats/`, browser);
+  // One real View after them, so the wait has something to find.
+  await get(`${LIVE}/writing/`, { ...browser, cookie: `visitor=${VISITOR}` });
+  assert.deepEqual(await eventsAfter(since), [event({ path: "/writing/" })]);
+});
+
+test("a Post View is both an Event and the old count, and the owner's is flagged", async () => {
+  const slug = "older-post";
+  const before = Number(views(slug));
+  const logged = viewLog(slug).length;
+  const since = lastEventId();
+  const res = await get(`${LIVE}/writing/${slug}/?ref=hn`, { ...browser, cookie: `visitor=${VISITOR}` });
+  assert.equal(stats(res.body), ` · Read ${before + 1} times`);
+  await get(`${LIVE}/writing/${slug}/`, { ...browser, cookie: `me=1; visitor=${VISITOR}` });
+  assert.equal(views(slug), before + 1, "the owner's View leaves the public count alone");
+  assert.equal(viewLog(slug).length, logged + 2);
+  assert.deepEqual(await eventsAfter(since, 2), [
+    event({ path: `/writing/${slug}/`, ref: "hn" }),
+    event({ path: `/writing/${slug}/`, is_me: 1 }),
+  ]);
+});
+
+test("a Game's page View, Plays and Finishes are Events with the Game, beside the Game log", async () => {
+  const logged = gameLog().length;
+  const since = lastEventId();
+  const cookie = `visitor=${VISITOR}`;
+  await get(`${LIVE}/games/cactus-boats/?ref=hn`, { ...browser, cookie });
+  const url = `${LIVE}/games/cactus-boats/event`;
+  const from = { ref: "hn", referrer: "https://news.ycombinator.com/" };
+  await report(url, { event: "play", ...from }, { cookie });
+  await report(url, { event: "finish", ending: "sunk", survived: false, ...from }, { cookie });
+  const fresh = await report(url, { event: "play" });
+  assert.match(String(fresh.headers["set-cookie"]), /^visitor=/, "a browser without one gets a Visitor id");
+  await report("https://views.spratt-dev.example.workers.dev/games/cactus-boats/event", { event: "play" }, { cookie });
+  assert.equal(gameLog().length, logged + 4, "the Game log still gets its rows");
+  const rows = await eventsAfter(since, 4);
+  const game = { path: "/games/cactus-boats/", game: "cactus-boats" };
+  assert.deepEqual(rows.slice(0, 3), [
+    event({ ...game, ref: "hn" }),
+    event({ ...game, kind: "play", ref: "hn", referrer: "news.ycombinator.com" }),
+    event({ ...game, kind: "finish", ref: "hn", referrer: "news.ycombinator.com", ending: "sunk", survived: 0 }),
+  ]);
+  assert.equal(rows.length, 4, "the preview's report is no Event");
+  assert.equal(rows[3].kind, "play");
+  assert.notEqual(rows[3].visitor, VISITOR);
+});
+
+test("a Like and an Interest are Events with the source of the Visitor's View of the Post", async () => {
+  const visitor = "11111111-2222-4333-8444-555555555555";
+  const cookie = `visitor=${visitor}`;
+  await get(`${LIVE}/writing/newer-post/?ref=bluesky`, { ...browser, cookie, referer: "https://bsky.app/" });
+  const since = lastEventId();
+  const before = Number(likes("newer-post"));
+  assert.equal((await like(`${LIVE}/writing/newer-post/like`, { cookie })).status, 303);
+  assert.equal(likes("newer-post"), before + 1, "the old Like count still goes up");
+  assert.equal((await like(`${LIVE}/writing/newer-post/interest`, { cookie })).status, 303);
+  // Already liked: no second Like, and no Event for it.
+  await like(`${LIVE}/writing/newer-post/like`, { cookie: `liked=1; ${cookie}` });
+  const source = { path: "/writing/newer-post/", ref: "bluesky", referrer: "bsky.app", visitor };
+  assert.deepEqual(await eventsAfter(since, 2), [event({ ...source, kind: "like" }), event({ ...source, kind: "interest" })]);
+});
+
+test("a Click out records the Event with the page's source and redirects to the real address", async () => {
+  const cookie = `visitor=${VISITOR}`;
+  await get(`${LIVE}/?ref=cv`, { ...browser, cookie });
+  const since = lastEventId();
+  const res = await get(`${LIVE}/out/github/`, { ...browser, cookie, referer: `${LIVE}/?ref=cv` });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.location, "https://github.com/fixture");
+  assert.equal(res.headers["cache-control"], "no-store");
+  assert.equal(res.headers["set-cookie"], undefined);
+  const project = await get(`${LIVE}/out/fixture-alpha/`, { ...browser, cookie, referer: `${LIVE}/` });
+  assert.equal(project.headers.location, "https://example.com/alpha");
+  const email = await get(`${LIVE}/out/email/`, { ...browser, cookie, referer: `${LIVE}/writing/` });
+  assert.equal(email.headers.location, "mailto:fixture@example.com");
+  assert.deepEqual(await eventsAfter(since, 3), [
+    event({ kind: "click_out", path: "/", ref: "cv", target: "github" }),
+    event({ kind: "click_out", path: "/", ref: "cv", target: "fixture-alpha" }),
+    event({ kind: "click_out", path: "/writing/", target: "email" }),
+  ]);
+});
+
+test("a Click out to a name not on the list is the 404 page; previews and bots are redirected but not recorded", async () => {
+  for (const path of ["/out/evil/", "/out/constructor/", "/out/a/b/"]) {
+    const res = await get(`${LIVE}${path}`, browser);
+    assert.equal(res.status, 404, path);
+    assert.equal(res.headers.location, undefined, path);
+  }
+  const since = lastEventId();
+  const preview = await get("https://views.spratt-dev.example.workers.dev/out/github/", browser);
+  assert.equal(preview.status, 302);
+  assert.equal(preview.headers.location, "https://github.com/fixture");
+  assert.equal(preview.headers["set-cookie"], undefined);
+  const bot = await get(`${LIVE}/out/github/`, { ...navigate, "user-agent": "Slackbot 1.0" });
+  assert.equal(bot.status, 302);
+  // A recorded one after them, so the wait has something to find.
+  await get(`${LIVE}/out/linkedin/`, { ...browser, cookie: `visitor=${VISITOR}` });
+  assert.deepEqual(await eventsAfter(since), [event({ kind: "click_out", path: "/out/linkedin/", target: "linkedin" })]);
 });

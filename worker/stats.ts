@@ -311,3 +311,105 @@ export function likeLabel(likes: number, liked: boolean): string {
   const word = liked ? "Liked" : "Like";
   return likes > 0 ? `${word} · ${likes.toLocaleString("en-GB")}` : word;
 }
+
+// Events: one row per View, Play, Finish, Like, Interest or Click out, written
+// alongside the old tables (docs/database.md).
+
+export type EventKind = "view" | "play" | "finish" | "like" | "interest" | "click_out";
+
+/**
+ * The anonymous Visitor id cookie: a random id, no IP, nothing about the
+ * person. Set once and not renewed, so a browser is one Visitor for about 400
+ * days (docs/adr/0001-first-party-visitor-cookie.md).
+ */
+export const VISITOR_COOKIE = "visitor";
+
+const VISITOR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** This browser's Visitor id, or null when it sent none (or something that isn't one). */
+export function visitorId(request: Request): string | null {
+  for (const part of (request.headers.get("cookie") ?? "").split(";")) {
+    const [k, v] = part.trim().split("=");
+    if (k === VISITOR_COOKIE && VISITOR_ID.test(v ?? "")) return v;
+  }
+  return null;
+}
+
+export function visitorCookie(id: string): string {
+  return `${VISITOR_COOKIE}=${id}; Path=/; Max-Age=34560000; HttpOnly; Secure; SameSite=Lax`;
+}
+
+/** The browser's Visitor id, and the cookie to set when it's a new one. */
+export function visitorOf(request: Request): { id: string; cookie: string | null } {
+  const id = visitorId(request);
+  if (id) return { id, cookie: null };
+  const fresh = crypto.randomUUID();
+  return { id: fresh, cookie: visitorCookie(fresh) };
+}
+
+/**
+ * User agents that navigate like a browser but aren't a reader: link-preview
+ * fetchers, uptime checkers and headless browsers. Lowercase substrings. Most
+ * crawlers send no Sec-Fetch-Mode and never get this far; this is for the ones
+ * that do. Kept short on purpose: add one when it shows up in the Events.
+ */
+export const BOT_AGENTS = [
+  "bot",
+  "crawl",
+  "spider",
+  "slurp",
+  "preview",
+  "facebookexternalhit",
+  "embedly",
+  "whatsapp",
+  "headless",
+  "phantomjs",
+  "lighthouse",
+  "pingdom",
+  "uptime",
+  "statuscake",
+  "site24x7",
+  "monitor",
+] as const;
+
+/** A missing user agent counts as a bot: every browser sends one. */
+export function isBot(request: Request): boolean {
+  const agent = request.headers.get("user-agent")?.toLowerCase();
+  return !agent || BOT_AGENTS.some((b) => agent.includes(b));
+}
+
+/**
+ * A page View Event: a reader's browser navigating to a page of the live site
+ * (as for the old counts, see shouldCount), not a known bot, answered with the
+ * page. A 304 is the browser's cached copy of the page being revalidated,
+ * which is still a View.
+ */
+export function isPageView(request: Request, res: Response): boolean {
+  if (!shouldCount(request) || isBot(request)) return false;
+  if (res.status === 304) return true;
+  return res.status === 200 && (res.headers.get("content-type")?.startsWith("text/html") ?? false);
+}
+
+/** "/out/github/" → "github", a Click out; anything else → null. Whether the name is real is up to the list. */
+export function outPath(pathname: string): string | null {
+  return /^\/out\/([a-z0-9][a-z0-9-]*)\/?$/.exec(pathname)?.[1] ?? null;
+}
+
+/** A Click out's destination from the build's list, or null for a name not on it or not a web or mail address. */
+export function outTarget(links: unknown, name: string): string | null {
+  if (!links || typeof links !== "object" || !Object.hasOwn(links, name)) return null;
+  const url = (links as Record<string, unknown>)[name];
+  return typeof url === "string" && /^(https?:\/\/|mailto:)/.test(url) ? url : null;
+}
+
+/** The same-site page a request came from, e.g. "/writing/the-graveyard/", or null. */
+export function fromPage(request: Request): string | null {
+  const referer = request.headers.get("referer");
+  if (!referer) return null;
+  try {
+    const from = new URL(referer);
+    return from.origin === new URL(request.url).origin ? from.pathname : null;
+  } catch {
+    return null;
+  }
+}
