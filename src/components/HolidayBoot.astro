@@ -1,0 +1,22 @@
+---
+import { isHolidaySeason, HOLIDAY_KEY } from "../lib/holiday";
+// Both emitted as their own content-hashed files, so they cache across pages
+// and deploys, and only load in season.
+import style from "../styles/holiday-decorations.css?url";
+import decorations from "../scripts/holiday.js?url";
+
+// Runs in the head, before the first paint, so the page never flashes yellow
+// before turning green. In season it sets data-season, data-holiday="on" unless
+// this visitor turned it off, and loads the decorations: their sheet first, then
+// the script that builds the lights, snow and switch, so nothing shows unstyled.
+// Out of season it does nothing and loads nothing.
+// Kept compact: it ships inline on every page, all year.
+const season = isHolidaySeason.toString().replace(/\s+/g, " ");
+const boot =
+  `(function(){if(!(${season})(new Date))return;var r=document.documentElement,h=document.head,l;` +
+  `r.dataset.season="holiday";try{if(localStorage.getItem("${HOLIDAY_KEY}")=="off")l=1}catch(e){}` +
+  `if(!l)r.dataset.holiday="on";l=document.createElement("link");l.rel="stylesheet";l.href="${style}";` +
+  `l.onload=function(){var s=document.createElement("script");s.src="${decorations}";h.appendChild(s)};h.appendChild(l)})()`;
+---
+
+<script is:inline data-holiday-script set:html={boot} />

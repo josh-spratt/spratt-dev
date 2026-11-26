@@ -1,8 +1,10 @@
 ---
 import Head from "../components/Head.astro";
+import HolidayBoot from "../components/HolidayBoot.astro";
 import { site, games, getPosts, outHref } from "../lib/site";
 // Only the site's own pages get its styles: a Game page brings its own.
 import "../styles/global.css";
+import "../styles/holiday.css";
 
 interface Props {
   /** Full document title, e.g. "Writing | Josh Spratt". */
@@ -38,6 +40,7 @@ const hasHero = Astro.slots.has("hero");
       published={published}
       modified={modified}
     />
+    <HolidayBoot />
   </head>
   <body class:list={{ home }}>
     <a class="skip" href="#content">Skip to content</a>

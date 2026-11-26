@@ -70,7 +70,7 @@ test("/writing builds with zero Posts", () => {
 test("Code blocks are highlighted at build time with no client JS", () => {
   const page = buildSite(fixtures("production")).html("writing/newer-post/index.html");
   assert.ok(page.querySelector("pre.astro-code"));
-  assert.equal(page.querySelectorAll("script:not([data-cf-beacon]):not([data-copy-link-script])").length, 0);
+  assert.equal(page.querySelectorAll("script:not([data-cf-beacon]):not([data-copy-link-script]):not([data-holiday-script])").length, 0);
 });
 
 test("Homepage does not link to /writing when there are no Posts", () => {
@@ -97,7 +97,7 @@ test("A Post ends with a Copy link that is a real link to its canonical URL", ()
   assert.equal(link?.getAttribute("href"), "https://jspratt.dev/writing/newer-post/");
   assert.equal(link?.text.trim(), "Copy link");
   assert.equal(link?.querySelector("[aria-live]")?.getAttribute("aria-live"), "polite");
-  // Besides the production analytics beacon, the only script is the inline copy handler.
+  // Besides the production analytics beacon, the only scripts are inline: the copy handler and the Holiday ones.
   assert.deepEqual(
     page.querySelectorAll("script").map((s) => s.getAttribute("src")).filter(Boolean),
     ["https://static.cloudflareinsights.com/beacon.min.js"],
